@@ -41,10 +41,32 @@
         <label class="toggle-row">
           <span>
             <strong>채팅 박스</strong>
-            <small>회색 라운드 배경</small>
+            <small>라운드 배경</small>
           </span>
           <input type="checkbox" id="showChatBoxes">
         </label>
+
+        <label class="toggle-row">
+          <span>
+            <strong>큰 글씨</strong>
+            <small>살짝 굵게</small>
+          </span>
+          <input type="checkbox" id="showLargeText">
+        </label>
+      </section>
+
+      <section class="palette" aria-label="채팅 박스 색상">
+        <div class="palette__header">
+          <strong>박스 색상</strong>
+          <small>채팅 박스 배경</small>
+        </div>
+        <div class="swatches" role="radiogroup" aria-label="채팅 박스 색상">
+          <button type="button" class="swatch" data-chat-box-color="gray" aria-label="회색" style="--swatch: #808080"></button>
+          <button type="button" class="swatch" data-chat-box-color="green" aria-label="초록" style="--swatch: #00c471"></button>
+          <button type="button" class="swatch" data-chat-box-color="blue" aria-label="파랑" style="--swatch: #4b8bff"></button>
+          <button type="button" class="swatch" data-chat-box-color="purple" aria-label="보라" style="--swatch: #8b5cf6"></button>
+          <button type="button" class="swatch" data-chat-box-color="yellow" aria-label="노랑" style="--swatch: #f5bd23"></button>
+        </div>
       </section>
     </main>
 

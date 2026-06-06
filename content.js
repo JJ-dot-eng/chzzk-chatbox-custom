@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.2";
+  const SCRIPT_VERSION = "0.1.3";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -21,14 +21,40 @@
     showNicknames: true,
     showBadges: true,
     showTimestamps: true,
-    showChatBoxes: true
+    showChatBoxes: true,
+    showLargeText: false,
+    chatBoxColor: "gray"
   };
 
   const DATASET_KEYS = {
     showNicknames: "chzzkChatUiToggleNicknames",
     showBadges: "chzzkChatUiToggleBadges",
     showTimestamps: "chzzkChatUiToggleTimestamps",
-    showChatBoxes: "chzzkChatUiToggleChatBoxes"
+    showChatBoxes: "chzzkChatUiToggleChatBoxes",
+    showLargeText: "chzzkChatUiToggleLargeText"
+  };
+
+  const CHAT_BOX_COLORS = {
+    gray: {
+      base: "rgba(128, 128, 128, 0.18)",
+      hover: "rgba(128, 128, 128, 0.24)"
+    },
+    green: {
+      base: "rgba(0, 196, 113, 0.16)",
+      hover: "rgba(0, 196, 113, 0.24)"
+    },
+    blue: {
+      base: "rgba(75, 139, 255, 0.18)",
+      hover: "rgba(75, 139, 255, 0.26)"
+    },
+    purple: {
+      base: "rgba(139, 92, 246, 0.18)",
+      hover: "rgba(139, 92, 246, 0.26)"
+    },
+    yellow: {
+      base: "rgba(245, 189, 35, 0.2)",
+      hover: "rgba(245, 189, 35, 0.28)"
+    }
   };
 
   const CHAT_ROOT_SELECTORS = [
@@ -100,11 +126,17 @@
   }
 
   function normalizeOptions(options) {
+    const chatBoxColor = Object.hasOwn(CHAT_BOX_COLORS, options?.chatBoxColor)
+      ? options.chatBoxColor
+      : DEFAULT_OPTIONS.chatBoxColor;
+
     return {
       showNicknames: options?.showNicknames !== false,
       showBadges: options?.showBadges !== false,
       showTimestamps: options?.showTimestamps !== false,
-      showChatBoxes: options?.showChatBoxes !== false
+      showChatBoxes: options?.showChatBoxes !== false,
+      showLargeText: options?.showLargeText === true,
+      chatBoxColor
     };
   }
 
@@ -155,6 +187,11 @@
     style.id = STYLE_ID;
     style.dataset.chzzkChatUiToggleVersion = SCRIPT_VERSION;
     style.textContent = `
+      html {
+        --chzzk-chat-ui-toggle-box-bg: rgba(128, 128, 128, 0.18);
+        --chzzk-chat-ui-toggle-box-bg-hover: rgba(128, 128, 128, 0.24);
+      }
+
       html:not([data-chzzk-chat-ui-toggle-ready="true"])
         [class*="live_chatting_list_item" i] {
         visibility: hidden !important;
@@ -179,14 +216,37 @@
         margin: 3px 8px !important;
         padding: 4px 8px !important;
         border-radius: 8px !important;
-        background: rgba(128, 128, 128, 0.18) !important;
+        background: var(--chzzk-chat-ui-toggle-box-bg) !important;
         box-sizing: border-box !important;
         overflow-wrap: anywhere !important;
       }
 
       html[data-chzzk-chat-ui-toggle-chat-boxes="on"]
         [class*="live_chatting_list_item" i]:has([class*="live_chatting_message_container" i]):hover {
-        background: rgba(128, 128, 128, 0.24) !important;
+        background: var(--chzzk-chat-ui-toggle-box-bg-hover) !important;
+      }
+
+      html[data-chzzk-chat-ui-toggle-large-text="on"]
+        [class*="live_chatting_list_item" i]:has([class*="live_chatting_message_container" i]) {
+        font-size: 17px !important;
+        font-weight: 500 !important;
+        line-height: 1.45 !important;
+      }
+
+      html[data-chzzk-chat-ui-toggle-large-text="on"]
+        [class*="live_chatting_list_item" i]
+        [class*="live_chatting_message_text" i],
+      html[data-chzzk-chat-ui-toggle-large-text="on"]
+        [class*="live_chatting_list_item" i]
+        [class*="live_chatting_username_nickname" i],
+      html[data-chzzk-chat-ui-toggle-large-text="on"]
+        [class*="live_chatting_list_item" i]
+        [class*="name_text" i],
+      html[data-chzzk-chat-ui-toggle-large-text="on"]
+        .chzzk-chat-ui-toggle-timestamp {
+        font-size: inherit !important;
+        font-weight: 500 !important;
+        line-height: inherit !important;
       }
 
       html[data-chzzk-chat-ui-toggle-timestamps="on"]
@@ -297,6 +357,11 @@
     writeCachedOptions(currentOptions);
     document.documentElement.dataset.chzzkChatUiToggleReady = "true";
     document.documentElement.dataset.chzzkChatUiToggleVersion = SCRIPT_VERSION;
+    document.documentElement.dataset.chzzkChatUiToggleChatBoxColor = currentOptions.chatBoxColor;
+
+    const color = CHAT_BOX_COLORS[currentOptions.chatBoxColor];
+    document.documentElement.style.setProperty("--chzzk-chat-ui-toggle-box-bg", color.base);
+    document.documentElement.style.setProperty("--chzzk-chat-ui-toggle-box-bg-hover", color.hover);
 
     for (const [optionKey, datasetKey] of Object.entries(DATASET_KEYS)) {
       document.documentElement.dataset[datasetKey] = currentOptions[optionKey] ? "on" : "off";

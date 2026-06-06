@@ -9,40 +9,66 @@ const LIVE_URL =
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const ROLE_ATTR = "data-chzzk-chat-ui-toggle-role";
 const OUTPUT_DIR = path.join(process.cwd(), "output", "playwright");
+const EXPECTED_CHAT_BOX_COLORS = {
+  gray: "rgba(128, 128, 128, 0.18)",
+  green: "rgba(0, 196, 113, 0.16)",
+  blue: "rgba(75, 139, 255, 0.18)",
+  purple: "rgba(139, 92, 246, 0.18)",
+  yellow: "rgba(245, 189, 35, 0.2)"
+};
 
 const onOptions = {
   showNicknames: true,
   showBadges: true,
   showTimestamps: true,
-  showChatBoxes: true
+  showChatBoxes: true,
+  showLargeText: false,
+  chatBoxColor: "gray"
 };
 
 const offOptions = {
   showNicknames: false,
   showBadges: false,
   showTimestamps: false,
-  showChatBoxes: true
+  showChatBoxes: true,
+  showLargeText: false,
+  chatBoxColor: "gray"
 };
 
 const badgeOffOptions = {
   showNicknames: true,
   showBadges: false,
   showTimestamps: true,
-  showChatBoxes: true
+  showChatBoxes: true,
+  showLargeText: false,
+  chatBoxColor: "gray"
 };
 
 const nicknameOffOptions = {
   showNicknames: false,
   showBadges: true,
   showTimestamps: true,
-  showChatBoxes: true
+  showChatBoxes: true,
+  showLargeText: false,
+  chatBoxColor: "gray"
 };
 
 const chatBoxOffOptions = {
   showNicknames: true,
   showBadges: true,
   showTimestamps: true,
-  showChatBoxes: false
+  showChatBoxes: false,
+  showLargeText: false,
+  chatBoxColor: "gray"
+};
+
+const largeTextColorOptions = {
+  showNicknames: true,
+  showBadges: true,
+  showTimestamps: true,
+  showChatBoxes: true,
+  showLargeText: true,
+  chatBoxColor: "blue"
 };
 
 function summarizeFrameState(frameStates) {
@@ -83,6 +109,18 @@ function summarizeFrameState(frameStates) {
           summary.layout.chatBoxes.textInsetDeltas.push(delta);
         }
 
+        for (const fontSize of chatBoxes.fontSizes || []) {
+          summary.layout.chatBoxes.fontSizes.push(fontSize);
+        }
+
+        for (const fontWeight of chatBoxes.fontWeights || []) {
+          summary.layout.chatBoxes.fontWeights.push(fontWeight);
+        }
+
+        for (const backgroundColor of chatBoxes.backgroundColors || []) {
+          summary.layout.chatBoxes.backgroundColors.push(backgroundColor);
+        }
+
         for (const sample of chatBoxes.samples || []) {
           if (summary.layout.chatBoxes.samples.length < 8) {
             summary.layout.chatBoxes.samples.push(sample);
@@ -119,6 +157,11 @@ function summarizeFrameState(frameStates) {
           widthSpread: null,
           textInsetDeltas: [],
           maxTextInsetDelta: null,
+          fontSizes: [],
+          maxFontSize: null,
+          fontWeights: [],
+          maxFontWeight: null,
+          backgroundColors: [],
           samples: []
         }
       }
@@ -134,6 +177,10 @@ function summarizeFrameState(frameStates) {
 
   const insetDeltas = summary.layout.chatBoxes.textInsetDeltas;
   summary.layout.chatBoxes.maxTextInsetDelta = insetDeltas.length ? Math.max(...insetDeltas) : null;
+  const fontSizes = summary.layout.chatBoxes.fontSizes;
+  summary.layout.chatBoxes.maxFontSize = fontSizes.length ? Math.max(...fontSizes) : null;
+  const fontWeights = summary.layout.chatBoxes.fontWeights;
+  summary.layout.chatBoxes.maxFontWeight = fontWeights.length ? Math.max(...fontWeights) : null;
 
   return summary;
 }
@@ -208,6 +255,8 @@ async function collectFrameStates(page) {
             const paddingLeft = Number.parseFloat(style.paddingLeft) || 0;
             const parentWidth = parentRect?.width || 0;
             const width = Math.round(rect.width);
+            const fontSize = Number.parseFloat(style.fontSize) || 0;
+            const fontWeight = Number.parseInt(style.fontWeight, 10) || 0;
             const messageText = row.querySelector("[class*='live_chatting_message_text' i], [class*='message_text' i]");
             let textLeftInset = null;
             let textRightInset = null;
@@ -232,6 +281,8 @@ async function collectFrameStates(page) {
               borderRadius,
               paddingLeft,
               marginLeft: Number.parseFloat(style.marginLeft) || 0,
+              fontSize,
+              fontWeight,
               backgroundIsVisible,
               isRounded: borderRadius >= 6,
               isPadded: paddingLeft >= 6,
@@ -249,6 +300,13 @@ async function collectFrameStates(page) {
         const textInsetDeltas = chatBoxSamples
           .map((sample) => sample.textInsetDelta)
           .filter((delta) => Number.isFinite(delta));
+        const fontSizes = chatBoxSamples
+          .map((sample) => sample.fontSize)
+          .filter((fontSize) => Number.isFinite(fontSize) && fontSize > 0);
+        const fontWeights = chatBoxSamples
+          .map((sample) => sample.fontWeight)
+          .filter((fontWeight) => Number.isFinite(fontWeight) && fontWeight > 0);
+        const backgroundColors = chatBoxSamples.map((sample) => sample.backgroundColor);
 
         return {
           url: location.href,
@@ -260,7 +318,9 @@ async function collectFrameStates(page) {
             nicknames: document.documentElement.dataset.chzzkChatUiToggleNicknames || null,
             badges: document.documentElement.dataset.chzzkChatUiToggleBadges || null,
             timestamps: document.documentElement.dataset.chzzkChatUiToggleTimestamps || null,
-            chatBoxes: document.documentElement.dataset.chzzkChatUiToggleChatBoxes || null
+            chatBoxes: document.documentElement.dataset.chzzkChatUiToggleChatBoxes || null,
+            largeText: document.documentElement.dataset.chzzkChatUiToggleLargeText || null,
+            chatBoxColor: document.documentElement.dataset.chzzkChatUiToggleChatBoxColor || null
           },
           counts,
           hidden,
@@ -278,6 +338,9 @@ async function collectFrameStates(page) {
               maxWidth: chatBoxWidths.length ? Math.max(...chatBoxWidths) : null,
               widthSpread: chatBoxWidths.length ? Math.max(...chatBoxWidths) - Math.min(...chatBoxWidths) : null,
               textInsetDeltas,
+              fontSizes,
+              fontWeights,
+              backgroundColors,
               samples: chatBoxSamples.slice(0, 4)
             }
           }
@@ -425,6 +488,30 @@ function assertChatBoxesOn(label, summary) {
   }
 }
 
+function assertChatBoxColor(label, summary, colorName) {
+  const expectedColor = EXPECTED_CHAT_BOX_COLORS[colorName];
+
+  if (!expectedColor) {
+    throw new Error(`${label}: unknown expected chat box color ${colorName}`);
+  }
+
+  if (!summary.layout.chatBoxes.backgroundColors.includes(expectedColor)) {
+    throw new Error(`${label}: expected ${expectedColor} chat box background`);
+  }
+}
+
+function assertLargeTextOn(label, summary) {
+  const chatBoxes = summary.layout.chatBoxes;
+
+  if (chatBoxes.maxFontSize === null || chatBoxes.maxFontSize < 16.8) {
+    throw new Error(`${label}: large text font size was not applied`);
+  }
+
+  if (chatBoxes.maxFontWeight === null || chatBoxes.maxFontWeight < 500) {
+    throw new Error(`${label}: large text font weight was not applied`);
+  }
+}
+
 function assertChatBoxesOff(label, summary) {
   const chatBoxes = summary.layout.chatBoxes;
 
@@ -496,6 +583,11 @@ async function setPopupOptions(popup, options) {
   await popup.locator("#showBadges").setChecked(options.showBadges);
   await popup.locator("#showTimestamps").setChecked(options.showTimestamps);
   await popup.locator("#showChatBoxes").setChecked(options.showChatBoxes);
+  await popup.locator("#showLargeText").setChecked(options.showLargeText);
+
+  if (options.chatBoxColor) {
+    await popup.locator(`[data-chat-box-color="${options.chatBoxColor}"]`).click();
+  }
 }
 
 async function main() {
@@ -538,6 +630,7 @@ async function main() {
   assertSummary("initial on state", before.summary);
   assertOnState(before.summary);
   assertChatBoxesOn("initial on state", before.summary);
+  assertChatBoxColor("initial on state", before.summary, "gray");
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-on-before.png"), fullPage: false });
 
   const popup = await context.newPage();
@@ -565,6 +658,15 @@ async function main() {
   assertChatBoxesOn("nickname-only off state", nicknameOff.summary);
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-nickname-off.png"), fullPage: false });
 
+  await setPopupOptions(popup, largeTextColorOptions);
+
+  const largeTextColor = await collectState(page, "large-text color state");
+  assertOnState(largeTextColor.summary);
+  assertChatBoxesOn("large-text color state", largeTextColor.summary);
+  assertLargeTextOn("large-text color state", largeTextColor.summary);
+  assertChatBoxColor("large-text color state", largeTextColor.summary, "blue");
+  await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-large-text-blue.png"), fullPage: false });
+
   await setPopupOptions(popup, chatBoxOffOptions);
 
   const chatBoxOff = await collectState(page, "chat-box off state");
@@ -585,6 +687,7 @@ async function main() {
   const onAfter = await collectState(page, "popup on state");
   assertOnState(onAfter.summary);
   assertChatBoxesOn("popup on state", onAfter.summary);
+  assertChatBoxColor("popup on state", onAfter.summary, "gray");
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-on-after.png"), fullPage: false });
 
   await popup.close();
@@ -600,6 +703,7 @@ async function main() {
           "output/playwright/chzzk-live-on-before.png",
           "output/playwright/chzzk-live-badge-off.png",
           "output/playwright/chzzk-live-nickname-off.png",
+          "output/playwright/chzzk-live-large-text-blue.png",
           "output/playwright/chzzk-live-chat-box-off.png",
           "output/playwright/chzzk-live-off.png",
           "output/playwright/chzzk-live-on-after.png"
@@ -608,6 +712,7 @@ async function main() {
           before: before.summary,
           badgeOff: badgeOff.summary,
           nicknameOff: nicknameOff.summary,
+          largeTextColor: largeTextColor.summary,
           chatBoxOff: chatBoxOff.summary,
           off: off.summary,
           onAfter: onAfter.summary
