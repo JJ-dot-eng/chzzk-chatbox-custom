@@ -19,13 +19,15 @@
   const DEFAULT_OPTIONS = {
     showNicknames: true,
     showBadges: true,
-    showTimestamps: true
+    showTimestamps: true,
+    showChatBoxes: true
   };
 
   const DATASET_KEYS = {
     showNicknames: "chzzkChatUiToggleNicknames",
     showBadges: "chzzkChatUiToggleBadges",
-    showTimestamps: "chzzkChatUiToggleTimestamps"
+    showTimestamps: "chzzkChatUiToggleTimestamps",
+    showChatBoxes: "chzzkChatUiToggleChatBoxes"
   };
 
   const CHAT_ROOT_SELECTORS = [
@@ -100,7 +102,8 @@
     return {
       showNicknames: options?.showNicknames !== false,
       showBadges: options?.showBadges !== false,
-      showTimestamps: options?.showTimestamps !== false
+      showTimestamps: options?.showTimestamps !== false,
+      showChatBoxes: options?.showChatBoxes !== false
     };
   }
 
@@ -159,6 +162,21 @@
         line-height: inherit;
         white-space: nowrap;
         user-select: none;
+      }
+
+      html[data-chzzk-chat-ui-toggle-chat-boxes="on"]
+        [class*="live_chatting_list_item" i]:has([class*="live_chatting_message_container" i]) {
+        width: calc(100% - 16px) !important;
+        margin: 3px 8px !important;
+        padding: 4px 8px !important;
+        border-radius: 8px !important;
+        background: rgba(128, 128, 128, 0.18) !important;
+        box-sizing: border-box !important;
+      }
+
+      html[data-chzzk-chat-ui-toggle-chat-boxes="on"]
+        [class*="live_chatting_list_item" i]:has([class*="live_chatting_message_container" i]):hover {
+        background: rgba(128, 128, 128, 0.24) !important;
       }
 
       html[data-chzzk-chat-ui-toggle-timestamps="on"]

@@ -13,25 +13,36 @@ const OUTPUT_DIR = path.join(process.cwd(), "output", "playwright");
 const onOptions = {
   showNicknames: true,
   showBadges: true,
-  showTimestamps: true
+  showTimestamps: true,
+  showChatBoxes: true
 };
 
 const offOptions = {
   showNicknames: false,
   showBadges: false,
-  showTimestamps: false
+  showTimestamps: false,
+  showChatBoxes: true
 };
 
 const badgeOffOptions = {
   showNicknames: true,
   showBadges: false,
-  showTimestamps: true
+  showTimestamps: true,
+  showChatBoxes: true
 };
 
 const nicknameOffOptions = {
   showNicknames: false,
   showBadges: true,
-  showTimestamps: true
+  showTimestamps: true,
+  showChatBoxes: true
+};
+
+const chatBoxOffOptions = {
+  showNicknames: true,
+  showBadges: true,
+  showTimestamps: true,
+  showChatBoxes: false
 };
 
 function summarizeFrameState(frameStates) {
@@ -45,6 +56,21 @@ function summarizeFrameState(frameStates) {
 
       for (const gap of state.layout?.timestampNicknameGaps || []) {
         summary.layout.timestampNicknameGaps.push(gap);
+      }
+
+      const chatBoxes = state.layout?.chatBoxes;
+
+      if (chatBoxes) {
+        summary.layout.chatBoxes.sampleCount += chatBoxes.sampleCount || 0;
+        summary.layout.chatBoxes.roundedCount += chatBoxes.roundedCount || 0;
+        summary.layout.chatBoxes.backgroundedCount += chatBoxes.backgroundedCount || 0;
+        summary.layout.chatBoxes.paddedCount += chatBoxes.paddedCount || 0;
+
+        for (const sample of chatBoxes.samples || []) {
+          if (summary.layout.chatBoxes.samples.length < 8) {
+            summary.layout.chatBoxes.samples.push(sample);
+          }
+        }
       }
 
       if (state.hasStyle) {
@@ -63,7 +89,16 @@ function summarizeFrameState(frameStates) {
       counts: { nickname: 0, badge: 0, timestamp: 0 },
       hidden: { nickname: 0, badge: 0, timestamp: 0 },
       visible: { nickname: 0, badge: 0, timestamp: 0 },
-      layout: { timestampNicknameGaps: [] }
+      layout: {
+        timestampNicknameGaps: [],
+        chatBoxes: {
+          sampleCount: 0,
+          roundedCount: 0,
+          backgroundedCount: 0,
+          paddedCount: 0,
+          samples: []
+        }
+      }
     }
   );
 
@@ -134,6 +169,30 @@ async function collectFrameStates(page) {
           })
           .filter((gap) => Number.isFinite(gap) && gap >= 0);
 
+        const chatBoxSamples = [...document.querySelectorAll("[class*='live_chatting_list_item' i]")]
+          .filter((row) => row.querySelector("[class*='live_chatting_message_container' i]"))
+          .slice(-40)
+          .map((row) => {
+            const style = getComputedStyle(row);
+            const rect = row.getBoundingClientRect();
+            const backgroundIsVisible =
+              style.backgroundColor !== "rgba(0, 0, 0, 0)" && style.backgroundColor !== "transparent";
+            const borderRadius = Number.parseFloat(style.borderTopLeftRadius) || 0;
+            const paddingLeft = Number.parseFloat(style.paddingLeft) || 0;
+
+            return {
+              width: Math.round(rect.width),
+              height: Math.round(rect.height),
+              backgroundColor: style.backgroundColor,
+              borderRadius,
+              paddingLeft,
+              marginLeft: Number.parseFloat(style.marginLeft) || 0,
+              backgroundIsVisible,
+              isRounded: borderRadius >= 6,
+              isPadded: paddingLeft >= 6
+            };
+          });
+
         return {
           url: location.href,
           title: document.title,
@@ -143,14 +202,22 @@ async function collectFrameStates(page) {
           rootDataset: {
             nicknames: document.documentElement.dataset.chzzkChatUiToggleNicknames || null,
             badges: document.documentElement.dataset.chzzkChatUiToggleBadges || null,
-            timestamps: document.documentElement.dataset.chzzkChatUiToggleTimestamps || null
+            timestamps: document.documentElement.dataset.chzzkChatUiToggleTimestamps || null,
+            chatBoxes: document.documentElement.dataset.chzzkChatUiToggleChatBoxes || null
           },
           counts,
           hidden,
           visible,
           samples,
           layout: {
-            timestampNicknameGaps
+            timestampNicknameGaps,
+            chatBoxes: {
+              sampleCount: chatBoxSamples.length,
+              roundedCount: chatBoxSamples.filter((sample) => sample.isRounded).length,
+              backgroundedCount: chatBoxSamples.filter((sample) => sample.backgroundIsVisible).length,
+              paddedCount: chatBoxSamples.filter((sample) => sample.isPadded).length,
+              samples: chatBoxSamples.slice(0, 4)
+            }
           }
         };
       }, ROLE_ATTR);
@@ -268,6 +335,40 @@ function assertOnState(summary) {
   }
 }
 
+function assertChatBoxesOn(label, summary) {
+  const chatBoxes = summary.layout.chatBoxes;
+
+  if (chatBoxes.sampleCount <= 0) {
+    throw new Error(`${label}: no chat row box samples`);
+  }
+
+  if (chatBoxes.backgroundedCount <= 0) {
+    throw new Error(`${label}: no visible chat row backgrounds`);
+  }
+
+  if (chatBoxes.roundedCount <= 0) {
+    throw new Error(`${label}: no rounded chat row boxes`);
+  }
+
+  if (chatBoxes.paddedCount <= 0) {
+    throw new Error(`${label}: no padded chat row boxes`);
+  }
+}
+
+function assertChatBoxesOff(label, summary) {
+  const chatBoxes = summary.layout.chatBoxes;
+
+  if (chatBoxes.sampleCount <= 0) {
+    throw new Error(`${label}: no chat row box samples`);
+  }
+
+  if (chatBoxes.backgroundedCount > 0 || chatBoxes.roundedCount > 0) {
+    throw new Error(
+      `${label}: chat boxes still styled; backgrounded ${chatBoxes.backgroundedCount}, rounded ${chatBoxes.roundedCount}`
+    );
+  }
+}
+
 function assertRoleHidden(label, summary, role) {
   if (summary.hidden[role] !== summary.counts[role]) {
     throw new Error(`${label}: ${role} hidden ${summary.hidden[role]} of ${summary.counts[role]}`);
@@ -310,6 +411,7 @@ async function setPopupOptions(popup, options) {
   await popup.locator("#showNicknames").setChecked(options.showNicknames);
   await popup.locator("#showBadges").setChecked(options.showBadges);
   await popup.locator("#showTimestamps").setChecked(options.showTimestamps);
+  await popup.locator("#showChatBoxes").setChecked(options.showChatBoxes);
 }
 
 async function main() {
@@ -351,6 +453,7 @@ async function main() {
   const before = await waitForRoleCoverage(page);
   assertSummary("initial on state", before.summary);
   assertOnState(before.summary);
+  assertChatBoxesOn("initial on state", before.summary);
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-on-before.png"), fullPage: false });
 
   const popup = await context.newPage();
@@ -365,6 +468,7 @@ async function main() {
   assertRoleVisible("badge-only off state", badgeOff.summary, "nickname");
   assertRoleHidden("badge-only off state", badgeOff.summary, "badge");
   assertRoleVisible("badge-only off state", badgeOff.summary, "timestamp");
+  assertChatBoxesOn("badge-only off state", badgeOff.summary);
   assertBadgeGapCollapsed("badge-only off state", badgeOff.summary);
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-badge-off.png"), fullPage: false });
 
@@ -374,18 +478,28 @@ async function main() {
   assertRoleHidden("nickname-only off state", nicknameOff.summary, "nickname");
   assertRoleVisible("nickname-only off state", nicknameOff.summary, "badge");
   assertRoleVisible("nickname-only off state", nicknameOff.summary, "timestamp");
+  assertChatBoxesOn("nickname-only off state", nicknameOff.summary);
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-nickname-off.png"), fullPage: false });
+
+  await setPopupOptions(popup, chatBoxOffOptions);
+
+  const chatBoxOff = await collectState(page, "chat-box off state");
+  assertOnState(chatBoxOff.summary);
+  assertChatBoxesOff("chat-box off state", chatBoxOff.summary);
+  await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-chat-box-off.png"), fullPage: false });
 
   await setPopupOptions(popup, offOptions);
 
   const off = await collectState(page, "popup off state");
   assertOffState(off.summary);
+  assertChatBoxesOn("popup off state", off.summary);
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-off.png"), fullPage: false });
 
   await setPopupOptions(popup, onOptions);
 
   const onAfter = await collectState(page, "popup on state");
   assertOnState(onAfter.summary);
+  assertChatBoxesOn("popup on state", onAfter.summary);
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-on-after.png"), fullPage: false });
 
   await popup.close();
@@ -401,6 +515,7 @@ async function main() {
           "output/playwright/chzzk-live-on-before.png",
           "output/playwright/chzzk-live-badge-off.png",
           "output/playwright/chzzk-live-nickname-off.png",
+          "output/playwright/chzzk-live-chat-box-off.png",
           "output/playwright/chzzk-live-off.png",
           "output/playwright/chzzk-live-on-after.png"
         ],
@@ -408,6 +523,7 @@ async function main() {
           before: before.summary,
           badgeOff: badgeOff.summary,
           nicknameOff: nicknameOff.summary,
+          chatBoxOff: chatBoxOff.summary,
           off: off.summary,
           onAfter: onAfter.summary
         },

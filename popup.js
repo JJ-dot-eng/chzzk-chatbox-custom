@@ -2,10 +2,11 @@ const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const DEFAULT_OPTIONS = {
   showNicknames: true,
   showBadges: true,
-  showTimestamps: true
+  showTimestamps: true,
+  showChatBoxes: true
 };
 
-const controlIds = ["showNicknames", "showBadges", "showTimestamps"];
+const controlIds = ["showNicknames", "showBadges", "showTimestamps", "showChatBoxes"];
 const controls = Object.fromEntries(controlIds.map((id) => [id, document.getElementById(id)]));
 const statusElement = document.getElementById("status");
 
@@ -13,7 +14,8 @@ function normalizeOptions(options) {
   return {
     showNicknames: options?.showNicknames !== false,
     showBadges: options?.showBadges !== false,
-    showTimestamps: options?.showTimestamps !== false
+    showTimestamps: options?.showTimestamps !== false,
+    showChatBoxes: options?.showChatBoxes !== false
   };
 }
 
@@ -33,7 +35,8 @@ function readControls() {
   return normalizeOptions({
     showNicknames: controls.showNicknames.checked,
     showBadges: controls.showBadges.checked,
-    showTimestamps: controls.showTimestamps.checked
+    showTimestamps: controls.showTimestamps.checked,
+    showChatBoxes: controls.showChatBoxes.checked
   });
 }
 
