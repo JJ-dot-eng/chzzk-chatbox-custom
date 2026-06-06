@@ -11,8 +11,11 @@ const requiredRootFiles = [
   "content.js",
   "popup.html",
   "popup.css",
-  "popup.js"
+  "popup.js",
+  "README.md"
 ];
+
+const iconSizes = ["16", "32", "48", "128"];
 
 for (const file of requiredRootFiles) {
   await access(path.join(root, file));
@@ -20,6 +23,14 @@ for (const file of requiredRootFiles) {
 
 if (manifest.manifest_version !== 3) {
   throw new Error("manifest_version must be 3.");
+}
+
+if (manifest.name !== "치지직 채팅 UI 설정") {
+  throw new Error("manifest name must be 치지직 채팅 UI 설정.");
+}
+
+if (manifest.short_name !== "치지직 채팅 설정") {
+  throw new Error("manifest short_name must be 치지직 채팅 설정.");
 }
 
 if (!manifest.permissions?.includes("storage")) {
@@ -40,6 +51,22 @@ if (!manifest.host_permissions?.includes("https://*.chzzk.naver.com/*")) {
 
 if (manifest.action?.default_popup !== "popup.html") {
   throw new Error("default popup must point to popup.html.");
+}
+
+for (const size of iconSizes) {
+  const manifestIcon = manifest.icons?.[size];
+  const actionIcon = manifest.action?.default_icon?.[size];
+  const expectedPath = `icons/icon-${size}.png`;
+
+  if (manifestIcon !== expectedPath) {
+    throw new Error(`manifest icon ${size} must point to ${expectedPath}.`);
+  }
+
+  if (actionIcon !== expectedPath) {
+    throw new Error(`action icon ${size} must point to ${expectedPath}.`);
+  }
+
+  await access(path.join(root, expectedPath));
 }
 
 if (manifest.background?.service_worker !== "background.js") {

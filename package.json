@@ -1,10 +1,12 @@
 {
   "name": "chzzk-chat-ui-toggle",
-  "version": "0.1.0",
+  "version": "0.1.7",
   "private": true,
   "description": "Chrome/Edge extension for local-only CHZZK chat UI visibility toggles.",
   "scripts": {
     "check": "node tools/validate-extension.mjs && node --check background.js && node --check content.js && node --check popup.js && node --check tools/verify-live-edge.cjs",
+    "icons": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/generate-icons.ps1",
+    "package": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/package-extension.ps1",
     "verify:edge-cdp": "node tools/verify-live-edge.cjs"
   },
   "devDependencies": {
