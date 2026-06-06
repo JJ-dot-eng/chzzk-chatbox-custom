@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.24";
+  const SCRIPT_VERSION = "0.1.25";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -702,6 +702,7 @@
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_area" i],
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_container" i],
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_wrapper" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_header" i],
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="chatting_area" i],
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="chat_area" i] {
         background-color: #ffffff !important;
@@ -725,6 +726,7 @@
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [class*="live_chatting_area" i],
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [class*="live_chatting_container" i],
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [class*="live_chatting_wrapper" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [class*="live_chatting_header" i],
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [class*="chatting_area" i],
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [class*="chat_area" i] {
         background-color: #111315 !important;
@@ -744,6 +746,26 @@
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}] [class*="live_chatting_username" i],
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}] [class*="name_text" i] {
         background-color: transparent !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] ${NATIVE_CHAT_ROW_SELECTOR},
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] ${NATIVE_CHAT_ROW_SELECTOR} *,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_message" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="message_text" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_username" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="name_text" i] {
+        color: #1f2328 !important;
+        text-shadow: none !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] ${NATIVE_CHAT_ROW_SELECTOR},
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] ${NATIVE_CHAT_ROW_SELECTOR} *,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [class*="live_chatting_message" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [class*="message_text" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [class*="live_chatting_username" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [class*="name_text" i] {
+        color: #f1f3f5 !important;
+        text-shadow: none !important;
       }
 
       .chzzk-chat-ui-toggle-guest-chat-toggle {
