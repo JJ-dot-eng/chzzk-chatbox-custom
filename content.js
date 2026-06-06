@@ -12,6 +12,7 @@
   const STYLE_ID = "chzzk-chat-ui-toggle-style";
   const SCAN_DELAY_MS = 120;
   const SCAN_INTERVAL_MS = 2000;
+  const GENERATED_TIMESTAMP_ATTR = "data-chzzk-chat-ui-toggle-generated-timestamp";
 
   const DEFAULT_OPTIONS = {
     showNicknames: true,
@@ -36,9 +37,12 @@
   ];
 
   const CHAT_ROW_SELECTORS = [
+    "[class*='chatting_list_item' i]",
     "[class*='chatting_item' i]",
     "[class*='chat_item' i]",
+    "[class*='live_chatting_list_item' i]",
     "[class*='message_item' i]",
+    "[class*='message_container' i]",
     "[class*='chatting_message' i]",
     "[class*='live_chatting_message' i]",
     "[role='listitem']",
@@ -120,6 +124,18 @@
     const style = document.createElement("style");
     style.id = STYLE_ID;
     style.textContent = `
+      .chzzk-chat-ui-toggle-timestamp {
+        display: inline-flex;
+        flex: 0 0 auto;
+        align-items: center;
+        margin-right: 4px;
+        color: color-mix(in srgb, currentColor 62%, transparent);
+        font-size: 0.9em;
+        line-height: inherit;
+        white-space: nowrap;
+        user-select: none;
+      }
+
       html[data-chzzk-chat-ui-toggle-nicknames="off"] [${ROLE_ATTR}~="nickname"],
       html[data-chzzk-chat-ui-toggle-badges="off"] [${ROLE_ATTR}~="badge"],
       html[data-chzzk-chat-ui-toggle-timestamps="off"] [${ROLE_ATTR}~="timestamp"] {
@@ -192,6 +208,13 @@
     const text = element.textContent?.trim() ?? "";
 
     return /^(?:[01]?\d|2[0-3]):[0-5]\d$/.test(text);
+  }
+
+  function formatTimestamp(date) {
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+
+    return `${hours}:${minutes}`;
   }
 
   function isLikelyBadge(element) {
@@ -277,6 +300,47 @@
     parents.forEach((element) => addRole(element, "timestamp"));
   }
 
+  function hasTimestamp(row) {
+    return Boolean(row.querySelector(`[${ROLE_ATTR}~="timestamp"], [${GENERATED_TIMESTAMP_ATTR}]`));
+  }
+
+  function isChatMessageRow(row) {
+    if (!(row instanceof HTMLElement)) {
+      return false;
+    }
+
+    const className = String(row.getAttribute("class") ?? "");
+
+    if (/fixed|header|input|textarea|notice|banner/i.test(className)) {
+      return false;
+    }
+
+    const nickname = queryAllSafe(row, TARGET_SELECTORS.nickname).find(isLikelyNickname);
+    const messageText = row.querySelector("[class*='message_text' i], [class*='chatting_message_text' i]");
+
+    return Boolean(nickname && messageText);
+  }
+
+  function ensureGeneratedTimestamp(row) {
+    if (!isChatMessageRow(row) || hasTimestamp(row)) {
+      return;
+    }
+
+    const nickname = queryAllSafe(row, TARGET_SELECTORS.nickname).find(isLikelyNickname);
+
+    if (!nickname?.parentElement) {
+      return;
+    }
+
+    const timestamp = document.createElement("span");
+    timestamp.className = "chzzk-chat-ui-toggle-timestamp";
+    timestamp.textContent = formatTimestamp(new Date());
+    timestamp.setAttribute(GENERATED_TIMESTAMP_ATTR, "true");
+    addRole(timestamp, "timestamp");
+
+    nickname.insertAdjacentElement("beforebegin", timestamp);
+  }
+
   function annotateLeadingBadges(row) {
     const mediaCandidates = [...row.querySelectorAll("img, svg")]
       .filter((element) => element instanceof HTMLElement || element instanceof SVGElement)
@@ -296,6 +360,7 @@
       for (const row of getChatRows(root)) {
         annotateSelectorTargets(row, "timestamp");
         annotateTimestampLeaves(row);
+        ensureGeneratedTimestamp(row);
         annotateSelectorTargets(row, "badge");
         annotateLeadingBadges(row);
         annotateSelectorTargets(row, "nickname");

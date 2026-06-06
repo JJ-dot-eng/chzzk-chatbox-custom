@@ -7,6 +7,7 @@ const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 
 const requiredRootFiles = [
   "manifest.json",
+  "background.js",
   "content.js",
   "popup.html",
   "popup.css",
@@ -35,6 +36,10 @@ if (!manifest.host_permissions?.includes("https://*.chzzk.naver.com/*")) {
 
 if (manifest.action?.default_popup !== "popup.html") {
   throw new Error("default popup must point to popup.html.");
+}
+
+if (manifest.background?.service_worker !== "background.js") {
+  throw new Error("background service worker must point to background.js.");
 }
 
 const contentScript = manifest.content_scripts?.[0];

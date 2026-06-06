@@ -7,6 +7,9 @@
     "default_title": "치지직 채팅 표시 토글",
     "default_popup": "popup.html"
   },
+  "background": {
+    "service_worker": "background.js"
+  },
   "permissions": [
     "storage",
     "activeTab"
