@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.1";
+  const SCRIPT_VERSION = "0.1.2";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -262,6 +262,28 @@
         max-width: 0 !important;
         margin: 0 !important;
         padding: 0 !important;
+      }
+
+      html[data-chzzk-chat-ui-toggle-nicknames="off"][data-chzzk-chat-ui-toggle-badges="off"][data-chzzk-chat-ui-toggle-timestamps="off"]
+        [${MESSAGE_PREFIX_ATTR}] {
+        display: none !important;
+        width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      html[data-chzzk-chat-ui-toggle-nicknames="off"][data-chzzk-chat-ui-toggle-badges="off"][data-chzzk-chat-ui-toggle-timestamps="off"]
+        [class*="live_chatting_list_item" i]
+        [class*="live_chatting_message_container" i],
+      html[data-chzzk-chat-ui-toggle-nicknames="off"][data-chzzk-chat-ui-toggle-badges="off"][data-chzzk-chat-ui-toggle-timestamps="off"]
+        [class*="live_chatting_list_item" i]
+        [class*="live_chatting_message_text" i] {
+        column-gap: 0 !important;
+        gap: 0 !important;
+        margin-left: 0 !important;
+        padding-left: 0 !important;
       }
     `;
 

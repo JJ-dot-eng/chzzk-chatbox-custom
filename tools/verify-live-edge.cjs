@@ -79,6 +79,10 @@ function summarizeFrameState(frameStates) {
             ? summary.layout.chatBoxes.maxWidth - summary.layout.chatBoxes.minWidth
             : null;
 
+        for (const delta of chatBoxes.textInsetDeltas || []) {
+          summary.layout.chatBoxes.textInsetDeltas.push(delta);
+        }
+
         for (const sample of chatBoxes.samples || []) {
           if (summary.layout.chatBoxes.samples.length < 8) {
             summary.layout.chatBoxes.samples.push(sample);
@@ -113,6 +117,8 @@ function summarizeFrameState(frameStates) {
           minWidth: null,
           maxWidth: null,
           widthSpread: null,
+          textInsetDeltas: [],
+          maxTextInsetDelta: null,
           samples: []
         }
       }
@@ -125,6 +131,9 @@ function summarizeFrameState(frameStates) {
   summary.layout.timestampNicknameGapMedian = gaps.length
     ? [...gaps].sort((a, b) => a - b)[Math.floor(gaps.length / 2)]
     : null;
+
+  const insetDeltas = summary.layout.chatBoxes.textInsetDeltas;
+  summary.layout.chatBoxes.maxTextInsetDelta = insetDeltas.length ? Math.max(...insetDeltas) : null;
 
   return summary;
 }
@@ -199,6 +208,21 @@ async function collectFrameStates(page) {
             const paddingLeft = Number.parseFloat(style.paddingLeft) || 0;
             const parentWidth = parentRect?.width || 0;
             const width = Math.round(rect.width);
+            const messageText = row.querySelector("[class*='live_chatting_message_text' i], [class*='message_text' i]");
+            let textLeftInset = null;
+            let textRightInset = null;
+
+            if (messageText) {
+              const range = document.createRange();
+              range.selectNodeContents(messageText);
+              const textRect = range.getBoundingClientRect();
+              range.detach();
+
+              if (textRect.width > 0 && textRect.height > 0) {
+                textLeftInset = Math.round(textRect.left - rect.left);
+                textRightInset = Math.round(rect.right - textRect.right);
+              }
+            }
 
             return {
               width,
@@ -212,10 +236,19 @@ async function collectFrameStates(page) {
               isRounded: borderRadius >= 6,
               isPadded: paddingLeft >= 6,
               isShrunken: parentWidth > 0 && width <= Math.round(parentWidth) - 40,
+              textLeftInset,
+              textRightInset,
+              textInsetDelta:
+                textLeftInset !== null && textRightInset !== null
+                  ? Math.abs(textLeftInset - textRightInset)
+                  : null,
               text: String(row.textContent || "").trim().slice(0, 80)
             };
           });
         const chatBoxWidths = chatBoxSamples.map((sample) => sample.width);
+        const textInsetDeltas = chatBoxSamples
+          .map((sample) => sample.textInsetDelta)
+          .filter((delta) => Number.isFinite(delta));
 
         return {
           url: location.href,
@@ -244,6 +277,7 @@ async function collectFrameStates(page) {
               minWidth: chatBoxWidths.length ? Math.min(...chatBoxWidths) : null,
               maxWidth: chatBoxWidths.length ? Math.max(...chatBoxWidths) : null,
               widthSpread: chatBoxWidths.length ? Math.max(...chatBoxWidths) - Math.min(...chatBoxWidths) : null,
+              textInsetDeltas,
               samples: chatBoxSamples.slice(0, 4)
             }
           }
@@ -405,6 +439,20 @@ function assertChatBoxesOff(label, summary) {
   }
 }
 
+function assertAllOffChatBoxPadding(label, summary) {
+  const chatBoxes = summary.layout.chatBoxes;
+
+  if (chatBoxes.textInsetDeltas.length <= 0) {
+    throw new Error(`${label}: no text inset samples`);
+  }
+
+  if (chatBoxes.maxTextInsetDelta > 14) {
+    throw new Error(
+      `${label}: chat box text padding is unbalanced; max inset delta ${chatBoxes.maxTextInsetDelta}px`
+    );
+  }
+}
+
 function assertRoleHidden(label, summary, role) {
   if (summary.hidden[role] !== summary.counts[role]) {
     throw new Error(`${label}: ${role} hidden ${summary.hidden[role]} of ${summary.counts[role]}`);
@@ -529,6 +577,7 @@ async function main() {
   const off = await collectState(page, "popup off state");
   assertOffState(off.summary);
   assertChatBoxesOn("popup off state", off.summary);
+  assertAllOffChatBoxPadding("popup off state", off.summary);
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-off.png"), fullPage: false });
 
   await setPopupOptions(popup, onOptions);

@@ -1,5 +1,5 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
-const CONTENT_VERSION = "0.1.1";
+const CONTENT_VERSION = "0.1.2";
 
 const DEFAULT_OPTIONS = {
   showNicknames: true,
