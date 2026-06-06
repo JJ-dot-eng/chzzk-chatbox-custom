@@ -92,6 +92,10 @@ if (!contentSource.includes('const CHAT_ROW_SCOPE_SELECTOR = `[class*="live_chat
   throw new Error("content script must scope styling to native live chat row elements.");
 }
 
+if (!contentSource.includes('const NATIVE_CHAT_ROW_SELECTOR = `[class*="live_chatting_list_item" i]:has([class*="live_chatting_message_container" i])`;')) {
+  throw new Error("content script must define a native chat-row selector for non-hiding styles.");
+}
+
 const unsafeRoleSelectors = [
   'html[data-chzzk-chat-ui-toggle-nicknames="off"] [${ROLE_ATTR}~="nickname"]',
   'html[data-chzzk-chat-ui-toggle-badges="off"] [${ROLE_ATTR}~="badge"]',
@@ -151,6 +155,21 @@ for (const token of unsafeDetectionTokens) {
 
 if (contentSource.includes('html[data-chzzk-chat-ui-toggle-nicknames="off"] [${CHAT_ROW_ATTR}="true"]')) {
   throw new Error("nickname hiding must use CHAT_ROW_SCOPE_SELECTOR, not bare CHAT_ROW_ATTR.");
+}
+
+const nativeStyleSelectors = [
+  `html[data-chzzk-chat-ui-toggle-bold-text="on"]
+        \${NATIVE_CHAT_ROW_SELECTOR}`,
+  `html[data-chzzk-chat-ui-toggle-large-text="on"]
+        \${NATIVE_CHAT_ROW_SELECTOR}`,
+  `html[data-chzzk-chat-ui-toggle-chat-boxes="on"]
+        \${NATIVE_CHAT_ROW_SELECTOR}`
+];
+
+for (const selector of nativeStyleSelectors) {
+  if (!contentSource.includes(selector)) {
+    throw new Error(`content script must apply style before annotation with ${selector}`);
+  }
 }
 
 console.log("Extension manifest and root files are valid.");
