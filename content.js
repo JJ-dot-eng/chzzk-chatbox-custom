@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.29";
+  const SCRIPT_VERSION = "0.1.30";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -33,7 +33,9 @@
   const GUEST_CHAT_HOST_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-host";
   const GUEST_CHAT_CONTROL_HOST_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-control-host";
   const GUEST_CHAT_THEME_ATTR = "data-chzzk-chat-ui-toggle-guest-theme";
+  const GUEST_CHAT_EMBED_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-embed";
   const LIVE_CHAT_FRAME_ATTR = "data-chzzk-chat-ui-toggle-live-chat-frame";
+  const GUEST_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleGuest";
   const GUEST_CHAT_TOGGLE_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-toggle";
   const GUEST_CHAT_TOGGLE_BUTTON_ICON_CLASS = "chzzk-chat-ui-toggle-guest-chat-toggle__icon";
   const GUEST_CHAT_TOGGLE_BUTTON_SLASH_CLASS = "chzzk-chat-ui-toggle-guest-chat-toggle__slash";
@@ -660,6 +662,12 @@
     if (isLiveChatFrameUrl(window.location.href)) {
       document.documentElement.setAttribute(LIVE_CHAT_FRAME_ATTR, "true");
 
+      if (isGuestChatFrameEmbedUrl(window.location.href)) {
+        document.documentElement.setAttribute(GUEST_CHAT_EMBED_ATTR, "true");
+      } else {
+        document.documentElement.removeAttribute(GUEST_CHAT_EMBED_ATTR);
+      }
+
       if (normalizedTheme) {
         document.documentElement.setAttribute(GUEST_CHAT_THEME_ATTR, normalizedTheme);
         document.documentElement.dataset.chzzkChatUiToggleGuestThemeSource = source;
@@ -672,6 +680,7 @@
     }
 
     document.documentElement.removeAttribute(LIVE_CHAT_FRAME_ATTR);
+    document.documentElement.removeAttribute(GUEST_CHAT_EMBED_ATTR);
     document.documentElement.removeAttribute(GUEST_CHAT_THEME_ATTR);
     delete document.documentElement.dataset.chzzkChatUiToggleGuestThemeSource;
   }
@@ -744,6 +753,13 @@
   function syncGuestChatTheme() {
     if (isLiveChatFrameUrl(window.location.href)) {
       document.documentElement.setAttribute(LIVE_CHAT_FRAME_ATTR, "true");
+
+      if (isGuestChatFrameEmbedUrl(window.location.href)) {
+        document.documentElement.setAttribute(GUEST_CHAT_EMBED_ATTR, "true");
+      } else {
+        document.documentElement.removeAttribute(GUEST_CHAT_EMBED_ATTR);
+      }
+
       readGuestChatThemeFromBackground();
       return;
     }
@@ -798,6 +814,13 @@
         line-height: inherit;
         white-space: nowrap;
         user-select: none;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_EMBED_ATTR}="true"]
+        [class*="live_chatting_header" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_EMBED_ATTR}="true"]
+        [class*="chatting_header" i] {
+        display: none !important;
       }
 
       .chzzk-chat-ui-toggle-guest-chat-toggle {
@@ -1209,6 +1232,16 @@
     }
   }
 
+  function isGuestChatFrameEmbedUrl(url) {
+    try {
+      const parsedUrl = new URL(url);
+
+      return isLiveChatFrameUrl(url) && parsedUrl.searchParams.get(GUEST_CHAT_FRAME_MARKER_PARAM) === "1";
+    } catch (_error) {
+      return false;
+    }
+  }
+
   function getGuestChatFrameTheme() {
     if (window.self === window.top && !isLiveChatFrameUrl(window.location.href)) {
       return detectPageTheme();
@@ -1227,6 +1260,8 @@
 
     const frameUrl = new URL(`${CHZZK_ORIGIN}/live/${channelId}/chat`);
     const theme = getGuestChatFrameTheme();
+
+    frameUrl.searchParams.set(GUEST_CHAT_FRAME_MARKER_PARAM, "1");
 
     if (theme) {
       frameUrl.searchParams.set("theme", theme);
