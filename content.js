@@ -1,5 +1,6 @@
 (() => {
-  const GLOBAL_KEY = "__chzzkChatUiToggleLoaded";
+  const SCRIPT_VERSION = "0.1.1";
+  const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
     return;
@@ -140,12 +141,19 @@
   }
 
   function injectStyle() {
-    if (document.getElementById(STYLE_ID)) {
+    const existingStyle = document.getElementById(STYLE_ID);
+
+    if (existingStyle?.dataset.chzzkChatUiToggleVersion === SCRIPT_VERSION) {
       return;
     }
 
-    const style = document.createElement("style");
+    if (existingStyle && !(existingStyle instanceof HTMLStyleElement)) {
+      existingStyle.remove();
+    }
+
+    const style = existingStyle instanceof HTMLStyleElement ? existingStyle : document.createElement("style");
     style.id = STYLE_ID;
+    style.dataset.chzzkChatUiToggleVersion = SCRIPT_VERSION;
     style.textContent = `
       html:not([data-chzzk-chat-ui-toggle-ready="true"])
         [class*="live_chatting_list_item" i] {
@@ -256,17 +264,30 @@
         padding: 0 !important;
       }
     `;
-    document.documentElement.appendChild(style);
+
+    if (!style.parentElement) {
+      document.documentElement.appendChild(style);
+    }
   }
 
   function applyOptions(options) {
     currentOptions = normalizeOptions(options);
     writeCachedOptions(currentOptions);
     document.documentElement.dataset.chzzkChatUiToggleReady = "true";
+    document.documentElement.dataset.chzzkChatUiToggleVersion = SCRIPT_VERSION;
 
     for (const [optionKey, datasetKey] of Object.entries(DATASET_KEYS)) {
       document.documentElement.dataset[datasetKey] = currentOptions[optionKey] ? "on" : "off";
     }
+  }
+
+  function getStatus() {
+    return {
+      ok: true,
+      version: SCRIPT_VERSION,
+      styleVersion: document.getElementById(STYLE_ID)?.dataset.chzzkChatUiToggleVersion || null,
+      options: currentOptions
+    };
   }
 
   function queryAllSafe(root, selectorList) {
@@ -628,15 +649,29 @@
     }
 
     runtime.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+      if (message?.type === "CHZZK_CHAT_UI_TOGGLE_GET_STATUS") {
+        sendResponse(getStatus());
+        return false;
+      }
+
       if (message?.type === "CHZZK_CHAT_UI_TOGGLE_GET_OPTIONS") {
-        sendResponse({ ok: true, options: currentOptions });
+        sendResponse(getStatus());
+        return false;
+      }
+
+      if (message?.type === "CHZZK_CHAT_UI_TOGGLE_REFRESH") {
+        injectStyle();
+        applyOptions(currentOptions);
+        scan();
+        sendResponse(getStatus());
         return false;
       }
 
       if (message?.type === "CHZZK_CHAT_UI_TOGGLE_SET_OPTIONS") {
+        injectStyle();
         applyOptions(message.options);
         scheduleScan();
-        sendResponse({ ok: true, options: currentOptions });
+        sendResponse(getStatus());
         return false;
       }
 

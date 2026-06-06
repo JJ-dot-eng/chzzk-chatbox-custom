@@ -26,6 +26,10 @@ if (!manifest.permissions?.includes("storage")) {
   throw new Error("storage permission is required.");
 }
 
+if (!manifest.permissions?.includes("scripting")) {
+  throw new Error("scripting permission is required for stale content-script refresh.");
+}
+
 if (!manifest.host_permissions?.includes("https://chzzk.naver.com/*")) {
   throw new Error("CHZZK host permission is missing.");
 }

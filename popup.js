@@ -1,4 +1,6 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
+const CONTENT_VERSION = "0.1.1";
+
 const DEFAULT_OPTIONS = {
   showNicknames: true,
   showBadges: true,
@@ -62,19 +64,81 @@ function queryActiveTab() {
   });
 }
 
-function sendOptionsToTab(tabId, options) {
+function sendMessageToTab(tabId, message) {
   return new Promise((resolve) => {
-    chrome.tabs.sendMessage(
-      tabId,
+    chrome.tabs.sendMessage(tabId, message, (response) => {
+      if (chrome.runtime.lastError) {
+        resolve(null);
+        return;
+      }
+
+      resolve(response ?? null);
+    });
+  });
+}
+
+function executeContentScript(tabId) {
+  return new Promise((resolve) => {
+    if (!chrome.scripting?.executeScript) {
+      resolve(false);
+      return;
+    }
+
+    chrome.scripting.executeScript(
       {
-        type: "CHZZK_CHAT_UI_TOGGLE_SET_OPTIONS",
-        options: normalizeOptions(options)
+        target: { tabId, allFrames: true },
+        files: ["content.js"]
       },
       () => {
         resolve(!chrome.runtime.lastError);
       }
     );
   });
+}
+
+function getContentStatus(tabId) {
+  return sendMessageToTab(tabId, {
+    type: "CHZZK_CHAT_UI_TOGGLE_GET_STATUS"
+  });
+}
+
+function refreshContent(tabId) {
+  return sendMessageToTab(tabId, {
+    type: "CHZZK_CHAT_UI_TOGGLE_REFRESH"
+  });
+}
+
+function sendOptionsToTab(tabId, options) {
+  return sendMessageToTab(tabId, {
+    type: "CHZZK_CHAT_UI_TOGGLE_SET_OPTIONS",
+    options: normalizeOptions(options)
+  });
+}
+
+function isCurrentContentStatus(status) {
+  return status?.version === CONTENT_VERSION && status?.styleVersion === CONTENT_VERSION;
+}
+
+async function ensureCurrentContentScript(tabId) {
+  let status = await getContentStatus(tabId);
+
+  if (isCurrentContentStatus(status)) {
+    return true;
+  }
+
+  if (status?.version === CONTENT_VERSION) {
+    status = await refreshContent(tabId);
+    return isCurrentContentStatus(status);
+  }
+
+  const injected = await executeContentScript(tabId);
+
+  if (!injected) {
+    return false;
+  }
+
+  status = await getContentStatus(tabId);
+  return isCurrentContentStatus(status);
 }
 
 async function applyToActiveTab(options) {
@@ -85,8 +149,9 @@ async function applyToActiveTab(options) {
     return;
   }
 
+  const ready = await ensureCurrentContentScript(tab.id);
   const applied = await sendOptionsToTab(tab.id, options);
-  setStatus(applied ? "적용됨" : "새로고침 필요");
+  setStatus(ready && applied?.ok ? "적용됨" : "새로고침 필요");
 }
 
 async function handleControlChange() {
