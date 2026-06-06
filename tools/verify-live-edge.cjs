@@ -65,6 +65,19 @@ function summarizeFrameState(frameStates) {
         summary.layout.chatBoxes.roundedCount += chatBoxes.roundedCount || 0;
         summary.layout.chatBoxes.backgroundedCount += chatBoxes.backgroundedCount || 0;
         summary.layout.chatBoxes.paddedCount += chatBoxes.paddedCount || 0;
+        summary.layout.chatBoxes.shrunkenCount += chatBoxes.shrunkenCount || 0;
+        summary.layout.chatBoxes.minWidth =
+          summary.layout.chatBoxes.minWidth === null
+            ? chatBoxes.minWidth
+            : Math.min(summary.layout.chatBoxes.minWidth, chatBoxes.minWidth || summary.layout.chatBoxes.minWidth);
+        summary.layout.chatBoxes.maxWidth =
+          summary.layout.chatBoxes.maxWidth === null
+            ? chatBoxes.maxWidth
+            : Math.max(summary.layout.chatBoxes.maxWidth, chatBoxes.maxWidth || summary.layout.chatBoxes.maxWidth);
+        summary.layout.chatBoxes.widthSpread =
+          summary.layout.chatBoxes.minWidth !== null && summary.layout.chatBoxes.maxWidth !== null
+            ? summary.layout.chatBoxes.maxWidth - summary.layout.chatBoxes.minWidth
+            : null;
 
         for (const sample of chatBoxes.samples || []) {
           if (summary.layout.chatBoxes.samples.length < 8) {
@@ -96,6 +109,10 @@ function summarizeFrameState(frameStates) {
           roundedCount: 0,
           backgroundedCount: 0,
           paddedCount: 0,
+          shrunkenCount: 0,
+          minWidth: null,
+          maxWidth: null,
+          widthSpread: null,
           samples: []
         }
       }
@@ -175,23 +192,30 @@ async function collectFrameStates(page) {
           .map((row) => {
             const style = getComputedStyle(row);
             const rect = row.getBoundingClientRect();
+            const parentRect = row.parentElement?.getBoundingClientRect();
             const backgroundIsVisible =
               style.backgroundColor !== "rgba(0, 0, 0, 0)" && style.backgroundColor !== "transparent";
             const borderRadius = Number.parseFloat(style.borderTopLeftRadius) || 0;
             const paddingLeft = Number.parseFloat(style.paddingLeft) || 0;
+            const parentWidth = parentRect?.width || 0;
+            const width = Math.round(rect.width);
 
             return {
-              width: Math.round(rect.width),
+              width,
               height: Math.round(rect.height),
+              parentWidth: Math.round(parentWidth),
               backgroundColor: style.backgroundColor,
               borderRadius,
               paddingLeft,
               marginLeft: Number.parseFloat(style.marginLeft) || 0,
               backgroundIsVisible,
               isRounded: borderRadius >= 6,
-              isPadded: paddingLeft >= 6
+              isPadded: paddingLeft >= 6,
+              isShrunken: parentWidth > 0 && width <= Math.round(parentWidth) - 40,
+              text: String(row.textContent || "").trim().slice(0, 80)
             };
           });
+        const chatBoxWidths = chatBoxSamples.map((sample) => sample.width);
 
         return {
           url: location.href,
@@ -216,6 +240,10 @@ async function collectFrameStates(page) {
               roundedCount: chatBoxSamples.filter((sample) => sample.isRounded).length,
               backgroundedCount: chatBoxSamples.filter((sample) => sample.backgroundIsVisible).length,
               paddedCount: chatBoxSamples.filter((sample) => sample.isPadded).length,
+              shrunkenCount: chatBoxSamples.filter((sample) => sample.isShrunken).length,
+              minWidth: chatBoxWidths.length ? Math.min(...chatBoxWidths) : null,
+              maxWidth: chatBoxWidths.length ? Math.max(...chatBoxWidths) : null,
+              widthSpread: chatBoxWidths.length ? Math.max(...chatBoxWidths) - Math.min(...chatBoxWidths) : null,
               samples: chatBoxSamples.slice(0, 4)
             }
           }
@@ -352,6 +380,14 @@ function assertChatBoxesOn(label, summary) {
 
   if (chatBoxes.paddedCount <= 0) {
     throw new Error(`${label}: no padded chat row boxes`);
+  }
+
+  if (chatBoxes.shrunkenCount <= 0) {
+    throw new Error(`${label}: no content-width chat row boxes`);
+  }
+
+  if (chatBoxes.widthSpread === null || chatBoxes.widthSpread < 32) {
+    throw new Error(`${label}: chat row boxes are not varying by content length`);
   }
 }
 

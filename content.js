@@ -166,12 +166,14 @@
 
       html[data-chzzk-chat-ui-toggle-chat-boxes="on"]
         [class*="live_chatting_list_item" i]:has([class*="live_chatting_message_container" i]) {
-        width: calc(100% - 16px) !important;
+        width: fit-content !important;
+        max-width: calc(100% - 16px) !important;
         margin: 3px 8px !important;
         padding: 4px 8px !important;
         border-radius: 8px !important;
         background: rgba(128, 128, 128, 0.18) !important;
         box-sizing: border-box !important;
+        overflow-wrap: anywhere !important;
       }
 
       html[data-chzzk-chat-ui-toggle-chat-boxes="on"]
