@@ -1,0 +1,10 @@
+{
+  "name": "chzzk-chat-ui-toggle",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chrome/Edge extension for local-only CHZZK chat UI visibility toggles.",
+  "scripts": {
+    "check": "node tools/validate-extension.mjs && node --check content.js && node --check popup.js"
+  },
+  "devDependencies": {}
+}

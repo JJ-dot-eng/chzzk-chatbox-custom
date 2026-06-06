@@ -1,0 +1,128 @@
+:root {
+  color-scheme: light;
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --text: #101418;
+  --muted: #66707c;
+  --line: #dfe4ea;
+  --accent: #00c471;
+  --accent-strong: #009f5b;
+  --shadow: 0 10px 26px rgba(10, 18, 28, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 280px;
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.popup {
+  padding: 14px;
+}
+
+.popup__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.status {
+  max-width: 120px;
+  margin: 1px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.toggles {
+  display: grid;
+  gap: 8px;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 54px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+
+.toggle-row span {
+  display: grid;
+  gap: 2px;
+}
+
+.toggle-row strong {
+  font-size: 13px;
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+.toggle-row small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.toggle-row input {
+  appearance: none;
+  position: relative;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 24px;
+  margin: 0;
+  border: 1px solid #c8d0d8;
+  border-radius: 999px;
+  background: #d9dee4;
+  outline: none;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+
+.toggle-row input::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(10, 18, 28, 0.24);
+  transition: transform 140ms ease;
+}
+
+.toggle-row input:checked {
+  border-color: var(--accent-strong);
+  background: var(--accent);
+}
+
+.toggle-row input:checked::after {
+  transform: translateX(18px);
+}
+
+.toggle-row input:focus-visible {
+  box-shadow: 0 0 0 3px rgba(0, 196, 113, 0.22);
+}

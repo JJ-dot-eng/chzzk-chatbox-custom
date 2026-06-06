@@ -1,0 +1,36 @@
+import { access, readFile } from "node:fs/promises";
+import path from "node:path";
+
+const root = process.cwd();
+const manifestPath = path.join(root, "manifest.json");
+const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+
+const requiredRootFiles = [
+  "manifest.json",
+  "content.js",
+  "popup.html",
+  "popup.css",
+  "popup.js"
+];
+
+for (const file of requiredRootFiles) {
+  await access(path.join(root, file));
+}
+
+if (manifest.manifest_version !== 3) {
+  throw new Error("manifest_version must be 3.");
+}
+
+if (!manifest.permissions?.includes("storage")) {
+  throw new Error("storage permission is required.");
+}
+
+if (!manifest.host_permissions?.includes("https://chzzk.naver.com/*")) {
+  throw new Error("CHZZK host permission is missing.");
+}
+
+if (manifest.action?.default_popup !== "popup.html") {
+  throw new Error("default popup must point to popup.html.");
+}
+
+console.log("Extension manifest and root files are valid.");

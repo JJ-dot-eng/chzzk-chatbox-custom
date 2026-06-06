@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>치지직 채팅 표시 토글</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="popup">
+      <header class="popup__header">
+        <h1>채팅 표시</h1>
+        <p id="status" class="status" aria-live="polite">대기 중</p>
+      </header>
+
+      <section class="toggles" aria-label="채팅 표시 옵션">
+        <label class="toggle-row">
+          <span>
+            <strong>닉네임</strong>
+            <small>작성자 이름</small>
+          </span>
+          <input type="checkbox" id="showNicknames">
+        </label>
+
+        <label class="toggle-row">
+          <span>
+            <strong>배지</strong>
+            <small>닉네임 앞 아이콘</small>
+          </span>
+          <input type="checkbox" id="showBadges">
+        </label>
+
+        <label class="toggle-row">
+          <span>
+            <strong>타임스탬프</strong>
+            <small>hh:mm</small>
+          </span>
+          <input type="checkbox" id="showTimestamps">
+        </label>
+      </section>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

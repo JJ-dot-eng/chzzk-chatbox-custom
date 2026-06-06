@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "CHZZK Chat UI Toggle",
+  "version": "0.1.0",
+  "description": "치지직 채팅창에서 닉네임, 배지, hh:mm 타임스탬프 표시를 내 브라우저에서만 토글합니다.",
+  "action": {
+    "default_title": "치지직 채팅 표시 토글",
+    "default_popup": "popup.html"
+  },
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://chzzk.naver.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chzzk.naver.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
