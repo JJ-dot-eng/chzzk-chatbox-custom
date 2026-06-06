@@ -3,76 +3,76 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>치지직 채팅 표시 토글</title>
+    <title>치지직 채팅 설정</title>
     <link rel="stylesheet" href="popup.css">
   </head>
   <body>
     <main class="popup">
       <header class="popup__header">
-        <h1>채팅 표시</h1>
+        <h1>채팅 설정</h1>
         <p id="status" class="status" aria-live="polite">대기 중</p>
       </header>
 
-      <section class="toggles" aria-label="채팅 표시 옵션">
-        <label class="toggle-row">
-          <span>
-            <strong>닉네임</strong>
-            <small>작성자 이름</small>
-          </span>
-          <input type="checkbox" id="showNicknames">
-        </label>
+      <nav class="tabs" role="tablist" aria-label="설정 분류">
+        <button type="button" id="textTab" class="tab is-active" role="tab" aria-selected="true" aria-controls="textPanel" data-tab-target="textPanel">텍스트</button>
+        <button type="button" id="styleTab" class="tab" role="tab" aria-selected="false" aria-controls="stylePanel" data-tab-target="stylePanel">꾸미기</button>
+      </nav>
 
-        <label class="toggle-row">
-          <span>
-            <strong>배지</strong>
-            <small>닉네임 앞 아이콘</small>
-          </span>
-          <input type="checkbox" id="showBadges">
-        </label>
+      <section id="textPanel" class="tab-panel is-active" role="tabpanel" aria-labelledby="textTab">
+        <div class="toggles" aria-label="텍스트 옵션">
+          <label class="toggle-row">
+            <span><strong>닉네임</strong></span>
+            <input type="checkbox" id="showNicknames">
+          </label>
 
-        <label class="toggle-row">
-          <span>
-            <strong>타임스탬프</strong>
-            <small>hh:mm</small>
-          </span>
-          <input type="checkbox" id="showTimestamps">
-        </label>
+          <label class="toggle-row">
+            <span><strong>배지</strong></span>
+            <input type="checkbox" id="showBadges">
+          </label>
 
-        <label class="toggle-row">
-          <span>
-            <strong>채팅 박스</strong>
-            <small>라운드 배경</small>
-          </span>
-          <input type="checkbox" id="showChatBoxes">
-        </label>
-
-        <label class="toggle-row">
-          <span>
-            <strong>큰 글씨</strong>
-            <small>살짝 굵게</small>
-          </span>
-          <input type="checkbox" id="showLargeText">
-        </label>
+          <label class="toggle-row">
+            <span><strong>타임스탬프</strong></span>
+            <input type="checkbox" id="showTimestamps">
+          </label>
+        </div>
       </section>
 
-      <section class="color-picker" aria-label="채팅 박스 색상">
-        <div class="color-picker__header">
-          <strong>박스 색상</strong>
-          <small>채팅 박스 배경</small>
+      <section id="stylePanel" class="tab-panel" role="tabpanel" aria-labelledby="styleTab" hidden>
+        <div class="toggles" aria-label="꾸미기 옵션">
+          <label class="toggle-row">
+            <span><strong>채팅 박스</strong></span>
+            <input type="checkbox" id="showChatBoxes">
+          </label>
+
+          <label class="toggle-row">
+            <span><strong>큰 글씨</strong></span>
+            <input type="checkbox" id="showLargeText">
+          </label>
+
+          <label class="toggle-row">
+            <span><strong>굵게</strong></span>
+            <input type="checkbox" id="showBoldText">
+          </label>
         </div>
 
-        <div class="color-picker__controls">
-          <span id="colorPreview" class="color-preview" aria-hidden="true"></span>
-          <input type="text" id="chatBoxColorHex" class="hex-input" inputmode="text" maxlength="7" spellcheck="false" aria-label="색상 코드">
-          <button type="button" id="resetChatBoxColor" class="default-button">기본</button>
-        </div>
+        <section class="color-picker" aria-label="채팅 박스 색상">
+          <div class="color-picker__header">
+            <strong>박스 색상</strong>
+          </div>
 
-        <div class="color-picker__body">
-          <button type="button" id="colorField" class="color-field" aria-label="색상 영역">
-            <span id="colorFieldHandle" class="color-field__handle"></span>
-          </button>
-          <input type="range" id="hueSlider" class="hue-slider" min="0" max="360" value="0" aria-label="색상 범위">
-        </div>
+          <div class="color-picker__controls">
+            <span id="colorPreview" class="color-preview" aria-hidden="true"></span>
+            <input type="text" id="chatBoxColorHex" class="hex-input" inputmode="text" maxlength="7" spellcheck="false" aria-label="색상 코드">
+            <button type="button" id="resetChatBoxColor" class="default-button">기본</button>
+          </div>
+
+          <div class="color-picker__body">
+            <button type="button" id="colorField" class="color-field" aria-label="색상 영역">
+              <span id="colorFieldHandle" class="color-field__handle"></span>
+            </button>
+            <input type="range" id="hueSlider" class="hue-slider" min="0" max="360" value="0" aria-label="색상 범위">
+          </div>
+        </section>
       </section>
     </main>
 

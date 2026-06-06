@@ -1,5 +1,5 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
-const CONTENT_VERSION = "0.1.4";
+const CONTENT_VERSION = "0.1.5";
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const NAMED_CHAT_BOX_COLORS = {
   gray: "#808080",
@@ -15,11 +15,14 @@ const DEFAULT_OPTIONS = {
   showTimestamps: true,
   showChatBoxes: true,
   showLargeText: false,
+  showBoldText: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
 
-const controlIds = ["showNicknames", "showBadges", "showTimestamps", "showChatBoxes", "showLargeText"];
+const controlIds = ["showNicknames", "showBadges", "showTimestamps", "showChatBoxes", "showLargeText", "showBoldText"];
 const controls = Object.fromEntries(controlIds.map((id) => [id, document.getElementById(id)]));
+const tabButtons = [...document.querySelectorAll("[data-tab-target]")];
+const tabPanels = [...document.querySelectorAll(".tab-panel")];
 const colorPreview = document.getElementById("colorPreview");
 const hexInput = document.getElementById("chatBoxColorHex");
 const resetColorButton = document.getElementById("resetChatBoxColor");
@@ -148,14 +151,31 @@ function hueToHex(hue) {
 }
 
 function normalizeOptions(options) {
+  const legacyBoldText = options?.showBoldText === undefined && options?.showLargeText === true;
+
   return {
     showNicknames: options?.showNicknames !== false,
     showBadges: options?.showBadges !== false,
     showTimestamps: options?.showTimestamps !== false,
     showChatBoxes: options?.showChatBoxes !== false,
     showLargeText: options?.showLargeText === true,
+    showBoldText: options?.showBoldText === true || legacyBoldText,
     chatBoxColor: normalizeHexColor(options?.chatBoxColor)
   };
+}
+
+function selectTab(targetId) {
+  for (const button of tabButtons) {
+    const isSelected = button.dataset.tabTarget === targetId;
+    button.classList.toggle("is-active", isSelected);
+    button.setAttribute("aria-selected", String(isSelected));
+  }
+
+  for (const panel of tabPanels) {
+    const isSelected = panel.id === targetId;
+    panel.classList.toggle("is-active", isSelected);
+    panel.hidden = !isSelected;
+  }
 }
 
 function setStatus(message) {
@@ -196,6 +216,7 @@ function readControls() {
     showTimestamps: controls.showTimestamps.checked,
     showChatBoxes: controls.showChatBoxes.checked,
     showLargeText: controls.showLargeText.checked,
+    showBoldText: controls.showBoldText.checked,
     chatBoxColor: currentColor
   });
 }
@@ -458,6 +479,12 @@ async function init() {
 
   for (const id of controlIds) {
     controls[id].addEventListener("change", handleControlChange);
+  }
+
+  for (const button of tabButtons) {
+    button.addEventListener("click", () => {
+      selectTab(button.dataset.tabTarget);
+    });
   }
 
   colorField.addEventListener("pointerdown", handleColorFieldPointerDown);

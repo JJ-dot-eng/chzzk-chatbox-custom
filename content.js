@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.4";
+  const SCRIPT_VERSION = "0.1.5";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -23,6 +23,7 @@
     showTimestamps: true,
     showChatBoxes: true,
     showLargeText: false,
+    showBoldText: false,
     chatBoxColor: "#808080"
   };
 
@@ -31,7 +32,8 @@
     showBadges: "chzzkChatUiToggleBadges",
     showTimestamps: "chzzkChatUiToggleTimestamps",
     showChatBoxes: "chzzkChatUiToggleChatBoxes",
-    showLargeText: "chzzkChatUiToggleLargeText"
+    showLargeText: "chzzkChatUiToggleLargeText",
+    showBoldText: "chzzkChatUiToggleBoldText"
   };
 
   const NAMED_CHAT_BOX_COLORS = {
@@ -147,12 +149,15 @@
   }
 
   function normalizeOptions(options) {
+    const legacyBoldText = options?.showBoldText === undefined && options?.showLargeText === true;
+
     return {
       showNicknames: options?.showNicknames !== false,
       showBadges: options?.showBadges !== false,
       showTimestamps: options?.showTimestamps !== false,
       showChatBoxes: options?.showChatBoxes !== false,
       showLargeText: options?.showLargeText === true,
+      showBoldText: options?.showBoldText === true || legacyBoldText,
       chatBoxColor: normalizeHexColor(options?.chatBoxColor)
     };
   }
@@ -246,7 +251,6 @@
       html[data-chzzk-chat-ui-toggle-large-text="on"]
         [class*="live_chatting_list_item" i]:has([class*="live_chatting_message_container" i]) {
         font-size: 17px !important;
-        font-weight: 500 !important;
         line-height: 1.45 !important;
       }
 
@@ -262,8 +266,26 @@
       html[data-chzzk-chat-ui-toggle-large-text="on"]
         .chzzk-chat-ui-toggle-timestamp {
         font-size: inherit !important;
-        font-weight: 500 !important;
         line-height: inherit !important;
+      }
+
+      html[data-chzzk-chat-ui-toggle-bold-text="on"]
+        [class*="live_chatting_list_item" i]:has([class*="live_chatting_message_container" i]) {
+        font-weight: 500 !important;
+      }
+
+      html[data-chzzk-chat-ui-toggle-bold-text="on"]
+        [class*="live_chatting_list_item" i]
+        [class*="live_chatting_message_text" i],
+      html[data-chzzk-chat-ui-toggle-bold-text="on"]
+        [class*="live_chatting_list_item" i]
+        [class*="live_chatting_username_nickname" i],
+      html[data-chzzk-chat-ui-toggle-bold-text="on"]
+        [class*="live_chatting_list_item" i]
+        [class*="name_text" i],
+      html[data-chzzk-chat-ui-toggle-bold-text="on"]
+        .chzzk-chat-ui-toggle-timestamp {
+        font-weight: 500 !important;
       }
 
       html[data-chzzk-chat-ui-toggle-timestamps="on"]

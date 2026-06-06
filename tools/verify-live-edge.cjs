@@ -17,6 +17,7 @@ const onOptions = {
   showTimestamps: true,
   showChatBoxes: true,
   showLargeText: false,
+  showBoldText: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
 
@@ -26,6 +27,7 @@ const offOptions = {
   showTimestamps: false,
   showChatBoxes: true,
   showLargeText: false,
+  showBoldText: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
 
@@ -35,6 +37,7 @@ const badgeOffOptions = {
   showTimestamps: true,
   showChatBoxes: true,
   showLargeText: false,
+  showBoldText: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
 
@@ -44,6 +47,7 @@ const nicknameOffOptions = {
   showTimestamps: true,
   showChatBoxes: true,
   showLargeText: false,
+  showBoldText: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
 
@@ -53,6 +57,7 @@ const chatBoxOffOptions = {
   showTimestamps: true,
   showChatBoxes: false,
   showLargeText: false,
+  showBoldText: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
 
@@ -62,7 +67,18 @@ const largeTextColorOptions = {
   showTimestamps: true,
   showChatBoxes: true,
   showLargeText: true,
+  showBoldText: false,
   chatBoxColor: "#4b8bff"
+};
+
+const boldTextOptions = {
+  showNicknames: true,
+  showBadges: true,
+  showTimestamps: true,
+  showChatBoxes: true,
+  showLargeText: false,
+  showBoldText: true,
+  chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
 
 function normalizeHexColor(value) {
@@ -338,6 +354,7 @@ async function collectFrameStates(page) {
             timestamps: document.documentElement.dataset.chzzkChatUiToggleTimestamps || null,
             chatBoxes: document.documentElement.dataset.chzzkChatUiToggleChatBoxes || null,
             largeText: document.documentElement.dataset.chzzkChatUiToggleLargeText || null,
+            boldText: document.documentElement.dataset.chzzkChatUiToggleBoldText || null,
             chatBoxColor: document.documentElement.dataset.chzzkChatUiToggleChatBoxColor || null
           },
           counts,
@@ -520,9 +537,29 @@ function assertLargeTextOn(label, summary) {
   if (chatBoxes.maxFontSize === null || chatBoxes.maxFontSize < 16.8) {
     throw new Error(`${label}: large text font size was not applied`);
   }
+}
+
+function assertLargeTextOff(label, summary) {
+  const chatBoxes = summary.layout.chatBoxes;
+
+  if (chatBoxes.maxFontSize === null || chatBoxes.maxFontSize >= 16.8) {
+    throw new Error(`${label}: large text font size should be off`);
+  }
+}
+
+function assertBoldTextOn(label, summary) {
+  const chatBoxes = summary.layout.chatBoxes;
 
   if (chatBoxes.maxFontWeight === null || chatBoxes.maxFontWeight < 500) {
-    throw new Error(`${label}: large text font weight was not applied`);
+    throw new Error(`${label}: bold text font weight was not applied`);
+  }
+}
+
+function assertBoldTextOff(label, summary) {
+  const chatBoxes = summary.layout.chatBoxes;
+
+  if (chatBoxes.maxFontWeight === null || chatBoxes.maxFontWeight >= 500) {
+    throw new Error(`${label}: bold text font weight should be off`);
   }
 }
 
@@ -591,13 +628,22 @@ async function collectState(page, label) {
   return state;
 }
 
+async function selectPopupTab(popup, targetId) {
+  await popup.locator(`[data-tab-target="${targetId}"]`).click();
+  await popup.locator(`#${targetId}`).waitFor({ state: "visible", timeout: 5000 });
+}
+
 async function setPopupOptions(popup, options) {
   await popup.bringToFront();
+  await selectPopupTab(popup, "textPanel");
   await popup.locator("#showNicknames").setChecked(options.showNicknames);
   await popup.locator("#showBadges").setChecked(options.showBadges);
   await popup.locator("#showTimestamps").setChecked(options.showTimestamps);
+
+  await selectPopupTab(popup, "stylePanel");
   await popup.locator("#showChatBoxes").setChecked(options.showChatBoxes);
   await popup.locator("#showLargeText").setChecked(options.showLargeText);
+  await popup.locator("#showBoldText").setChecked(options.showBoldText);
 
   if (options.chatBoxColor) {
     const hexInput = popup.locator("#chatBoxColorHex");
@@ -680,8 +726,18 @@ async function main() {
   assertOnState(largeTextColor.summary);
   assertChatBoxesOn("large-text color state", largeTextColor.summary);
   assertLargeTextOn("large-text color state", largeTextColor.summary);
+  assertBoldTextOff("large-text color state", largeTextColor.summary);
   assertChatBoxColor("large-text color state", largeTextColor.summary, largeTextColorOptions.chatBoxColor);
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-large-text-blue.png"), fullPage: false });
+
+  await setPopupOptions(popup, boldTextOptions);
+
+  const boldText = await collectState(page, "bold-text state");
+  assertOnState(boldText.summary);
+  assertChatBoxesOn("bold-text state", boldText.summary);
+  assertLargeTextOff("bold-text state", boldText.summary);
+  assertBoldTextOn("bold-text state", boldText.summary);
+  await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-bold-text.png"), fullPage: false });
 
   await setPopupOptions(popup, chatBoxOffOptions);
 
@@ -720,6 +776,7 @@ async function main() {
           "output/playwright/chzzk-live-badge-off.png",
           "output/playwright/chzzk-live-nickname-off.png",
           "output/playwright/chzzk-live-large-text-blue.png",
+          "output/playwright/chzzk-live-bold-text.png",
           "output/playwright/chzzk-live-chat-box-off.png",
           "output/playwright/chzzk-live-off.png",
           "output/playwright/chzzk-live-on-after.png"
@@ -729,6 +786,7 @@ async function main() {
           badgeOff: badgeOff.summary,
           nicknameOff: nicknameOff.summary,
           largeTextColor: largeTextColor.summary,
+          boldText: boldText.summary,
           chatBoxOff: chatBoxOff.summary,
           off: off.summary,
           onAfter: onAfter.summary
