@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.1";
+  const SCRIPT_VERSION = "0.2.2";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -43,6 +43,12 @@
   const GUEST_CHAT_TOGGLE_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-toggle";
   const GUEST_CHAT_TOGGLE_BUTTON_ICON_CLASS = "chzzk-chat-ui-toggle-guest-chat-toggle__icon";
   const GUEST_CHAT_TOGGLE_BUTTON_SLASH_CLASS = "chzzk-chat-ui-toggle-guest-chat-toggle__slash";
+  const SETTINGS_BUTTON_ID = "chzzk-chat-ui-toggle-settings-button";
+  const SETTINGS_BUTTON_ICON_CLASS = "chzzk-chat-ui-toggle-settings-button__icon";
+  const SETTINGS_PANEL_ID = "chzzk-chat-ui-toggle-settings-panel";
+  const SETTINGS_STATUS_ID = "chzzk-chat-ui-toggle-settings-status";
+  const SETTINGS_CONTROL_ATTR = "data-chzzk-chat-ui-toggle-settings-control";
+  const SETTINGS_PANEL_MARGIN_PX = 8;
   const LIVE_CHANNEL_ID_PATTERN = /^[0-9a-f]{32}$/i;
 
   const DEFAULT_OPTIONS = {
@@ -73,6 +79,16 @@
     purple: "#8b5cf6",
     yellow: "#f5bd23"
   };
+
+  const SETTINGS_TOGGLE_OPTIONS = [
+    { key: "showNicknames", label: "닉네임" },
+    { key: "showBadges", label: "배지" },
+    { key: "showTimestamps", label: "타임스탬프" },
+    { key: "showChatBoxes", label: "채팅 박스" },
+    { key: "useGuestChatFrame", label: "비로그인 채팅" },
+    { key: "showLargeText", label: "큰 글씨" },
+    { key: "showBoldText", label: "굵게" }
+  ];
 
   const CHAT_ROOT_SELECTORS = [
     "[class*='live_chatting' i]",
@@ -181,6 +197,8 @@
   let lastPublishedGuestChatThemeKey = "";
   let lastPublishedGuestChatThemeAt = 0;
   let nativeGuestChatThemeRetryTimers = [];
+  let settingsPanelStatusResetTimer = 0;
+  let settingsPanelDismissHandlersConnected = false;
 
   function getRuntime() {
     if (typeof chrome === "undefined") {
@@ -1122,6 +1140,179 @@
         transform-origin: center !important;
       }
 
+      .chzzk-chat-ui-toggle-settings-button {
+        position: relative !important;
+        display: inline-flex !important;
+        flex: 0 0 auto !important;
+        align-self: center !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 28px !important;
+        height: 28px !important;
+        min-width: 28px !important;
+        min-height: 28px !important;
+        margin: 0 6px 0 4px !important;
+        padding: 0 !important;
+        border: 0 !important;
+        border-radius: 6px !important;
+        background: transparent !important;
+        color: rgba(32, 36, 40, 0.72) !important;
+        box-shadow: none !important;
+        cursor: pointer !important;
+        z-index: 2147483646 !important;
+      }
+
+      .chzzk-chat-ui-toggle-settings-button:hover,
+      .chzzk-chat-ui-toggle-settings-button[aria-expanded="true"] {
+        background: rgba(32, 36, 40, 0.08) !important;
+        color: rgba(32, 36, 40, 0.92) !important;
+      }
+
+      .chzzk-chat-ui-toggle-settings-button:focus-visible {
+        outline: 2px solid rgba(0, 196, 113, 0.42) !important;
+        outline-offset: 2px !important;
+      }
+
+      .${SETTINGS_BUTTON_ICON_CLASS} {
+        display: block !important;
+        color: inherit !important;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        line-height: 1 !important;
+        transform: translateY(-1px) !important;
+        pointer-events: none !important;
+      }
+
+      #${SETTINGS_PANEL_ID} {
+        position: fixed !important;
+        display: grid !important;
+        gap: 10px !important;
+        width: min(252px, calc(100vw - 16px)) !important;
+        max-height: min(420px, calc(100vh - 16px)) !important;
+        padding: 12px !important;
+        border: 1px solid rgba(12, 18, 28, 0.14) !important;
+        border-radius: 8px !important;
+        background: #ffffff !important;
+        color: #11181f !important;
+        box-shadow: 0 14px 34px rgba(10, 18, 28, 0.22) !important;
+        box-sizing: border-box !important;
+        overflow: auto !important;
+        z-index: 2147483647 !important;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+      }
+
+      #${SETTINGS_PANEL_ID}[hidden] {
+        display: none !important;
+      }
+
+      #${SETTINGS_PANEL_ID} * {
+        box-sizing: border-box !important;
+      }
+
+      .chzzk-chat-ui-toggle-settings-panel__header {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 10px !important;
+      }
+
+      .chzzk-chat-ui-toggle-settings-panel__title {
+        min-width: 0 !important;
+        margin: 0 !important;
+        color: inherit !important;
+        font-size: 14px !important;
+        font-weight: 800 !important;
+        line-height: 1.25 !important;
+        letter-spacing: 0 !important;
+      }
+
+      .chzzk-chat-ui-toggle-settings-panel__status {
+        min-width: 48px !important;
+        margin: 0 !important;
+        color: #66707c !important;
+        font-size: 11px !important;
+        line-height: 1.25 !important;
+        text-align: right !important;
+        white-space: nowrap !important;
+      }
+
+      .chzzk-chat-ui-toggle-settings-panel__status[data-state="error"] {
+        color: #c92a2a !important;
+      }
+
+      .chzzk-chat-ui-toggle-settings-panel__status[data-state="saved"] {
+        color: #008f54 !important;
+      }
+
+      .chzzk-chat-ui-toggle-settings-panel__toggles {
+        display: grid !important;
+        gap: 7px !important;
+      }
+
+      .chzzk-chat-ui-toggle-settings-panel__row {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 14px !important;
+        min-height: 38px !important;
+        padding: 8px 10px !important;
+        border: 1px solid rgba(12, 18, 28, 0.12) !important;
+        border-radius: 8px !important;
+        background: #f8fafc !important;
+        color: inherit !important;
+        cursor: pointer !important;
+      }
+
+      .chzzk-chat-ui-toggle-settings-panel__row span {
+        min-width: 0 !important;
+        color: inherit !important;
+        font-size: 12px !important;
+        font-weight: 750 !important;
+        line-height: 1.25 !important;
+        letter-spacing: 0 !important;
+      }
+
+      .chzzk-chat-ui-toggle-settings-panel__row input {
+        appearance: none !important;
+        position: relative !important;
+        flex: 0 0 auto !important;
+        width: 38px !important;
+        height: 22px !important;
+        margin: 0 !important;
+        border: 1px solid #c8d0d8 !important;
+        border-radius: 999px !important;
+        background: #d9dee4 !important;
+        outline: none !important;
+        cursor: pointer !important;
+      }
+
+      .chzzk-chat-ui-toggle-settings-panel__row input::after {
+        content: "" !important;
+        position: absolute !important;
+        top: 2px !important;
+        left: 2px !important;
+        width: 16px !important;
+        height: 16px !important;
+        border-radius: 50% !important;
+        background: #ffffff !important;
+        box-shadow: 0 1px 4px rgba(10, 18, 28, 0.24) !important;
+        transition: transform 140ms ease !important;
+      }
+
+      .chzzk-chat-ui-toggle-settings-panel__row input:checked {
+        border-color: #009f5b !important;
+        background: #00c471 !important;
+      }
+
+      .chzzk-chat-ui-toggle-settings-panel__row input:checked::after {
+        transform: translateX(16px) !important;
+      }
+
+      .chzzk-chat-ui-toggle-settings-panel__row input:focus-visible {
+        box-shadow: 0 0 0 3px rgba(0, 196, 113, 0.22) !important;
+      }
+
       html[data-chzzk-chat-ui-toggle-guest-chat-frame="on"]
         [${GUEST_CHAT_HOST_ATTR}="true"] {
         position: relative !important;
@@ -1357,6 +1548,8 @@
 
     syncGuestChatFrame();
     ensureGuestChatToggleButton();
+    ensureSettingsButton();
+    syncSettingsPanelUi();
 
     if (markAsReady) {
       markReady();
@@ -1734,6 +1927,360 @@
 
   function isNestedHeaderAction(element, actions) {
     return actions.some((candidate) => candidate !== element && candidate.contains(element));
+  }
+
+  function isSettingsButtonEligibleContext() {
+    return !isGuestChatFrameEmbedUrl(window.location.href);
+  }
+
+  function findSettingsButtonTarget() {
+    if (!isSettingsButtonEligibleContext()) {
+      return null;
+    }
+
+    const header = getChatHeaderBar();
+
+    if (!header || !isElementVisible(header)) {
+      return null;
+    }
+
+    const candidates = [...header.children]
+      .filter((element) => element instanceof HTMLElement)
+      .filter((element) => element.id !== SETTINGS_BUTTON_ID && element.id !== SETTINGS_PANEL_ID)
+      .filter(isElementVisible)
+      .map((element) => ({ element, rect: element.getBoundingClientRect() }))
+      .filter(({ rect }) => rect.width > 0 && rect.height > 0)
+      .sort((left, right) => left.rect.left - right.rect.left || left.rect.top - right.rect.top);
+
+    return {
+      before: candidates[0]?.element || null,
+      container: header,
+      header
+    };
+  }
+
+  function getSettingsButton() {
+    const button = document.getElementById(SETTINGS_BUTTON_ID);
+
+    return button instanceof HTMLButtonElement ? button : null;
+  }
+
+  function getSettingsPanel() {
+    const panel = document.getElementById(SETTINGS_PANEL_ID);
+
+    return panel instanceof HTMLElement ? panel : null;
+  }
+
+  function setSettingsPanelStatus(message = "", state = "") {
+    const status = document.getElementById(SETTINGS_STATUS_ID);
+
+    if (!(status instanceof HTMLElement)) {
+      return;
+    }
+
+    window.clearTimeout(settingsPanelStatusResetTimer);
+    status.textContent = message;
+
+    if (state) {
+      status.dataset.state = state;
+    } else {
+      delete status.dataset.state;
+    }
+
+    if (message && state !== "loading") {
+      settingsPanelStatusResetTimer = window.setTimeout(() => {
+        if (status.isConnected) {
+          status.textContent = "";
+          delete status.dataset.state;
+        }
+      }, 1400);
+    }
+  }
+
+  function createSettingsPanelHeader() {
+    const header = document.createElement("div");
+    const title = document.createElement("p");
+    const status = document.createElement("p");
+
+    header.className = "chzzk-chat-ui-toggle-settings-panel__header";
+    title.className = "chzzk-chat-ui-toggle-settings-panel__title";
+    status.id = SETTINGS_STATUS_ID;
+    status.className = "chzzk-chat-ui-toggle-settings-panel__status";
+    status.setAttribute("aria-live", "polite");
+    title.textContent = "채팅 설정";
+
+    header.append(title, status);
+    return header;
+  }
+
+  function createSettingsPanelToggle(option) {
+    const row = document.createElement("label");
+    const label = document.createElement("span");
+    const input = document.createElement("input");
+
+    row.className = "chzzk-chat-ui-toggle-settings-panel__row";
+    label.textContent = option.label;
+    input.type = "checkbox";
+    input.setAttribute(SETTINGS_CONTROL_ATTR, option.key);
+    input.checked = currentOptions[option.key] === true;
+    input.addEventListener("change", () => {
+      updateSettingsOption(option.key, input.checked);
+    });
+
+    row.append(label, input);
+    return row;
+  }
+
+  function createSettingsPanel() {
+    const panel = document.createElement("div");
+    const toggles = document.createElement("div");
+
+    panel.id = SETTINGS_PANEL_ID;
+    panel.hidden = true;
+    panel.setAttribute("role", "dialog");
+    panel.setAttribute("aria-label", "채팅 표시 설정");
+    toggles.className = "chzzk-chat-ui-toggle-settings-panel__toggles";
+
+    for (const option of SETTINGS_TOGGLE_OPTIONS) {
+      toggles.append(createSettingsPanelToggle(option));
+    }
+
+    panel.append(createSettingsPanelHeader(), toggles);
+    document.body?.append(panel);
+    return panel;
+  }
+
+  function ensureSettingsPanel() {
+    return getSettingsPanel() || createSettingsPanel();
+  }
+
+  function syncSettingsPanelUi() {
+    const panel = getSettingsPanel();
+
+    if (!panel) {
+      return;
+    }
+
+    const controls = panel.querySelectorAll(`[${SETTINGS_CONTROL_ATTR}]`);
+
+    for (const control of controls) {
+      if (!(control instanceof HTMLInputElement)) {
+        continue;
+      }
+
+      const key = control.getAttribute(SETTINGS_CONTROL_ATTR);
+
+      if (key && hasOwn(currentOptions, key)) {
+        control.checked = currentOptions[key] === true;
+      }
+    }
+  }
+
+  function positionSettingsPanel(button = getSettingsButton(), panel = getSettingsPanel()) {
+    if (!(button instanceof HTMLButtonElement) || !(panel instanceof HTMLElement) || panel.hidden) {
+      return;
+    }
+
+    const buttonRect = button.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    const margin = SETTINGS_PANEL_MARGIN_PX;
+    const panelWidth = Math.min(panelRect.width || 252, Math.max(180, window.innerWidth - margin * 2));
+    const panelHeight = Math.min(panelRect.height || 320, Math.max(120, window.innerHeight - margin * 2));
+    const left = Math.max(
+      margin,
+      Math.min(buttonRect.left, window.innerWidth - panelWidth - margin)
+    );
+    const belowTop = buttonRect.bottom + 6;
+    const aboveTop = buttonRect.top - panelHeight - 6;
+    const top = belowTop + panelHeight <= window.innerHeight - margin
+      ? belowTop
+      : Math.max(margin, aboveTop);
+
+    panel.style.left = `${Math.round(left)}px`;
+    panel.style.top = `${Math.round(top)}px`;
+  }
+
+  function setSettingsButtonState(button = getSettingsButton()) {
+    if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+
+    const isOpen = getSettingsPanel()?.hidden === false;
+    const label = isOpen ? "채팅 설정 닫기" : "채팅 설정 열기";
+
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    button.setAttribute("aria-controls", SETTINGS_PANEL_ID);
+    button.setAttribute("aria-expanded", String(isOpen));
+  }
+
+  function closeSettingsPanel({ focusButton = false } = {}) {
+    const panel = getSettingsPanel();
+    const button = getSettingsButton();
+
+    if (panel) {
+      panel.hidden = true;
+    }
+
+    setSettingsButtonState(button);
+
+    if (focusButton && button?.isConnected) {
+      button.focus();
+    }
+  }
+
+  function handleSettingsPanelPointerDown(event) {
+    const target = event.target;
+    const panel = getSettingsPanel();
+    const button = getSettingsButton();
+
+    if (!(target instanceof Node) || panel?.hidden !== false) {
+      return;
+    }
+
+    if (panel.contains(target) || button?.contains(target)) {
+      return;
+    }
+
+    closeSettingsPanel();
+  }
+
+  function handleSettingsPanelKeyDown(event) {
+    if (event.key === "Escape" && getSettingsPanel()?.hidden === false) {
+      event.preventDefault();
+      closeSettingsPanel({ focusButton: true });
+    }
+  }
+
+  function repositionOpenSettingsPanel() {
+    const panel = getSettingsPanel();
+    const button = getSettingsButton();
+
+    if (panel?.hidden !== false) {
+      return;
+    }
+
+    if (!button || !isElementVisible(button)) {
+      closeSettingsPanel();
+      return;
+    }
+
+    positionSettingsPanel(button, panel);
+  }
+
+  function connectSettingsPanelDismissHandlers() {
+    if (settingsPanelDismissHandlersConnected) {
+      return;
+    }
+
+    settingsPanelDismissHandlersConnected = true;
+    document.addEventListener("pointerdown", handleSettingsPanelPointerDown, true);
+    window.addEventListener("keydown", handleSettingsPanelKeyDown, true);
+    window.addEventListener("resize", repositionOpenSettingsPanel);
+    window.addEventListener("scroll", repositionOpenSettingsPanel, true);
+  }
+
+  async function updateSettingsOption(key, value) {
+    if (!hasOwn(DEFAULT_OPTIONS, key)) {
+      return;
+    }
+
+    const previousOptions = { ...currentOptions };
+    const nextOptions = normalizeOptions({
+      ...currentOptions,
+      [key]: value
+    });
+
+    setSettingsPanelStatus("저장 중", "loading");
+
+    const result = await writeOptionsToStorageLocal(nextOptions);
+
+    if (!result.ok) {
+      applyOptions(previousOptions, { source: "header-settings-error" });
+      scan();
+      syncSettingsPanelUi();
+      setSettingsPanelStatus("저장 실패", "error");
+      return;
+    }
+
+    applyOptions(result.options, { source: "header-settings" });
+    scan();
+    setSettingsPanelStatus("저장됨", "saved");
+  }
+
+  function toggleSettingsPanel(button) {
+    const panel = ensureSettingsPanel();
+    const shouldOpen = panel.hidden;
+
+    if (!shouldOpen) {
+      closeSettingsPanel();
+      return;
+    }
+
+    syncSettingsPanelUi();
+    panel.hidden = false;
+    positionSettingsPanel(button, panel);
+    window.requestAnimationFrame(() => positionSettingsPanel(button, panel));
+    connectSettingsPanelDismissHandlers();
+    setSettingsPanelStatus();
+    setSettingsButtonState(button);
+  }
+
+  function createSettingsButton() {
+    const button = document.createElement("button");
+    const icon = document.createElement("span");
+
+    button.id = SETTINGS_BUTTON_ID;
+    button.type = "button";
+    button.className = "chzzk-chat-ui-toggle-settings-button";
+    icon.className = SETTINGS_BUTTON_ICON_CLASS;
+    icon.textContent = "⚙";
+    icon.setAttribute("aria-hidden", "true");
+    button.append(icon);
+    setSettingsButtonState(button);
+
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleSettingsPanel(button);
+    });
+
+    return button;
+  }
+
+  function ensureSettingsButton() {
+    const existingElement = document.getElementById(SETTINGS_BUTTON_ID);
+    const existingButton = existingElement instanceof HTMLButtonElement ? existingElement : null;
+
+    if (existingElement && !existingButton) {
+      existingElement.remove();
+    }
+
+    if (!isSettingsButtonEligibleContext()) {
+      existingButton?.remove();
+      closeSettingsPanel();
+      return;
+    }
+
+    const target = findSettingsButtonTarget();
+
+    if (!target) {
+      existingButton?.remove();
+      closeSettingsPanel();
+      return;
+    }
+
+    const button = existingButton || createSettingsButton();
+
+    setSettingsButtonState(button);
+
+    if (button.parentElement !== target.container || button.nextSibling !== target.before) {
+      target.container.insertBefore(button, target.before);
+    }
+
+    if (getSettingsPanel()?.hidden === false) {
+      positionSettingsPanel(button);
+    }
   }
 
   function findGuestChatToggleTarget() {
@@ -2291,6 +2838,7 @@
 
       syncGuestChatFrame();
       ensureGuestChatToggleButton();
+      ensureSettingsButton();
     } finally {
       isScanning = false;
     }
@@ -2374,6 +2922,7 @@
           scanRows(addedRows);
           syncGuestChatFrame();
           ensureGuestChatToggleButton();
+          ensureSettingsButton();
         } else {
           scan();
         }

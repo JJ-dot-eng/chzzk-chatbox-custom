@@ -379,6 +379,25 @@ if (!popupSource.includes('"useGuestChatFrame"')) {
   throw new Error("popup script must store and apply the guest chat option.");
 }
 
+const requiredHeaderSettingsTokens = [
+  'const SETTINGS_BUTTON_ID = "chzzk-chat-ui-toggle-settings-button";',
+  'const SETTINGS_PANEL_ID = "chzzk-chat-ui-toggle-settings-panel";',
+  "const SETTINGS_TOGGLE_OPTIONS = [",
+  "function findSettingsButtonTarget()",
+  "function createSettingsPanel()",
+  "function updateSettingsOption(key, value)",
+  "function ensureSettingsButton()",
+  "button.id = SETTINGS_BUTTON_ID;",
+  "writeOptionsToStorageLocal(nextOptions)",
+  "ensureSettingsButton();"
+];
+
+for (const token of requiredHeaderSettingsTokens) {
+  if (!contentSource.includes(token)) {
+    throw new Error(`content script must support the chat header settings button: ${token}`);
+  }
+}
+
 const unsafeRoleSelectors = [
   'html[data-chzzk-chat-ui-toggle-nicknames="off"] [${ROLE_ATTR}~="nickname"]',
   'html[data-chzzk-chat-ui-toggle-badges="off"] [${ROLE_ATTR}~="badge"]',
