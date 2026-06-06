@@ -4,6 +4,7 @@ import path from "node:path";
 const root = process.cwd();
 const manifestPath = path.join(root, "manifest.json");
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+const contentSource = await readFile(path.join(root, "content.js"), "utf8");
 
 const requiredRootFiles = [
   "manifest.json",
@@ -81,6 +82,34 @@ if (!contentScript?.all_frames) {
 
 if (contentScript.run_at !== "document_start") {
   throw new Error("content script must run at document_start to avoid raw chat flashes.");
+}
+
+if (!contentSource.includes('const CHAT_ROW_ATTR = "data-chzzk-chat-ui-toggle-chat-row";')) {
+  throw new Error("content script must define a chat-row scope attribute.");
+}
+
+const unsafeRoleSelectors = [
+  'html[data-chzzk-chat-ui-toggle-nicknames="off"] [${ROLE_ATTR}~="nickname"]',
+  'html[data-chzzk-chat-ui-toggle-badges="off"] [${ROLE_ATTR}~="badge"]',
+  'html[data-chzzk-chat-ui-toggle-timestamps="off"] [${ROLE_ATTR}~="timestamp"]'
+];
+
+for (const selector of unsafeRoleSelectors) {
+  if (contentSource.includes(selector)) {
+    throw new Error(`content script has an unsafe global role selector: ${selector}`);
+  }
+}
+
+const scopedRoleSelectors = [
+  '[${CHAT_ROW_ATTR}="true"] [${ROLE_ATTR}~="nickname"]',
+  '[${CHAT_ROW_ATTR}="true"] [${ROLE_ATTR}~="badge"]',
+  '[${CHAT_ROW_ATTR}="true"] [${ROLE_ATTR}~="timestamp"]'
+];
+
+for (const selector of scopedRoleSelectors) {
+  if (!contentSource.includes(selector)) {
+    throw new Error(`content script is missing scoped role selector: ${selector}`);
+  }
 }
 
 console.log("Extension manifest and root files are valid.");

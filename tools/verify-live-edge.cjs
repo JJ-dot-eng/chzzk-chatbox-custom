@@ -8,6 +8,7 @@ const LIVE_URL =
   "https://chzzk.naver.com/live/1b0561f3051c10a24b9d8ec9a6cb3374";
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const ROLE_ATTR = "data-chzzk-chat-ui-toggle-role";
+const CHAT_ROW_ATTR = "data-chzzk-chat-ui-toggle-chat-row";
 const OUTPUT_DIR = path.join(process.cwd(), "output", "playwright");
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 
@@ -224,7 +225,7 @@ async function collectFrameStates(page) {
 
   for (const frame of page.frames()) {
     try {
-      const state = await frame.evaluate((roleAttr) => {
+      const state = await frame.evaluate(({ roleAttr, chatRowAttr }) => {
         const roles = ["nickname", "badge", "timestamp"];
         const counts = {};
         const hidden = {};
@@ -232,7 +233,7 @@ async function collectFrameStates(page) {
         const samples = {};
 
         for (const role of roles) {
-          const elements = [...document.querySelectorAll(`[${roleAttr}~="${role}"]`)];
+          const elements = [...document.querySelectorAll(`[${chatRowAttr}="true"] [${roleAttr}~="${role}"]`)];
           counts[role] = elements.length;
           hidden[role] = elements.filter((element) => getComputedStyle(element).display === "none").length;
           visible[role] = elements.filter((element) => {
@@ -380,7 +381,7 @@ async function collectFrameStates(page) {
             }
           }
         };
-      }, ROLE_ATTR);
+      }, { roleAttr: ROLE_ATTR, chatRowAttr: CHAT_ROW_ATTR });
 
       states.push(state);
     } catch (error) {
@@ -461,7 +462,7 @@ async function setExtensionOptions(worker, options) {
 
 async function collectSyntheticFirstMutationState(page) {
   return page.evaluate(
-    ({ roleAttr }) =>
+    ({ roleAttr, chatRowAttr }) =>
       new Promise((resolve) => {
         const rootId = `chzzk-chat-ui-toggle-probe-${Date.now()}`;
         const rowId = `${rootId}-row`;
@@ -517,6 +518,7 @@ async function collectSyntheticFirstMutationState(page) {
               timestamps: document.documentElement.dataset.chzzkChatUiToggleTimestamps || null
             }
           };
+          state.row.chatRow = row.getAttribute(chatRowAttr) || "";
 
           state.visible = {
             row: isVisible(state.row),
@@ -578,11 +580,15 @@ async function collectSyntheticFirstMutationState(page) {
 
         document.body.appendChild(root);
       }),
-    { roleAttr: ROLE_ATTR }
+    { roleAttr: ROLE_ATTR, chatRowAttr: CHAT_ROW_ATTR }
   );
 }
 
 function assertSyntheticNoRawPrefixFlash(label, state) {
+  if (state.row.chatRow !== "true") {
+    throw new Error(`${label}: synthetic row was not confirmed as a scoped chat row`);
+  }
+
   const hiddenTargets = ["nickname", "badge", "timestamp"];
 
   for (const target of hiddenTargets) {
