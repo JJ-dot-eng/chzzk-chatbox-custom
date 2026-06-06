@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.16";
+  const SCRIPT_VERSION = "0.1.17";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -16,6 +16,7 @@
   const STYLE_ID = "chzzk-chat-ui-toggle-style";
   const CACHE_KEY = "chzzkChatUiToggleOptionsCache";
   const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
+  const OPEN_INCOGNITO_CHAT_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_INCOGNITO_CHAT";
   const STORAGE_READ_TIMEOUT_MS = 700;
   const OPTIONS_LOAD_RETRY_MS = 250;
   const OPTIONS_LOAD_MAX_ATTEMPTS = 20;
@@ -23,6 +24,10 @@
   const SCAN_INTERVAL_MS = 2000;
   const GENERATED_TIMESTAMP_ATTR = "data-chzzk-chat-ui-toggle-generated-timestamp";
   const MESSAGE_PREFIX_ATTR = "data-chzzk-chat-ui-toggle-prefix";
+  const INCOGNITO_CHAT_BUTTON_ID = "chzzk-chat-ui-toggle-incognito-chat-button";
+  const INCOGNITO_CHAT_BUTTON_ICON_CLASS = "chzzk-chat-ui-toggle-incognito-chat-button__icon";
+  const INCOGNITO_CHAT_BUTTON_HOST_ATTR = "data-chzzk-chat-ui-toggle-action-host";
+  const LIVE_CHANNEL_ID_PATTERN = /^[0-9a-f]{32}$/i;
 
   const DEFAULT_OPTIONS = {
     showNicknames: true,
@@ -63,6 +68,19 @@
 
   const CHAT_ROW_SELECTORS = [
     "[class*='live_chatting_list_item' i]"
+  ];
+
+  const CHAT_HEADER_ACTION_SELECTORS = [
+    "[class*='live_chatting_header_menu' i]",
+    "[class*='live_chatting_header_wrapper' i]",
+    "[class*='live_chatting_header_container' i]"
+  ];
+
+  const CHAT_ACTION_HOST_SELECTORS = [
+    "[class*='live_chatting_header_container' i]",
+    "[class*='live_chatting' i]",
+    "[class*='chatting_area' i]",
+    "[class*='chat_area' i]"
   ];
 
   const TARGET_SELECTORS = {
@@ -368,6 +386,99 @@
         user-select: none;
       }
 
+      [${INCOGNITO_CHAT_BUTTON_HOST_ATTR}="true"] {
+        position: relative !important;
+      }
+
+      .chzzk-chat-ui-toggle-incognito-chat-button {
+        display: inline-flex !important;
+        flex: 0 0 auto !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 28px !important;
+        height: 28px !important;
+        min-width: 28px !important;
+        min-height: 28px !important;
+        margin: 0 0 0 4px !important;
+        padding: 0 !important;
+        border: 1px solid rgba(128, 137, 145, 0.42) !important;
+        border-radius: 7px !important;
+        background: rgba(255, 255, 255, 0.86) !important;
+        color: #202428 !important;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16) !important;
+        cursor: pointer !important;
+        opacity: 0.88 !important;
+        z-index: 2147483646 !important;
+      }
+
+      .chzzk-chat-ui-toggle-incognito-chat-button:hover {
+        opacity: 1 !important;
+        border-color: rgba(0, 196, 113, 0.72) !important;
+        color: #008f52 !important;
+      }
+
+      .chzzk-chat-ui-toggle-incognito-chat-button:focus-visible {
+        outline: 2px solid rgba(0, 196, 113, 0.4) !important;
+        outline-offset: 2px !important;
+      }
+
+      .chzzk-chat-ui-toggle-incognito-chat-button:disabled {
+        cursor: wait !important;
+        opacity: 0.62 !important;
+      }
+
+      .chzzk-chat-ui-toggle-incognito-chat-button[data-placement="overlay"] {
+        position: absolute !important;
+        top: 8px !important;
+        right: 8px !important;
+        margin: 0 !important;
+      }
+
+      .chzzk-chat-ui-toggle-incognito-chat-button[data-state="opened"] {
+        border-color: rgba(0, 196, 113, 0.82) !important;
+        color: #008f52 !important;
+      }
+
+      .chzzk-chat-ui-toggle-incognito-chat-button[data-state="error"] {
+        border-color: rgba(224, 49, 49, 0.76) !important;
+        color: #c92a2a !important;
+      }
+
+      .${INCOGNITO_CHAT_BUTTON_ICON_CLASS} {
+        position: relative !important;
+        display: block !important;
+        width: 15px !important;
+        height: 15px !important;
+        border: 1.7px solid currentColor !important;
+        border-radius: 3px !important;
+        box-sizing: border-box !important;
+      }
+
+      .${INCOGNITO_CHAT_BUTTON_ICON_CLASS}::before {
+        content: "" !important;
+        position: absolute !important;
+        top: 1px !important;
+        right: 1px !important;
+        width: 5px !important;
+        height: 5px !important;
+        border-top: 1.7px solid currentColor !important;
+        border-right: 1.7px solid currentColor !important;
+        box-sizing: border-box !important;
+      }
+
+      .${INCOGNITO_CHAT_BUTTON_ICON_CLASS}::after {
+        content: "" !important;
+        position: absolute !important;
+        top: 5px !important;
+        right: 1px !important;
+        width: 7px !important;
+        height: 1.7px !important;
+        border-radius: 999px !important;
+        background: currentColor !important;
+        transform: rotate(-45deg) !important;
+        transform-origin: right center !important;
+      }
+
       html[data-chzzk-chat-ui-toggle-chat-boxes="on"]
         ${NATIVE_CHAT_ROW_SELECTOR} {
         width: fit-content !important;
@@ -580,6 +691,228 @@
     }
 
     return [...new Set(results)];
+  }
+
+  function extractLiveChannelIdFromUrl(url) {
+    try {
+      const parsedUrl = new URL(url);
+      const pathParts = parsedUrl.pathname.split("/").filter(Boolean);
+
+      if (pathParts[0] === "live" && LIVE_CHANNEL_ID_PATTERN.test(pathParts[1] || "")) {
+        return pathParts[1].toLowerCase();
+      }
+
+      if (pathParts.length === 1 && LIVE_CHANNEL_ID_PATTERN.test(pathParts[0])) {
+        return pathParts[0].toLowerCase();
+      }
+
+      return null;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function getTopLocationHref() {
+    try {
+      return window.top?.location?.href || "";
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  function getCurrentLivePageUrl() {
+    const topHref = getTopLocationHref();
+
+    if (extractLiveChannelIdFromUrl(topHref)) {
+      return topHref;
+    }
+
+    return extractLiveChannelIdFromUrl(window.location.href) ? window.location.href : null;
+  }
+
+  function isElementVisible(element) {
+    return element instanceof HTMLElement && element.getClientRects().length > 0;
+  }
+
+  function clearIncognitoChatButtonHosts(activeHost = null) {
+    const hosts = document.querySelectorAll(`[${INCOGNITO_CHAT_BUTTON_HOST_ATTR}="true"]`);
+
+    for (const host of hosts) {
+      if (host !== activeHost) {
+        host.removeAttribute(INCOGNITO_CHAT_BUTTON_HOST_ATTR);
+      }
+    }
+  }
+
+  function setIncognitoChatButtonState(button, state) {
+    const labels = {
+      ready: "시크릿 채팅창 열기",
+      loading: "시크릿 채팅창 여는 중",
+      opened: "시크릿 채팅창 열림",
+      error: "시크릿 채팅창 열기 실패"
+    };
+    const label = labels[state] || labels.ready;
+
+    button.dataset.state = state;
+    button.disabled = state === "loading";
+    button.title = label;
+    button.setAttribute("aria-label", label);
+  }
+
+  function resetIncognitoChatButtonStateLater(button) {
+    window.setTimeout(() => {
+      if (button.isConnected && button.dataset.state !== "loading") {
+        setIncognitoChatButtonState(button, "ready");
+      }
+    }, 1800);
+  }
+
+  function openCurrentIncognitoChat(button) {
+    const runtime = getRuntime();
+    const pageUrl = getCurrentLivePageUrl();
+
+    if (!pageUrl || !runtime?.runtime?.sendMessage) {
+      setIncognitoChatButtonState(button, "error");
+      resetIncognitoChatButtonStateLater(button);
+      return;
+    }
+
+    setIncognitoChatButtonState(button, "loading");
+
+    try {
+      runtime.runtime.sendMessage(
+        {
+          type: OPEN_INCOGNITO_CHAT_MESSAGE,
+          pageUrl
+        },
+        (response) => {
+          const error = runtime.runtime?.lastError;
+          setIncognitoChatButtonState(button, !error && response?.ok ? "opened" : "error");
+          resetIncognitoChatButtonStateLater(button);
+        }
+      );
+    } catch (_error) {
+      setIncognitoChatButtonState(button, "error");
+      resetIncognitoChatButtonStateLater(button);
+    }
+  }
+
+  function createIncognitoChatButton() {
+    const button = document.createElement("button");
+    const icon = document.createElement("span");
+
+    button.id = INCOGNITO_CHAT_BUTTON_ID;
+    button.type = "button";
+    button.className = "chzzk-chat-ui-toggle-incognito-chat-button";
+    icon.className = INCOGNITO_CHAT_BUTTON_ICON_CLASS;
+    icon.setAttribute("aria-hidden", "true");
+    button.append(icon);
+    setIncognitoChatButtonState(button, "ready");
+
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openCurrentIncognitoChat(button);
+    });
+
+    return button;
+  }
+
+  function findHeaderIncognitoChatTarget() {
+    return queryAllSafe(document, CHAT_HEADER_ACTION_SELECTORS)
+      .filter((element) => element instanceof HTMLElement)
+      .filter(isElementVisible)
+      .find((element) => /live_chatting_header_/i.test(getClassName(element))) || null;
+  }
+
+  function findRowIncognitoChatHost() {
+    const rows = queryAllSafe(document, CHAT_ROW_SELECTORS)
+      .filter((element) => element instanceof HTMLElement)
+      .filter(isChatMessageRow)
+      .slice(-20)
+      .reverse();
+
+    for (const row of rows) {
+      let fallback = null;
+
+      for (let element = row.parentElement; element && element !== document.body; element = element.parentElement) {
+        if (!(element instanceof HTMLElement)) {
+          continue;
+        }
+
+        const className = getClassName(element);
+        const isChatContainer = /live_chatting|chatting_area|chat_area/i.test(className);
+        const isChatRow = /live_chatting_list_item/i.test(className);
+
+        if (isChatContainer && !isChatRow) {
+          fallback ??= element;
+        }
+
+        if (
+          fallback &&
+          queryAllSafe(element, CHAT_HEADER_ACTION_SELECTORS).some((candidate) => candidate instanceof HTMLElement)
+        ) {
+          return element;
+        }
+      }
+
+      if (fallback) {
+        return fallback;
+      }
+    }
+
+    return null;
+  }
+
+  function findIncognitoChatButtonTarget() {
+    const headerTarget = findHeaderIncognitoChatTarget();
+
+    if (headerTarget) {
+      return { element: headerTarget, placement: "inline" };
+    }
+
+    const rowHost = findRowIncognitoChatHost();
+
+    if (rowHost) {
+      return { element: rowHost, placement: "overlay" };
+    }
+
+    const actionHost = queryAllSafe(document, CHAT_ACTION_HOST_SELECTORS)
+      .filter((element) => element instanceof HTMLElement)
+      .filter(isElementVisible)
+      .find((element) => /live_chatting|chatting_area|chat_area/i.test(getClassName(element)));
+
+    return actionHost ? { element: actionHost, placement: "overlay" } : null;
+  }
+
+  function ensureIncognitoChatButton() {
+    const existingButton = document.getElementById(INCOGNITO_CHAT_BUTTON_ID);
+
+    if (!getCurrentLivePageUrl()) {
+      existingButton?.remove();
+      clearIncognitoChatButtonHosts();
+      return;
+    }
+
+    const target = findIncognitoChatButtonTarget();
+
+    if (!target) {
+      return;
+    }
+
+    const button = existingButton instanceof HTMLButtonElement ? existingButton : createIncognitoChatButton();
+    button.dataset.placement = target.placement;
+
+    if (target.placement === "overlay") {
+      target.element.setAttribute(INCOGNITO_CHAT_BUTTON_HOST_ATTR, "true");
+      clearIncognitoChatButtonHosts(target.element);
+    } else {
+      clearIncognitoChatButtonHosts();
+    }
+
+    if (button.parentElement !== target.element) {
+      target.element.append(button);
+    }
   }
 
   function hasChatLikeText(element) {
@@ -977,6 +1310,8 @@
       for (const root of roots) {
         scanRows(getChatRows(root));
       }
+
+      ensureIncognitoChatButton();
     } finally {
       isScanning = false;
     }
@@ -1058,6 +1393,7 @@
 
         if (addedRows.length > 0) {
           scanRows(addedRows);
+          ensureIncognitoChatButton();
         } else {
           scan();
         }

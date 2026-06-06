@@ -1,6 +1,5 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
-const CONTENT_VERSION = "0.1.16";
-const OPEN_INCOGNITO_CHAT_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_INCOGNITO_CHAT";
+const CONTENT_VERSION = "0.1.17";
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const NAMED_CHAT_BOX_COLORS = {
   gray: "#808080",
@@ -31,7 +30,6 @@ const colorField = document.getElementById("colorField");
 const colorFieldHandle = document.getElementById("colorFieldHandle");
 const hueSlider = document.getElementById("hueSlider");
 const statusElement = document.getElementById("status");
-const openIncognitoChatButton = document.getElementById("openIncognitoChat");
 
 let currentColor = DEFAULT_CHAT_BOX_COLOR;
 let hsv = { hue: 0, saturation: 0, value: 0.5 };
@@ -241,19 +239,6 @@ function queryActiveTab() {
   return new Promise((resolve) => {
     chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
       resolve(tab);
-    });
-  });
-}
-
-function sendMessageToBackground(message) {
-  return new Promise((resolve) => {
-    chrome.runtime.sendMessage(message, (response) => {
-      if (chrome.runtime.lastError) {
-        resolve({ ok: false, error: chrome.runtime.lastError.message || "runtime-message-error" });
-        return;
-      }
-
-      resolve(response ?? { ok: false, error: "empty-response" });
     });
   });
 }
@@ -487,45 +472,6 @@ async function handleResetColor() {
   await applyCurrentOptions();
 }
 
-function getOpenIncognitoChatStatus(response) {
-  if (response?.ok) {
-    return "채팅창 열림";
-  }
-
-  if (response?.error === "unsupported-url") {
-    return "라이브 탭 아님";
-  }
-
-  if (/incognito|시크릿/i.test(String(response?.error || ""))) {
-    return "시크릿 허용 필요";
-  }
-
-  return "열기 실패";
-}
-
-async function handleOpenIncognitoChat() {
-  const tab = await queryActiveTab();
-
-  if (!tab?.url) {
-    setStatus("라이브 탭 아님");
-    return;
-  }
-
-  openIncognitoChatButton.disabled = true;
-  setStatus("여는 중");
-
-  try {
-    const response = await sendMessageToBackground({
-      type: OPEN_INCOGNITO_CHAT_MESSAGE,
-      pageUrl: tab.url
-    });
-
-    setStatus(getOpenIncognitoChatStatus(response));
-  } finally {
-    openIncognitoChatButton.disabled = false;
-  }
-}
-
 async function init() {
   const options = await getStoredOptions();
   setControls(options);
@@ -548,7 +494,6 @@ async function init() {
   hexInput.addEventListener("keydown", handleHexKeyDown);
   hexInput.addEventListener("blur", handleHexBlur);
   resetColorButton.addEventListener("click", handleResetColor);
-  openIncognitoChatButton.addEventListener("click", handleOpenIncognitoChat);
 }
 
 init().catch(() => {

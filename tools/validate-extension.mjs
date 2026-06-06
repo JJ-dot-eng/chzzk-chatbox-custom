@@ -6,8 +6,6 @@ const manifestPath = path.join(root, "manifest.json");
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 const contentSource = await readFile(path.join(root, "content.js"), "utf8");
 const backgroundSource = await readFile(path.join(root, "background.js"), "utf8");
-const popupMarkup = await readFile(path.join(root, "popup.html"), "utf8");
-const popupSource = await readFile(path.join(root, "popup.js"), "utf8");
 
 const requiredRootFiles = [
   "manifest.json",
@@ -192,16 +190,20 @@ for (const token of requiredIncognitoChatTokens) {
   }
 }
 
-if (!popupMarkup.includes('id="openIncognitoChat"')) {
-  throw new Error("popup must include an incognito chat button.");
-}
+const requiredContentIncognitoChatTokens = [
+  'const OPEN_INCOGNITO_CHAT_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_INCOGNITO_CHAT";',
+  'const INCOGNITO_CHAT_BUTTON_ID = "chzzk-chat-ui-toggle-incognito-chat-button";',
+  "function createIncognitoChatButton()",
+  "function ensureIncognitoChatButton()",
+  "function openCurrentIncognitoChat(button)",
+  "function findHeaderIncognitoChatTarget()",
+  "ensureIncognitoChatButton();"
+];
 
-if (!popupSource.includes('const OPEN_INCOGNITO_CHAT_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_INCOGNITO_CHAT";')) {
-  throw new Error("popup script must define the incognito chat popup message.");
-}
-
-if (!popupSource.includes("function handleOpenIncognitoChat()")) {
-  throw new Error("popup script must handle the incognito chat button.");
+for (const token of requiredContentIncognitoChatTokens) {
+  if (!contentSource.includes(token)) {
+    throw new Error(`content script must render an incognito chat icon button: ${token}`);
+  }
 }
 
 const unsafeRoleSelectors = [
