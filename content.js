@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.5";
+  const SCRIPT_VERSION = "0.1.6";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -271,7 +271,7 @@
 
       html[data-chzzk-chat-ui-toggle-bold-text="on"]
         [class*="live_chatting_list_item" i]:has([class*="live_chatting_message_container" i]) {
-        font-weight: 500 !important;
+        font-weight: 600 !important;
       }
 
       html[data-chzzk-chat-ui-toggle-bold-text="on"]
@@ -285,7 +285,7 @@
         [class*="name_text" i],
       html[data-chzzk-chat-ui-toggle-bold-text="on"]
         .chzzk-chat-ui-toggle-timestamp {
-        font-weight: 500 !important;
+        font-weight: 600 !important;
       }
 
       html[data-chzzk-chat-ui-toggle-timestamps="on"]

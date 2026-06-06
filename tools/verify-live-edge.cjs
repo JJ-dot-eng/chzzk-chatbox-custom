@@ -550,7 +550,7 @@ function assertLargeTextOff(label, summary) {
 function assertBoldTextOn(label, summary) {
   const chatBoxes = summary.layout.chatBoxes;
 
-  if (chatBoxes.maxFontWeight === null || chatBoxes.maxFontWeight < 500) {
+  if (chatBoxes.maxFontWeight === null || chatBoxes.maxFontWeight < 600) {
     throw new Error(`${label}: bold text font weight was not applied`);
   }
 }
@@ -558,7 +558,7 @@ function assertBoldTextOn(label, summary) {
 function assertBoldTextOff(label, summary) {
   const chatBoxes = summary.layout.chatBoxes;
 
-  if (chatBoxes.maxFontWeight === null || chatBoxes.maxFontWeight >= 500) {
+  if (chatBoxes.maxFontWeight === null || chatBoxes.maxFontWeight >= 600) {
     throw new Error(`${label}: bold text font weight should be off`);
   }
 }
