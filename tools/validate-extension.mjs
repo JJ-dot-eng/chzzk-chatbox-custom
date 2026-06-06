@@ -206,8 +206,15 @@ const requiredGuestChatTokens = [
   'const GUEST_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-guest-chat-frame";',
   'const GUEST_CHAT_TOGGLE_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-toggle";',
   'const GUEST_CHAT_CONTROL_HOST_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-control-host";',
+  'const GUEST_CHAT_THEME_ATTR = "data-chzzk-chat-ui-toggle-guest-theme";',
+  'const READ_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_GUEST_CHAT_THEME";',
+  'const SET_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_GUEST_CHAT_THEME";',
+  'const APPLY_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_APPLY_GUEST_CHAT_THEME";',
   "function writeOptionsToStorageLocal(options)",
   "function syncGuestChatFrame()",
+  "function syncGuestChatTheme()",
+  "function detectPageTheme()",
+  "function applyGuestChatTheme(theme",
   "function ensureGuestChatToggleButton()",
   "function toggleGuestChatFrame(button)",
   "function findGuestChatToggleTarget()",
@@ -228,6 +235,24 @@ for (const token of requiredGuestChatTokens) {
 
 if (!backgroundSource.includes("useGuestChatFrame: options?.useGuestChatFrame === true")) {
   throw new Error("background script must normalize the guest chat option.");
+}
+
+const requiredGuestChatThemeBackgroundTokens = [
+  'const READ_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_GUEST_CHAT_THEME";',
+  'const SET_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_GUEST_CHAT_THEME";',
+  'const APPLY_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_APPLY_GUEST_CHAT_THEME";',
+  "const guestChatThemesByTab = new Map();",
+  "function setGuestChatTheme(tabId, channelId, theme)",
+  "function broadcastGuestChatTheme(tabId, entry)",
+  "chrome.tabs.onRemoved.addListener",
+  "message?.type === SET_GUEST_CHAT_THEME_MESSAGE",
+  "message?.type === READ_GUEST_CHAT_THEME_MESSAGE"
+];
+
+for (const token of requiredGuestChatThemeBackgroundTokens) {
+  if (!backgroundSource.includes(token)) {
+    throw new Error(`background script must relay guest chat theme without cookies: ${token}`);
+  }
 }
 
 if (!popupMarkup.includes('id="useGuestChatFrame"')) {

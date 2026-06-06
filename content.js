@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.22";
+  const SCRIPT_VERSION = "0.1.23";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -16,18 +16,24 @@
   const STYLE_ID = "chzzk-chat-ui-toggle-style";
   const CACHE_KEY = "chzzkChatUiToggleOptionsCache";
   const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
+  const READ_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_GUEST_CHAT_THEME";
+  const SET_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_GUEST_CHAT_THEME";
+  const APPLY_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_APPLY_GUEST_CHAT_THEME";
   const CHZZK_ORIGIN = "https://chzzk.naver.com";
   const STORAGE_READ_TIMEOUT_MS = 700;
   const OPTIONS_LOAD_RETRY_MS = 250;
   const OPTIONS_LOAD_MAX_ATTEMPTS = 20;
   const SCAN_DELAY_MS = 0;
   const SCAN_INTERVAL_MS = 2000;
+  const THEME_SYNC_INTERVAL_MS = 3000;
   const GENERATED_TIMESTAMP_ATTR = "data-chzzk-chat-ui-toggle-generated-timestamp";
   const MESSAGE_PREFIX_ATTR = "data-chzzk-chat-ui-toggle-prefix";
   const GUEST_CHAT_FRAME_CONTAINER_ID = "chzzk-chat-ui-toggle-guest-chat-frame-container";
   const GUEST_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-guest-chat-frame";
   const GUEST_CHAT_HOST_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-host";
   const GUEST_CHAT_CONTROL_HOST_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-control-host";
+  const GUEST_CHAT_THEME_ATTR = "data-chzzk-chat-ui-toggle-guest-theme";
+  const LIVE_CHAT_FRAME_ATTR = "data-chzzk-chat-ui-toggle-live-chat-frame";
   const GUEST_CHAT_TOGGLE_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-toggle";
   const GUEST_CHAT_TOGGLE_BUTTON_ICON_CLASS = "chzzk-chat-ui-toggle-guest-chat-toggle__icon";
   const GUEST_CHAT_TOGGLE_BUTTON_SLASH_CLASS = "chzzk-chat-ui-toggle-guest-chat-toggle__slash";
@@ -131,8 +137,12 @@
   let observer = null;
   let messagesConnected = false;
   let storageListenerConnected = false;
+  let themeSyncTimer = 0;
   let lastOptionsSource = "default";
   let lastOptionsLoadError = "";
+  let currentGuestChatTheme = null;
+  let lastPublishedGuestChatThemeKey = "";
+  let lastPublishedGuestChatThemeAt = 0;
 
   function getRuntime() {
     if (typeof chrome === "undefined") {
@@ -389,6 +399,262 @@
     });
   }
 
+  function normalizeGuestChatTheme(value) {
+    return value === "dark" || value === "light" ? value : null;
+  }
+
+  function getThemeFromText(value) {
+    const text = String(value || "").toLowerCase();
+
+    if (!text) {
+      return null;
+    }
+
+    if (/(^|[^a-z])dark([^a-z]|$)|darkmode|theme[-_]?dark|color[-_]?scheme:\s*dark/.test(text)) {
+      return "dark";
+    }
+
+    if (/(^|[^a-z])light([^a-z]|$)|lightmode|theme[-_]?light|color[-_]?scheme:\s*light/.test(text)) {
+      return "light";
+    }
+
+    return null;
+  }
+
+  function getThemeFromElementHints(element) {
+    if (!(element instanceof HTMLElement)) {
+      return null;
+    }
+
+    const hintAttributes = [
+      "data-theme",
+      "data-color-theme",
+      "data-color-mode",
+      "data-theme-mode",
+      "data-dark",
+      "class",
+      "style"
+    ];
+
+    for (const attribute of hintAttributes) {
+      const theme = getThemeFromText(element.getAttribute(attribute));
+
+      if (theme) {
+        return theme;
+      }
+    }
+
+    return null;
+  }
+
+  function parseRgbColor(value) {
+    const match = String(value || "").match(/rgba?\(([^)]+)\)/i);
+
+    if (!match) {
+      return null;
+    }
+
+    const parts = match[1].split(",").map((part) => Number.parseFloat(part.trim()));
+
+    if (parts.length < 3 || parts.slice(0, 3).some((part) => !Number.isFinite(part))) {
+      return null;
+    }
+
+    const alpha = parts.length >= 4 && Number.isFinite(parts[3]) ? parts[3] : 1;
+
+    if (alpha < 0.4) {
+      return null;
+    }
+
+    return {
+      red: Math.max(0, Math.min(255, parts[0])),
+      green: Math.max(0, Math.min(255, parts[1])),
+      blue: Math.max(0, Math.min(255, parts[2]))
+    };
+  }
+
+  function getRelativeLuminance({ red, green, blue }) {
+    const channels = [red, green, blue].map((channel) => {
+      const normalized = channel / 255;
+
+      return normalized <= 0.03928
+        ? normalized / 12.92
+        : ((normalized + 0.055) / 1.055) ** 2.4;
+    });
+
+    return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+  }
+
+  function getThemeFromComputedBackground() {
+    const candidates = [
+      document.documentElement,
+      document.body,
+      document.getElementById("root"),
+      ...queryAllSafe(document, [
+        "[class*='live_container' i]",
+        "[class*='live_chatting' i]",
+        "[class*='chatting_area' i]",
+        "[class*='content' i]",
+        "main"
+      ]).filter((element) => element instanceof HTMLElement).slice(0, 8)
+    ].filter((element) => element instanceof HTMLElement);
+
+    for (const element of candidates) {
+      const color = parseRgbColor(window.getComputedStyle(element).backgroundColor);
+
+      if (!color) {
+        continue;
+      }
+
+      const luminance = getRelativeLuminance(color);
+
+      if (luminance <= 0.28) {
+        return "dark";
+      }
+
+      if (luminance >= 0.72) {
+        return "light";
+      }
+    }
+
+    return null;
+  }
+
+  function detectPageTheme() {
+    const hintElements = [document.documentElement, document.body].filter(
+      (element) => element instanceof HTMLElement
+    );
+
+    for (const element of hintElements) {
+      const theme = getThemeFromElementHints(element);
+
+      if (theme) {
+        return theme;
+      }
+    }
+
+    const computedTheme = getThemeFromComputedBackground();
+
+    if (computedTheme) {
+      return computedTheme;
+    }
+
+    if (window.matchMedia?.("(prefers-color-scheme: dark)")?.matches) {
+      return "dark";
+    }
+
+    return "light";
+  }
+
+  function getCurrentChannelId() {
+    return extractLiveChannelIdFromUrl(getCurrentLivePageUrl() || window.location.href);
+  }
+
+  function applyGuestChatTheme(theme, { source = "direct" } = {}) {
+    const normalizedTheme = normalizeGuestChatTheme(theme);
+    currentGuestChatTheme = normalizedTheme;
+
+    if (isLiveChatFrameUrl(window.location.href)) {
+      document.documentElement.setAttribute(LIVE_CHAT_FRAME_ATTR, "true");
+
+      if (normalizedTheme) {
+        document.documentElement.setAttribute(GUEST_CHAT_THEME_ATTR, normalizedTheme);
+        document.documentElement.dataset.chzzkChatUiToggleGuestThemeSource = source;
+      } else {
+        document.documentElement.removeAttribute(GUEST_CHAT_THEME_ATTR);
+        delete document.documentElement.dataset.chzzkChatUiToggleGuestThemeSource;
+      }
+
+      return;
+    }
+
+    document.documentElement.removeAttribute(LIVE_CHAT_FRAME_ATTR);
+    document.documentElement.removeAttribute(GUEST_CHAT_THEME_ATTR);
+    delete document.documentElement.dataset.chzzkChatUiToggleGuestThemeSource;
+  }
+
+  function readGuestChatThemeFromBackground() {
+    const runtime = getRuntime();
+    const channelId = getCurrentChannelId();
+
+    if (!channelId || !runtime?.runtime?.sendMessage) {
+      return;
+    }
+
+    try {
+      runtime.runtime.sendMessage(
+        {
+          type: READ_GUEST_CHAT_THEME_MESSAGE,
+          channelId
+        },
+        (response) => {
+          if (runtime.runtime?.lastError || !response?.ok || response.found !== true) {
+            return;
+          }
+
+          applyGuestChatTheme(response.theme, { source: response.source || "background" });
+        }
+      );
+    } catch (_error) {
+      // Theme sync is cosmetic. A blocked runtime message should not affect chat rendering.
+    }
+  }
+
+  function publishGuestChatThemeToBackground(theme) {
+    const runtime = getRuntime();
+    const channelId = getCurrentChannelId();
+    const normalizedTheme = normalizeGuestChatTheme(theme);
+    const publishKey = `${channelId || ""}:${normalizedTheme || ""}`;
+    const now = Date.now();
+
+    if (
+      !channelId ||
+      !normalizedTheme ||
+      (publishKey === lastPublishedGuestChatThemeKey && now - lastPublishedGuestChatThemeAt < 10000)
+    ) {
+      return;
+    }
+
+    lastPublishedGuestChatThemeKey = publishKey;
+    lastPublishedGuestChatThemeAt = now;
+
+    if (!runtime?.runtime?.sendMessage) {
+      return;
+    }
+
+    try {
+      runtime.runtime.sendMessage(
+        {
+          type: SET_GUEST_CHAT_THEME_MESSAGE,
+          channelId,
+          theme: normalizedTheme
+        },
+        () => {
+          void runtime.runtime?.lastError;
+        }
+      );
+    } catch (_error) {
+      // Theme sync is best-effort and must never affect the local display toggles.
+    }
+  }
+
+  function syncGuestChatTheme() {
+    if (isLiveChatFrameUrl(window.location.href)) {
+      document.documentElement.setAttribute(LIVE_CHAT_FRAME_ATTR, "true");
+      readGuestChatThemeFromBackground();
+      return;
+    }
+
+    if (window.self !== window.top || !extractLiveChannelIdFromUrl(window.location.href)) {
+      return;
+    }
+
+    const detectedTheme = detectPageTheme();
+    currentGuestChatTheme = detectedTheme;
+    document.documentElement.dataset.chzzkChatUiToggleDetectedTheme = detectedTheme;
+    publishGuestChatThemeToBackground(detectedTheme);
+  }
+
   function injectStyle() {
     const existingStyle = document.getElementById(STYLE_ID);
 
@@ -424,6 +690,48 @@
         line-height: inherit;
         white-space: nowrap;
         user-select: none;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] {
+        color-scheme: light !important;
+        background: #ffffff !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] body,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] #root,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="chatting_area" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="chat_area" i] {
+        background-color: #ffffff !important;
+        color: #1f2328 !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] input,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] textarea,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [contenteditable="true"] {
+        background-color: #ffffff !important;
+        color: #1f2328 !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] {
+        color-scheme: dark !important;
+        background: #111315 !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] body,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] #root,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [class*="live_chatting" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [class*="chatting_area" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [class*="chat_area" i] {
+        background-color: #111315 !important;
+        color: #f1f3f5 !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] input,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] textarea,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [contenteditable="true"] {
+        background-color: #16191c !important;
+        color: #f1f3f5 !important;
       }
 
       .chzzk-chat-ui-toggle-guest-chat-toggle {
@@ -766,7 +1074,9 @@
       styleVersion: document.getElementById(STYLE_ID)?.dataset.chzzkChatUiToggleVersion || null,
       options: currentOptions,
       optionsSource: lastOptionsSource,
-      optionsLoadError: lastOptionsLoadError
+      optionsLoadError: lastOptionsLoadError,
+      guestChatTheme: currentGuestChatTheme,
+      detectedTheme: document.documentElement.dataset.chzzkChatUiToggleDetectedTheme || null
     };
   }
 
@@ -1735,6 +2045,17 @@
         return false;
       }
 
+      if (message?.type === APPLY_GUEST_CHAT_THEME_MESSAGE) {
+        const channelId = getCurrentChannelId();
+
+        if (!message.channelId || !channelId || message.channelId === channelId) {
+          applyGuestChatTheme(message.theme, { source: "background-push" });
+        }
+
+        sendResponse(getStatus());
+        return false;
+      }
+
       return false;
     });
   }
@@ -1817,11 +2138,16 @@
     }
 
     connectObserver();
+    syncGuestChatTheme();
     scheduleScan();
     loadStoredOptions(1, { allowFallback: true });
 
     if (!scanIntervalTimer) {
       scanIntervalTimer = window.setInterval(scan, SCAN_INTERVAL_MS);
+    }
+
+    if (!themeSyncTimer) {
+      themeSyncTimer = window.setInterval(syncGuestChatTheme, THEME_SYNC_INTERVAL_MS);
     }
   }
 

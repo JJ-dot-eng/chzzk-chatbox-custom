@@ -1,9 +1,13 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
 const SET_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_OPTIONS";
+const READ_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_GUEST_CHAT_THEME";
+const SET_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_GUEST_CHAT_THEME";
+const APPLY_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_APPLY_GUEST_CHAT_THEME";
 const CONTENT_SCRIPT_FILE = "content.js";
 const CHZZK_HOST_SUFFIX = ".chzzk.naver.com";
 const INJECTION_DELAYS_MS = [0, 250, 1000, 2500, 5000];
+const LIVE_CHANNEL_ID_PATTERN = /^[0-9a-f]{32}$/i;
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const NAMED_CHAT_BOX_COLORS = {
   gray: "#808080",
@@ -23,6 +27,8 @@ const DEFAULT_OPTIONS = {
   showBoldText: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
+
+const guestChatThemesByTab = new Map();
 
 function normalizeHexColor(value) {
   if (typeof value !== "string") {
@@ -61,6 +67,55 @@ function normalizeOptions(options) {
 
 function hasOwn(object, key) {
   return Object.prototype.hasOwnProperty.call(object ?? {}, key);
+}
+
+function normalizeGuestChatTheme(value) {
+  return value === "dark" || value === "light" ? value : null;
+}
+
+function normalizeChannelId(value) {
+  return typeof value === "string" && LIVE_CHANNEL_ID_PATTERN.test(value)
+    ? value.toLowerCase()
+    : null;
+}
+
+function getGuestChatTheme(tabId, channelId) {
+  const tabThemes = guestChatThemesByTab.get(tabId);
+
+  return tabThemes?.get(channelId) || null;
+}
+
+function setGuestChatTheme(tabId, channelId, theme) {
+  let tabThemes = guestChatThemesByTab.get(tabId);
+
+  if (!tabThemes) {
+    tabThemes = new Map();
+    guestChatThemesByTab.set(tabId, tabThemes);
+  }
+
+  const entry = {
+    channelId,
+    theme,
+    updatedAt: Date.now()
+  };
+
+  tabThemes.set(channelId, entry);
+  return entry;
+}
+
+function broadcastGuestChatTheme(tabId, entry) {
+  chrome.tabs.sendMessage(
+    tabId,
+    {
+      type: APPLY_GUEST_CHAT_THEME_MESSAGE,
+      channelId: entry.channelId,
+      theme: entry.theme,
+      source: "background"
+    },
+    () => {
+      void chrome.runtime.lastError;
+    }
+  );
 }
 
 function getStoredOptions(sendResponse) {
@@ -182,6 +237,10 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   scheduleContentScriptInjection(tabId);
 });
 
+chrome.tabs.onRemoved.addListener((tabId) => {
+  guestChatThemesByTab.delete(tabId);
+});
+
 chrome.webNavigation.onCommitted.addListener((details) => {
   if (details.frameId !== 0 || !isChzzkUrl(details.url)) {
     return;
@@ -210,6 +269,44 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === READ_OPTIONS_MESSAGE) {
     getStoredOptions(sendResponse);
     return true;
+  }
+
+  if (message?.type === SET_GUEST_CHAT_THEME_MESSAGE) {
+    const tabId = _sender.tab?.id;
+    const channelId = normalizeChannelId(message.channelId);
+    const theme = normalizeGuestChatTheme(message.theme);
+
+    if (!Number.isInteger(tabId) || !channelId || !theme) {
+      sendResponse({ ok: false, error: "invalid-guest-chat-theme" });
+      return false;
+    }
+
+    const entry = setGuestChatTheme(tabId, channelId, theme);
+    broadcastGuestChatTheme(tabId, entry);
+    sendResponse({ ok: true, theme, channelId });
+    return false;
+  }
+
+  if (message?.type === READ_GUEST_CHAT_THEME_MESSAGE) {
+    const tabId = _sender.tab?.id;
+    const channelId = normalizeChannelId(message.channelId);
+
+    if (!Number.isInteger(tabId) || !channelId) {
+      sendResponse({ ok: false, error: "invalid-guest-chat-theme-request" });
+      return false;
+    }
+
+    const entry = getGuestChatTheme(tabId, channelId);
+
+    sendResponse({
+      ok: true,
+      found: Boolean(entry),
+      channelId,
+      theme: entry?.theme || null,
+      updatedAt: entry?.updatedAt || null,
+      source: "background"
+    });
+    return false;
   }
 
   return false;
