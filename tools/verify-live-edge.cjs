@@ -9,13 +9,7 @@ const LIVE_URL =
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const ROLE_ATTR = "data-chzzk-chat-ui-toggle-role";
 const OUTPUT_DIR = path.join(process.cwd(), "output", "playwright");
-const EXPECTED_CHAT_BOX_COLORS = {
-  gray: "rgba(128, 128, 128, 0.18)",
-  green: "rgba(0, 196, 113, 0.16)",
-  blue: "rgba(75, 139, 255, 0.18)",
-  purple: "rgba(139, 92, 246, 0.18)",
-  yellow: "rgba(245, 189, 35, 0.2)"
-};
+const DEFAULT_CHAT_BOX_COLOR = "#808080";
 
 const onOptions = {
   showNicknames: true,
@@ -23,7 +17,7 @@ const onOptions = {
   showTimestamps: true,
   showChatBoxes: true,
   showLargeText: false,
-  chatBoxColor: "gray"
+  chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
 
 const offOptions = {
@@ -32,7 +26,7 @@ const offOptions = {
   showTimestamps: false,
   showChatBoxes: true,
   showLargeText: false,
-  chatBoxColor: "gray"
+  chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
 
 const badgeOffOptions = {
@@ -41,7 +35,7 @@ const badgeOffOptions = {
   showTimestamps: true,
   showChatBoxes: true,
   showLargeText: false,
-  chatBoxColor: "gray"
+  chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
 
 const nicknameOffOptions = {
@@ -50,7 +44,7 @@ const nicknameOffOptions = {
   showTimestamps: true,
   showChatBoxes: true,
   showLargeText: false,
-  chatBoxColor: "gray"
+  chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
 
 const chatBoxOffOptions = {
@@ -59,7 +53,7 @@ const chatBoxOffOptions = {
   showTimestamps: true,
   showChatBoxes: false,
   showLargeText: false,
-  chatBoxColor: "gray"
+  chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
 
 const largeTextColorOptions = {
@@ -68,8 +62,32 @@ const largeTextColorOptions = {
   showTimestamps: true,
   showChatBoxes: true,
   showLargeText: true,
-  chatBoxColor: "blue"
+  chatBoxColor: "#4b8bff"
 };
+
+function normalizeHexColor(value) {
+  const trimmed = String(value || "").trim();
+  const hex = trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
+
+  if (/^#[0-9a-f]{3}$/i.test(hex)) {
+    return `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`.toLowerCase();
+  }
+
+  if (/^#[0-9a-f]{6}$/i.test(hex)) {
+    return hex.toLowerCase();
+  }
+
+  return DEFAULT_CHAT_BOX_COLOR;
+}
+
+function hexToExpectedRgba(hexColor) {
+  const hex = normalizeHexColor(hexColor).slice(1);
+  const red = Number.parseInt(hex.slice(0, 2), 16);
+  const green = Number.parseInt(hex.slice(2, 4), 16);
+  const blue = Number.parseInt(hex.slice(4, 6), 16);
+
+  return `rgba(${red}, ${green}, ${blue}, 0.18)`;
+}
 
 function summarizeFrameState(frameStates) {
   const summary = frameStates.reduce(
@@ -488,12 +506,8 @@ function assertChatBoxesOn(label, summary) {
   }
 }
 
-function assertChatBoxColor(label, summary, colorName) {
-  const expectedColor = EXPECTED_CHAT_BOX_COLORS[colorName];
-
-  if (!expectedColor) {
-    throw new Error(`${label}: unknown expected chat box color ${colorName}`);
-  }
+function assertChatBoxColor(label, summary, hexColor) {
+  const expectedColor = hexToExpectedRgba(hexColor);
 
   if (!summary.layout.chatBoxes.backgroundColors.includes(expectedColor)) {
     throw new Error(`${label}: expected ${expectedColor} chat box background`);
@@ -586,7 +600,9 @@ async function setPopupOptions(popup, options) {
   await popup.locator("#showLargeText").setChecked(options.showLargeText);
 
   if (options.chatBoxColor) {
-    await popup.locator(`[data-chat-box-color="${options.chatBoxColor}"]`).click();
+    const hexInput = popup.locator("#chatBoxColorHex");
+    await hexInput.fill(options.chatBoxColor);
+    await hexInput.press("Enter");
   }
 }
 
@@ -630,7 +646,7 @@ async function main() {
   assertSummary("initial on state", before.summary);
   assertOnState(before.summary);
   assertChatBoxesOn("initial on state", before.summary);
-  assertChatBoxColor("initial on state", before.summary, "gray");
+  assertChatBoxColor("initial on state", before.summary, DEFAULT_CHAT_BOX_COLOR);
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-on-before.png"), fullPage: false });
 
   const popup = await context.newPage();
@@ -664,7 +680,7 @@ async function main() {
   assertOnState(largeTextColor.summary);
   assertChatBoxesOn("large-text color state", largeTextColor.summary);
   assertLargeTextOn("large-text color state", largeTextColor.summary);
-  assertChatBoxColor("large-text color state", largeTextColor.summary, "blue");
+  assertChatBoxColor("large-text color state", largeTextColor.summary, largeTextColorOptions.chatBoxColor);
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-large-text-blue.png"), fullPage: false });
 
   await setPopupOptions(popup, chatBoxOffOptions);
@@ -687,7 +703,7 @@ async function main() {
   const onAfter = await collectState(page, "popup on state");
   assertOnState(onAfter.summary);
   assertChatBoxesOn("popup on state", onAfter.summary);
-  assertChatBoxColor("popup on state", onAfter.summary, "gray");
+  assertChatBoxColor("popup on state", onAfter.summary, DEFAULT_CHAT_BOX_COLOR);
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-on-after.png"), fullPage: false });
 
   await popup.close();

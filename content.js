@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.3";
+  const SCRIPT_VERSION = "0.1.4";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -23,7 +23,7 @@
     showTimestamps: true,
     showChatBoxes: true,
     showLargeText: false,
-    chatBoxColor: "gray"
+    chatBoxColor: "#808080"
   };
 
   const DATASET_KEYS = {
@@ -34,27 +34,12 @@
     showLargeText: "chzzkChatUiToggleLargeText"
   };
 
-  const CHAT_BOX_COLORS = {
-    gray: {
-      base: "rgba(128, 128, 128, 0.18)",
-      hover: "rgba(128, 128, 128, 0.24)"
-    },
-    green: {
-      base: "rgba(0, 196, 113, 0.16)",
-      hover: "rgba(0, 196, 113, 0.24)"
-    },
-    blue: {
-      base: "rgba(75, 139, 255, 0.18)",
-      hover: "rgba(75, 139, 255, 0.26)"
-    },
-    purple: {
-      base: "rgba(139, 92, 246, 0.18)",
-      hover: "rgba(139, 92, 246, 0.26)"
-    },
-    yellow: {
-      base: "rgba(245, 189, 35, 0.2)",
-      hover: "rgba(245, 189, 35, 0.28)"
-    }
+  const NAMED_CHAT_BOX_COLORS = {
+    gray: "#808080",
+    green: "#00c471",
+    blue: "#4b8bff",
+    purple: "#8b5cf6",
+    yellow: "#f5bd23"
   };
 
   const CHAT_ROOT_SELECTORS = [
@@ -125,18 +110,50 @@
     return chrome;
   }
 
-  function normalizeOptions(options) {
-    const chatBoxColor = Object.hasOwn(CHAT_BOX_COLORS, options?.chatBoxColor)
-      ? options.chatBoxColor
-      : DEFAULT_OPTIONS.chatBoxColor;
+  function normalizeHexColor(value) {
+    if (typeof value !== "string") {
+      return DEFAULT_OPTIONS.chatBoxColor;
+    }
 
+    const mappedValue = NAMED_CHAT_BOX_COLORS[value] || value;
+    const trimmed = mappedValue.trim();
+    const hex = trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
+
+    if (/^#[0-9a-f]{3}$/i.test(hex)) {
+      return `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`.toLowerCase();
+    }
+
+    if (/^#[0-9a-f]{6}$/i.test(hex)) {
+      return hex.toLowerCase();
+    }
+
+    return DEFAULT_OPTIONS.chatBoxColor;
+  }
+
+  function hexToRgb(hexColor) {
+    const hex = normalizeHexColor(hexColor).slice(1);
+
+    return {
+      red: Number.parseInt(hex.slice(0, 2), 16),
+      green: Number.parseInt(hex.slice(2, 4), 16),
+      blue: Number.parseInt(hex.slice(4, 6), 16)
+    };
+  }
+
+  function hexToRgba(hexColor, alpha) {
+    const { red, green, blue } = hexToRgb(hexColor);
+
+    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+  }
+
+  function normalizeOptions(options) {
     return {
       showNicknames: options?.showNicknames !== false,
       showBadges: options?.showBadges !== false,
       showTimestamps: options?.showTimestamps !== false,
       showChatBoxes: options?.showChatBoxes !== false,
       showLargeText: options?.showLargeText === true,
-      chatBoxColor
+      chatBoxColor: normalizeHexColor(options?.chatBoxColor)
     };
   }
 
@@ -359,9 +376,14 @@
     document.documentElement.dataset.chzzkChatUiToggleVersion = SCRIPT_VERSION;
     document.documentElement.dataset.chzzkChatUiToggleChatBoxColor = currentOptions.chatBoxColor;
 
-    const color = CHAT_BOX_COLORS[currentOptions.chatBoxColor];
-    document.documentElement.style.setProperty("--chzzk-chat-ui-toggle-box-bg", color.base);
-    document.documentElement.style.setProperty("--chzzk-chat-ui-toggle-box-bg-hover", color.hover);
+    document.documentElement.style.setProperty(
+      "--chzzk-chat-ui-toggle-box-bg",
+      hexToRgba(currentOptions.chatBoxColor, 0.18)
+    );
+    document.documentElement.style.setProperty(
+      "--chzzk-chat-ui-toggle-box-bg-hover",
+      hexToRgba(currentOptions.chatBoxColor, 0.26)
+    );
 
     for (const [optionKey, datasetKey] of Object.entries(DATASET_KEYS)) {
       document.documentElement.dataset[datasetKey] = currentOptions[optionKey] ? "on" : "off";

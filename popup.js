@@ -1,7 +1,13 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
-const CONTENT_VERSION = "0.1.3";
-const DEFAULT_CHAT_BOX_COLOR = "gray";
-const CHAT_BOX_COLORS = new Set(["gray", "green", "blue", "purple", "yellow"]);
+const CONTENT_VERSION = "0.1.4";
+const DEFAULT_CHAT_BOX_COLOR = "#808080";
+const NAMED_CHAT_BOX_COLORS = {
+  gray: "#808080",
+  green: "#00c471",
+  blue: "#4b8bff",
+  purple: "#8b5cf6",
+  yellow: "#f5bd23"
+};
 
 const DEFAULT_OPTIONS = {
   showNicknames: true,
@@ -14,26 +20,163 @@ const DEFAULT_OPTIONS = {
 
 const controlIds = ["showNicknames", "showBadges", "showTimestamps", "showChatBoxes", "showLargeText"];
 const controls = Object.fromEntries(controlIds.map((id) => [id, document.getElementById(id)]));
-const swatches = [...document.querySelectorAll("[data-chat-box-color]")];
+const colorPreview = document.getElementById("colorPreview");
+const hexInput = document.getElementById("chatBoxColorHex");
+const resetColorButton = document.getElementById("resetChatBoxColor");
+const colorField = document.getElementById("colorField");
+const colorFieldHandle = document.getElementById("colorFieldHandle");
+const hueSlider = document.getElementById("hueSlider");
 const statusElement = document.getElementById("status");
 
-function normalizeOptions(options) {
-  const chatBoxColor = CHAT_BOX_COLORS.has(options?.chatBoxColor)
-    ? options.chatBoxColor
-    : DEFAULT_CHAT_BOX_COLOR;
+let currentColor = DEFAULT_CHAT_BOX_COLOR;
+let hsv = { hue: 0, saturation: 0, value: 0.5 };
+let colorApplyTimer = 0;
 
+function normalizeHexColor(value) {
+  if (typeof value !== "string") {
+    return DEFAULT_CHAT_BOX_COLOR;
+  }
+
+  const mappedValue = NAMED_CHAT_BOX_COLORS[value] || value;
+  const trimmed = mappedValue.trim();
+  const hex = trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
+
+  if (/^#[0-9a-f]{3}$/i.test(hex)) {
+    return `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`.toLowerCase();
+  }
+
+  if (/^#[0-9a-f]{6}$/i.test(hex)) {
+    return hex.toLowerCase();
+  }
+
+  return DEFAULT_CHAT_BOX_COLOR;
+}
+
+function isValidHexInput(value) {
+  const trimmed = value.trim();
+
+  return /^#?[0-9a-f]{3}$/i.test(trimmed) || /^#?[0-9a-f]{6}$/i.test(trimmed);
+}
+
+function isCompleteHexInput(value) {
+  return /^#?[0-9a-f]{6}$/i.test(value.trim());
+}
+
+function isPendingHexInput(value) {
+  return /^#?[0-9a-f]{0,6}$/i.test(value.trim());
+}
+
+function hexToRgb(hexColor) {
+  const hex = normalizeHexColor(hexColor).slice(1);
+
+  return {
+    red: Number.parseInt(hex.slice(0, 2), 16),
+    green: Number.parseInt(hex.slice(2, 4), 16),
+    blue: Number.parseInt(hex.slice(4, 6), 16)
+  };
+}
+
+function rgbToHex({ red, green, blue }) {
+  return `#${[red, green, blue]
+    .map((value) => Math.round(value).toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
+function rgbToHsv({ red, green, blue }) {
+  const r = red / 255;
+  const g = green / 255;
+  const b = blue / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  let hue = 0;
+
+  if (delta > 0) {
+    if (max === r) {
+      hue = 60 * (((g - b) / delta) % 6);
+    } else if (max === g) {
+      hue = 60 * ((b - r) / delta + 2);
+    } else {
+      hue = 60 * ((r - g) / delta + 4);
+    }
+  }
+
+  return {
+    hue: Math.round((hue + 360) % 360),
+    saturation: max === 0 ? 0 : delta / max,
+    value: max
+  };
+}
+
+function hsvToRgb({ hue, saturation, value }) {
+  const chroma = value * saturation;
+  const x = chroma * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const m = value - chroma;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+
+  if (hue < 60) {
+    r = chroma;
+    g = x;
+  } else if (hue < 120) {
+    r = x;
+    g = chroma;
+  } else if (hue < 180) {
+    g = chroma;
+    b = x;
+  } else if (hue < 240) {
+    g = x;
+    b = chroma;
+  } else if (hue < 300) {
+    r = x;
+    b = chroma;
+  } else {
+    r = chroma;
+    b = x;
+  }
+
+  return {
+    red: (r + m) * 255,
+    green: (g + m) * 255,
+    blue: (b + m) * 255
+  };
+}
+
+function hueToHex(hue) {
+  return rgbToHex(hsvToRgb({ hue, saturation: 1, value: 1 }));
+}
+
+function normalizeOptions(options) {
   return {
     showNicknames: options?.showNicknames !== false,
     showBadges: options?.showBadges !== false,
     showTimestamps: options?.showTimestamps !== false,
     showChatBoxes: options?.showChatBoxes !== false,
     showLargeText: options?.showLargeText === true,
-    chatBoxColor
+    chatBoxColor: normalizeHexColor(options?.chatBoxColor)
   };
 }
 
 function setStatus(message) {
   statusElement.textContent = message;
+}
+
+function updateColorUi(hexColor, { syncInput = true } = {}) {
+  currentColor = normalizeHexColor(hexColor);
+  hsv = rgbToHsv(hexToRgb(currentColor));
+
+  document.documentElement.style.setProperty("--current-color", currentColor);
+  document.documentElement.style.setProperty("--field-hue", hueToHex(hsv.hue));
+  colorField.style.setProperty("--field-x", String(hsv.saturation));
+  colorField.style.setProperty("--field-y", String(1 - hsv.value));
+  colorPreview.style.backgroundColor = currentColor;
+  hueSlider.value = String(hsv.hue);
+
+  if (syncInput) {
+    hexInput.value = currentColor;
+    hexInput.classList.remove("is-invalid");
+  }
 }
 
 function setControls(options) {
@@ -43,24 +186,17 @@ function setControls(options) {
     controls[id].checked = normalized[id];
   }
 
-  for (const swatch of swatches) {
-    const isSelected = swatch.dataset.chatBoxColor === normalized.chatBoxColor;
-    swatch.classList.toggle("is-selected", isSelected);
-    swatch.setAttribute("aria-checked", String(isSelected));
-    swatch.setAttribute("role", "radio");
-  }
+  updateColorUi(normalized.chatBoxColor);
 }
 
 function readControls() {
-  const selectedSwatch = swatches.find((swatch) => swatch.classList.contains("is-selected"));
-
   return normalizeOptions({
     showNicknames: controls.showNicknames.checked,
     showBadges: controls.showBadges.checked,
     showTimestamps: controls.showTimestamps.checked,
     showChatBoxes: controls.showChatBoxes.checked,
     showLargeText: controls.showLargeText.checked,
-    chatBoxColor: selectedSwatch?.dataset.chatBoxColor
+    chatBoxColor: currentColor
   });
 }
 
@@ -209,27 +345,110 @@ async function applyToActiveTab(options) {
   setStatus(ready && applied?.ok ? "적용됨" : "새로고침 필요");
 }
 
-async function handleControlChange() {
+async function applyCurrentOptions() {
   const options = readControls();
   await setStoredOptions(options);
   await applyToActiveTab(options);
 }
 
-async function handleColorChange(event) {
-  const color = event.currentTarget.dataset.chatBoxColor;
+function scheduleColorApply() {
+  window.clearTimeout(colorApplyTimer);
+  colorApplyTimer = window.setTimeout(applyCurrentOptions, 100);
+}
 
-  if (!CHAT_BOX_COLORS.has(color)) {
+async function handleControlChange() {
+  await applyCurrentOptions();
+}
+
+function setColorFromHsv(nextHsv, { commit = true } = {}) {
+  hsv = {
+    hue: Math.max(0, Math.min(360, nextHsv.hue)),
+    saturation: Math.max(0, Math.min(1, nextHsv.saturation)),
+    value: Math.max(0, Math.min(1, nextHsv.value))
+  };
+  updateColorUi(rgbToHex(hsvToRgb(hsv)));
+
+  if (commit) {
+    scheduleColorApply();
+  }
+}
+
+function updateColorFromField(event) {
+  const rect = colorField.getBoundingClientRect();
+  const x = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+  const y = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
+
+  setColorFromHsv({
+    hue: hsv.hue,
+    saturation: x,
+    value: 1 - y
+  });
+}
+
+function handleColorFieldPointerDown(event) {
+  colorField.setPointerCapture(event.pointerId);
+  updateColorFromField(event);
+}
+
+function handleColorFieldPointerMove(event) {
+  if (colorField.hasPointerCapture(event.pointerId)) {
+    updateColorFromField(event);
+  }
+}
+
+function handleHueChange() {
+  setColorFromHsv({
+    hue: Number(hueSlider.value),
+    saturation: hsv.saturation,
+    value: hsv.value
+  });
+}
+
+function commitHexInput() {
+  if (!isValidHexInput(hexInput.value)) {
+    hexInput.classList.add("is-invalid");
     return;
   }
 
-  const options = normalizeOptions({
-    ...readControls(),
-    chatBoxColor: color
-  });
+  updateColorUi(normalizeHexColor(hexInput.value));
+  applyCurrentOptions();
+}
 
-  setControls(options);
-  await setStoredOptions(options);
-  await applyToActiveTab(options);
+function handleHexInput() {
+  if (!hexInput.value.trim()) {
+    hexInput.classList.remove("is-invalid");
+    return;
+  }
+
+  if (isCompleteHexInput(hexInput.value)) {
+    updateColorUi(normalizeHexColor(hexInput.value), { syncInput: false });
+    hexInput.classList.remove("is-invalid");
+    scheduleColorApply();
+    return;
+  }
+
+  hexInput.classList.toggle("is-invalid", !isPendingHexInput(hexInput.value));
+}
+
+function handleHexKeyDown(event) {
+  if (event.key === "Enter") {
+    commitHexInput();
+    hexInput.blur();
+  }
+}
+
+function handleHexBlur() {
+  if (isValidHexInput(hexInput.value)) {
+    commitHexInput();
+    return;
+  }
+
+  updateColorUi(currentColor);
+}
+
+async function handleResetColor() {
+  updateColorUi(DEFAULT_CHAT_BOX_COLOR);
+  await applyCurrentOptions();
 }
 
 async function init() {
@@ -241,9 +460,13 @@ async function init() {
     controls[id].addEventListener("change", handleControlChange);
   }
 
-  for (const swatch of swatches) {
-    swatch.addEventListener("click", handleColorChange);
-  }
+  colorField.addEventListener("pointerdown", handleColorFieldPointerDown);
+  colorField.addEventListener("pointermove", handleColorFieldPointerMove);
+  hueSlider.addEventListener("input", handleHueChange);
+  hexInput.addEventListener("input", handleHexInput);
+  hexInput.addEventListener("keydown", handleHexKeyDown);
+  hexInput.addEventListener("blur", handleHexBlur);
+  resetColorButton.addEventListener("click", handleResetColor);
 }
 
 init().catch(() => {
