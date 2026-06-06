@@ -29,8 +29,18 @@ if (!manifest.host_permissions?.includes("https://chzzk.naver.com/*")) {
   throw new Error("CHZZK host permission is missing.");
 }
 
+if (!manifest.host_permissions?.includes("https://*.chzzk.naver.com/*")) {
+  throw new Error("CHZZK wildcard host permission is missing.");
+}
+
 if (manifest.action?.default_popup !== "popup.html") {
   throw new Error("default popup must point to popup.html.");
+}
+
+const contentScript = manifest.content_scripts?.[0];
+
+if (!contentScript?.all_frames) {
+  throw new Error("content script should run in all CHZZK frames.");
 }
 
 console.log("Extension manifest and root files are valid.");

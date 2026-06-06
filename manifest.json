@@ -12,17 +12,20 @@
     "activeTab"
   ],
   "host_permissions": [
-    "https://chzzk.naver.com/*"
+    "https://chzzk.naver.com/*",
+    "https://*.chzzk.naver.com/*"
   ],
   "content_scripts": [
     {
       "matches": [
-        "https://chzzk.naver.com/*"
+        "https://chzzk.naver.com/*",
+        "https://*.chzzk.naver.com/*"
       ],
       "js": [
         "content.js"
       ],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ]
 }
