@@ -6,6 +6,8 @@ const manifestPath = path.join(root, "manifest.json");
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 const contentSource = await readFile(path.join(root, "content.js"), "utf8");
 const backgroundSource = await readFile(path.join(root, "background.js"), "utf8");
+const popupMarkup = await readFile(path.join(root, "popup.html"), "utf8");
+const popupSource = await readFile(path.join(root, "popup.js"), "utf8");
 
 const requiredRootFiles = [
   "manifest.json",
@@ -204,6 +206,35 @@ for (const token of requiredContentIncognitoChatTokens) {
   if (!contentSource.includes(token)) {
     throw new Error(`content script must render an incognito chat icon button: ${token}`);
   }
+}
+
+const requiredGuestChatTokens = [
+  "useGuestChatFrame: false",
+  'useGuestChatFrame: "chzzkChatUiToggleGuestChatFrame"',
+  'const GUEST_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-guest-chat-frame";',
+  "function syncGuestChatFrame()",
+  "function supportsCredentiallessIframe()",
+  "function isGuestChatFrameEligibleContext()",
+  "iframe.credentialless = true",
+  "syncGuestChatFrame();"
+];
+
+for (const token of requiredGuestChatTokens) {
+  if (!contentSource.includes(token)) {
+    throw new Error(`content script must support the credentialless guest chat experiment: ${token}`);
+  }
+}
+
+if (!backgroundSource.includes("useGuestChatFrame: options?.useGuestChatFrame === true")) {
+  throw new Error("background script must normalize the guest chat option.");
+}
+
+if (!popupMarkup.includes('id="useGuestChatFrame"')) {
+  throw new Error("popup must include a guest chat frame toggle.");
+}
+
+if (!popupSource.includes('"useGuestChatFrame"')) {
+  throw new Error("popup script must store and apply the guest chat option.");
 }
 
 const unsafeRoleSelectors = [

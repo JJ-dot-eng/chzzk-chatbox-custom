@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.17";
+  const SCRIPT_VERSION = "0.1.18";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -17,6 +17,7 @@
   const CACHE_KEY = "chzzkChatUiToggleOptionsCache";
   const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
   const OPEN_INCOGNITO_CHAT_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_INCOGNITO_CHAT";
+  const CHZZK_ORIGIN = "https://chzzk.naver.com";
   const STORAGE_READ_TIMEOUT_MS = 700;
   const OPTIONS_LOAD_RETRY_MS = 250;
   const OPTIONS_LOAD_MAX_ATTEMPTS = 20;
@@ -27,6 +28,9 @@
   const INCOGNITO_CHAT_BUTTON_ID = "chzzk-chat-ui-toggle-incognito-chat-button";
   const INCOGNITO_CHAT_BUTTON_ICON_CLASS = "chzzk-chat-ui-toggle-incognito-chat-button__icon";
   const INCOGNITO_CHAT_BUTTON_HOST_ATTR = "data-chzzk-chat-ui-toggle-action-host";
+  const GUEST_CHAT_FRAME_CONTAINER_ID = "chzzk-chat-ui-toggle-guest-chat-frame-container";
+  const GUEST_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-guest-chat-frame";
+  const GUEST_CHAT_HOST_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-host";
   const LIVE_CHANNEL_ID_PATTERN = /^[0-9a-f]{32}$/i;
 
   const DEFAULT_OPTIONS = {
@@ -34,6 +38,7 @@
     showBadges: true,
     showTimestamps: true,
     showChatBoxes: true,
+    useGuestChatFrame: false,
     showLargeText: false,
     showBoldText: false,
     chatBoxColor: "#808080"
@@ -44,6 +49,7 @@
     showBadges: "chzzkChatUiToggleBadges",
     showTimestamps: "chzzkChatUiToggleTimestamps",
     showChatBoxes: "chzzkChatUiToggleChatBoxes",
+    useGuestChatFrame: "chzzkChatUiToggleGuestChatFrame",
     showLargeText: "chzzkChatUiToggleLargeText",
     showBoldText: "chzzkChatUiToggleBoldText"
   };
@@ -173,6 +179,7 @@
       showBadges: options?.showBadges !== false,
       showTimestamps: options?.showTimestamps !== false,
       showChatBoxes: options?.showChatBoxes !== false,
+      useGuestChatFrame: options?.useGuestChatFrame === true,
       showLargeText: options?.showLargeText === true,
       showBoldText: options?.showBoldText === true || legacyBoldText,
       chatBoxColor: normalizeHexColor(options?.chatBoxColor)
@@ -479,6 +486,40 @@
         transform-origin: right center !important;
       }
 
+      html[data-chzzk-chat-ui-toggle-guest-chat-frame="on"]
+        [${GUEST_CHAT_HOST_ATTR}="true"] {
+        position: relative !important;
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 360px !important;
+        overflow: hidden !important;
+      }
+
+      html[data-chzzk-chat-ui-toggle-guest-chat-frame="on"]
+        [${GUEST_CHAT_HOST_ATTR}="true"] > :not(#${GUEST_CHAT_FRAME_CONTAINER_ID}) {
+        display: none !important;
+      }
+
+      #${GUEST_CHAT_FRAME_CONTAINER_ID} {
+        display: flex !important;
+        flex: 1 1 auto !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        min-height: 360px !important;
+        height: 100% !important;
+        background: transparent !important;
+      }
+
+      #${GUEST_CHAT_FRAME_ID} {
+        display: block !important;
+        flex: 1 1 auto !important;
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 360px !important;
+        border: 0 !important;
+        background: transparent !important;
+      }
+
       html[data-chzzk-chat-ui-toggle-chat-boxes="on"]
         ${NATIVE_CHAT_ROW_SELECTOR} {
         width: fit-content !important;
@@ -663,6 +704,8 @@
       document.documentElement.dataset[datasetKey] = currentOptions[optionKey] ? "on" : "off";
     }
 
+    syncGuestChatFrame();
+
     if (markAsReady) {
       markReady();
     }
@@ -730,8 +773,143 @@
     return extractLiveChannelIdFromUrl(window.location.href) ? window.location.href : null;
   }
 
+  function isLiveChatFrameUrl(url) {
+    try {
+      const parsedUrl = new URL(url);
+      const pathParts = parsedUrl.pathname.split("/").filter(Boolean);
+
+      return pathParts[0] === "live" && LIVE_CHANNEL_ID_PATTERN.test(pathParts[1] || "") && pathParts[2] === "chat";
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function getGuestChatFrameUrl() {
+    const pageUrl = getCurrentLivePageUrl();
+    const channelId = extractLiveChannelIdFromUrl(pageUrl);
+
+    return channelId ? `${CHZZK_ORIGIN}/live/${channelId}/chat` : null;
+  }
+
+  function supportsCredentiallessIframe() {
+    return typeof HTMLIFrameElement !== "undefined" && "credentialless" in HTMLIFrameElement.prototype;
+  }
+
+  function isGuestChatFrameEligibleContext() {
+    if (window.self !== window.top) {
+      return false;
+    }
+
+    return Boolean(getGuestChatFrameUrl()) && !isLiveChatFrameUrl(window.location.href);
+  }
+
   function isElementVisible(element) {
     return element instanceof HTMLElement && element.getClientRects().length > 0;
+  }
+
+  function clearGuestChatHosts(activeHost = null) {
+    const hosts = document.querySelectorAll(`[${GUEST_CHAT_HOST_ATTR}="true"]`);
+
+    for (const host of hosts) {
+      if (host !== activeHost) {
+        host.removeAttribute(GUEST_CHAT_HOST_ATTR);
+      }
+    }
+  }
+
+  function removeGuestChatFrame() {
+    document.getElementById(GUEST_CHAT_FRAME_CONTAINER_ID)?.remove();
+    clearGuestChatHosts();
+  }
+
+  function createGuestChatFrameContainer() {
+    const container = document.createElement("div");
+    const iframe = document.createElement("iframe");
+
+    container.id = GUEST_CHAT_FRAME_CONTAINER_ID;
+    iframe.id = GUEST_CHAT_FRAME_ID;
+    iframe.title = "비로그인 치지직 채팅";
+    iframe.referrerPolicy = "origin";
+    iframe.setAttribute("credentialless", "");
+    iframe.credentialless = true;
+    container.append(iframe);
+
+    return container;
+  }
+
+  function findGuestChatHostFrom(element) {
+    for (let current = element; current && current !== document.body; current = current.parentElement) {
+      if (!(current instanceof HTMLElement)) {
+        continue;
+      }
+
+      const className = getClassName(current);
+      const hasChatShellClass = /live_chatting|chatting_area|chat_area/i.test(className);
+      const isHeaderOnly = /live_chatting_header_/i.test(className);
+      const hasChatParts = Boolean(
+        current.querySelector(
+          "[class*='live_chatting_header_container' i], [class*='live_chatting_input_container' i], [class*='live_chatting_list_item' i]"
+        )
+      );
+
+      if (hasChatShellClass && !isHeaderOnly && hasChatParts) {
+        return current;
+      }
+    }
+
+    return null;
+  }
+
+  function findGuestChatHost() {
+    const rowHost = findRowIncognitoChatHost();
+
+    if (rowHost && rowHost !== document.body) {
+      return rowHost;
+    }
+
+    const headerTarget = findHeaderIncognitoChatTarget();
+    const headerHost = headerTarget ? findGuestChatHostFrom(headerTarget) : null;
+
+    if (headerHost) {
+      return headerHost;
+    }
+
+    const actionHost = queryAllSafe(document, CHAT_ACTION_HOST_SELECTORS)
+      .filter((element) => element instanceof HTMLElement)
+      .filter(isElementVisible)
+      .map(findGuestChatHostFrom)
+      .find((element) => element instanceof HTMLElement);
+
+    return actionHost || null;
+  }
+
+  function syncGuestChatFrame() {
+    if (!currentOptions.useGuestChatFrame || !isGuestChatFrameEligibleContext() || !supportsCredentiallessIframe()) {
+      removeGuestChatFrame();
+      return;
+    }
+
+    const frameUrl = getGuestChatFrameUrl();
+    const host = findGuestChatHost();
+
+    if (!frameUrl || !host) {
+      return;
+    }
+
+    const container =
+      document.getElementById(GUEST_CHAT_FRAME_CONTAINER_ID) || createGuestChatFrameContainer();
+    const iframe = container.querySelector(`#${GUEST_CHAT_FRAME_ID}`);
+
+    if (iframe instanceof HTMLIFrameElement && iframe.src !== frameUrl) {
+      iframe.src = frameUrl;
+    }
+
+    host.setAttribute(GUEST_CHAT_HOST_ATTR, "true");
+    clearGuestChatHosts(host);
+
+    if (container.parentElement !== host) {
+      host.append(container);
+    }
   }
 
   function clearIncognitoChatButtonHosts(activeHost = null) {
@@ -1311,6 +1489,7 @@
         scanRows(getChatRows(root));
       }
 
+      syncGuestChatFrame();
       ensureIncognitoChatButton();
     } finally {
       isScanning = false;
@@ -1393,6 +1572,7 @@
 
         if (addedRows.length > 0) {
           scanRows(addedRows);
+          syncGuestChatFrame();
           ensureIncognitoChatButton();
         } else {
           scan();

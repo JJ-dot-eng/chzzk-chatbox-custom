@@ -1,5 +1,5 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
-const CONTENT_VERSION = "0.1.17";
+const CONTENT_VERSION = "0.1.18";
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const NAMED_CHAT_BOX_COLORS = {
   gray: "#808080",
@@ -14,12 +14,21 @@ const DEFAULT_OPTIONS = {
   showBadges: true,
   showTimestamps: true,
   showChatBoxes: true,
+  useGuestChatFrame: false,
   showLargeText: false,
   showBoldText: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
 
-const controlIds = ["showNicknames", "showBadges", "showTimestamps", "showChatBoxes", "showLargeText", "showBoldText"];
+const controlIds = [
+  "showNicknames",
+  "showBadges",
+  "showTimestamps",
+  "showChatBoxes",
+  "useGuestChatFrame",
+  "showLargeText",
+  "showBoldText"
+];
 const controls = Object.fromEntries(controlIds.map((id) => [id, document.getElementById(id)]));
 const tabButtons = [...document.querySelectorAll("[data-tab-target]")];
 const tabPanels = [...document.querySelectorAll(".tab-panel")];
@@ -158,6 +167,7 @@ function normalizeOptions(options) {
     showBadges: options?.showBadges !== false,
     showTimestamps: options?.showTimestamps !== false,
     showChatBoxes: options?.showChatBoxes !== false,
+    useGuestChatFrame: options?.useGuestChatFrame === true,
     showLargeText: options?.showLargeText === true,
     showBoldText: options?.showBoldText === true || legacyBoldText,
     chatBoxColor: normalizeHexColor(options?.chatBoxColor)
@@ -215,6 +225,7 @@ function readControls() {
     showBadges: controls.showBadges.checked,
     showTimestamps: controls.showTimestamps.checked,
     showChatBoxes: controls.showChatBoxes.checked,
+    useGuestChatFrame: controls.useGuestChatFrame.checked,
     showLargeText: controls.showLargeText.checked,
     showBoldText: controls.showBoldText.checked,
     chatBoxColor: currentColor
