@@ -233,6 +233,9 @@ const requiredGuestChatTokens = [
   "function ensureGuestChatToggleButton()",
   "function toggleGuestChatFrame(button)",
   "function findGuestChatToggleTarget()",
+  "function findGuestChatControlHost(guestHost, header = null)",
+  "function markGuestChatControlHost(guestHost, header = null)",
+  "markGuestChatControlHost(host);",
   "function supportsCredentiallessIframe()",
   "function isGuestChatFrameEligibleContext()",
   "iframe.credentialless = true",
@@ -246,6 +249,19 @@ for (const token of requiredGuestChatTokens) {
   if (!contentSource.includes(token)) {
     throw new Error(`content script must support the credentialless guest chat experiment: ${token}`);
   }
+}
+
+const syncGuestChatFrameStart = contentSource.indexOf("function syncGuestChatFrame()");
+const syncGuestChatFrameEnd = contentSource.indexOf("function findChatHeaderTarget", syncGuestChatFrameStart);
+const syncGuestChatFrameSource =
+  syncGuestChatFrameStart >= 0 && syncGuestChatFrameEnd > syncGuestChatFrameStart
+    ? contentSource.slice(syncGuestChatFrameStart, syncGuestChatFrameEnd)
+    : "";
+const markControlHostIndex = syncGuestChatFrameSource.indexOf("markGuestChatControlHost(host);");
+const setGuestHostIndex = syncGuestChatFrameSource.indexOf(`host.setAttribute(GUEST_CHAT_HOST_ATTR, "true");`);
+
+if (markControlHostIndex < 0 || setGuestHostIndex < 0 || markControlHostIndex > setGuestHostIndex) {
+  throw new Error("guest chat header control host must be marked before hiding native chat children.");
 }
 
 const unsafeGuestChatThemeSelectors = [

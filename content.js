@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.30";
+  const SCRIPT_VERSION = "0.1.31";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -1384,6 +1384,7 @@
       iframe.src = frameUrl;
     }
 
+    markGuestChatControlHost(host);
     host.setAttribute(GUEST_CHAT_HOST_ATTR, "true");
     clearGuestChatHosts(host);
 
@@ -1392,11 +1393,16 @@
     }
   }
 
-  function findChatHeaderTarget() {
-    return queryAllSafe(document, CHAT_HEADER_SELECTORS)
+  function findChatHeaderTarget({ includeHidden = false } = {}) {
+    let candidates = queryAllSafe(document, CHAT_HEADER_SELECTORS)
       .filter((element) => element instanceof HTMLElement)
-      .filter(isElementVisible)
-      .find((element) => /live_chatting_header_/i.test(getClassName(element))) || null;
+      .filter((element) => /live_chatting_header_/i.test(getClassName(element)));
+
+    if (!includeHidden) {
+      candidates = candidates.filter(isElementVisible);
+    }
+
+    return candidates[0] || null;
   }
 
   function findGuestChatHostFromRows() {
@@ -1446,6 +1452,42 @@
         host.removeAttribute(GUEST_CHAT_CONTROL_HOST_ATTR);
       }
     }
+  }
+
+  function findGuestChatControlHost(guestHost, header = null) {
+    if (!(guestHost instanceof HTMLElement)) {
+      return null;
+    }
+
+    const headerElement = header instanceof HTMLElement
+      ? header
+      : queryAllSafe(guestHost, CHAT_HEADER_SELECTORS)
+        .filter((element) => element instanceof HTMLElement)
+        .find((element) => /live_chatting_header_/i.test(getClassName(element))) || null;
+
+    if (!(headerElement instanceof HTMLElement)) {
+      return null;
+    }
+
+    let controlHost = headerElement;
+
+    while (controlHost.parentElement && controlHost.parentElement !== guestHost) {
+      controlHost = controlHost.parentElement;
+    }
+
+    return controlHost.parentElement === guestHost ? controlHost : null;
+  }
+
+  function markGuestChatControlHost(guestHost, header = null) {
+    const controlHost = findGuestChatControlHost(guestHost, header);
+
+    if (!controlHost) {
+      return false;
+    }
+
+    controlHost.setAttribute(GUEST_CHAT_CONTROL_HOST_ATTR, "true");
+    clearGuestChatControlHosts(controlHost);
+    return true;
   }
 
   function getChatHeaderBar() {
@@ -1507,23 +1549,13 @@
     const guestHost = findGuestChatHost();
 
     if (!guestHost || !header) {
-      clearGuestChatControlHosts();
+      if (!currentOptions.useGuestChatFrame) {
+        clearGuestChatControlHosts();
+      }
       return;
     }
 
-    let controlHost = header;
-
-    while (controlHost.parentElement && controlHost.parentElement !== guestHost) {
-      controlHost = controlHost.parentElement;
-    }
-
-    if (controlHost.parentElement === guestHost) {
-      controlHost.setAttribute(GUEST_CHAT_CONTROL_HOST_ATTR, "true");
-      clearGuestChatControlHosts(controlHost);
-      return;
-    }
-
-    clearGuestChatControlHosts();
+    markGuestChatControlHost(guestHost, header);
   }
 
   function setGuestChatToggleButtonState(button, state = currentOptions.useGuestChatFrame ? "on" : "off") {
@@ -1615,7 +1647,15 @@
         setGuestChatToggleButtonState(existingButton);
       }
 
-      clearGuestChatControlHosts();
+      if (currentOptions.useGuestChatFrame) {
+        const guestHost = findGuestChatHost();
+
+        if (guestHost) {
+          markGuestChatControlHost(guestHost);
+        }
+      } else {
+        clearGuestChatControlHosts();
+      }
       return;
     }
 

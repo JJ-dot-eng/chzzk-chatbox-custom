@@ -1,5 +1,5 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
-const CONTENT_VERSION = "0.1.30";
+const CONTENT_VERSION = "0.1.31";
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const NAMED_CHAT_BOX_COLORS = {
   gray: "#808080",
