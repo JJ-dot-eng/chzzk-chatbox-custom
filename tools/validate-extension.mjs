@@ -112,4 +112,21 @@ for (const selector of scopedRoleSelectors) {
   }
 }
 
+const unsafeLiveChatClassRules = [
+  'html[data-chzzk-chat-ui-toggle-nicknames="off"]\n        [class*="live_chatting_list_item" i]',
+  'html[data-chzzk-chat-ui-toggle-badges="off"]\n        [class*="live_chatting_list_item" i]',
+  'html[data-chzzk-chat-ui-toggle-large-text="on"]\n        [class*="live_chatting_list_item" i]',
+  'html[data-chzzk-chat-ui-toggle-bold-text="on"]\n        [class*="live_chatting_list_item" i]'
+];
+
+for (const selector of unsafeLiveChatClassRules) {
+  if (contentSource.includes(selector)) {
+    throw new Error(`content script has an unsafe unscoped live-chat class rule: ${selector}`);
+  }
+}
+
+if (!contentSource.includes("function cleanupUnscopedAnnotations")) {
+  throw new Error("content script must clean stale annotations outside confirmed chat rows.");
+}
+
 console.log("Extension manifest and root files are valid.");
