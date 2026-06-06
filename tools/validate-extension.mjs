@@ -129,4 +129,20 @@ if (!contentSource.includes("function cleanupUnscopedAnnotations")) {
   throw new Error("content script must clean stale annotations outside confirmed chat rows.");
 }
 
+const unsafeDetectionTokens = [
+  "[role='listitem']",
+  '"li"',
+  "[class*='author' i]",
+  "[class*='username' i]",
+  "[class*='user_name' i]",
+  "img[src*='profile_image' i]",
+  "badge|profile_image|emblem|grade"
+];
+
+for (const token of unsafeDetectionTokens) {
+  if (contentSource.includes(token)) {
+    throw new Error(`content script has an unsafe broad detection token: ${token}`);
+  }
+}
+
 console.log("Extension manifest and root files are valid.");

@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.9";
+  const SCRIPT_VERSION = "0.1.10";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -56,30 +56,16 @@
   ];
 
   const CHAT_ROW_SELECTORS = [
-    "[class*='chatting_list_item' i]",
-    "[class*='chatting_item' i]",
-    "[class*='chat_item' i]",
-    "[class*='live_chatting_list_item' i]",
-    "[class*='message_item' i]",
-    "[class*='message_container' i]",
-    "[class*='chatting_message' i]",
-    "[class*='live_chatting_message' i]",
-    "[role='listitem']",
-    "li"
+    "[class*='live_chatting_list_item' i]"
   ];
 
   const TARGET_SELECTORS = {
     nickname: [
       "[data-testid*='nickname' i]",
-      "[data-testid*='user-name' i]",
-      "[data-testid*='username' i]",
       "[aria-label*='닉네임' i]",
       "[class*='nickname' i]",
-      "[class*='user_name' i]",
-      "[class*='username' i]",
-      "[class*='name_text' i]",
-      "[class*='chatting_name' i]",
-      "[class*='author' i]"
+      "[class*='live_chatting_username' i]",
+      "button[class*='live_chatting_message_nickname' i] [class*='name_text' i]"
     ],
     badge: [
       "[data-testid*='badge' i]",
@@ -88,7 +74,6 @@
       "[class*='badge' i]",
       "[class*='grade' i]",
       "img[src*='badge' i]",
-      "img[src*='profile_image' i]",
       "svg[aria-label*='배지' i]"
     ],
     timestamp: [
@@ -512,7 +497,7 @@
   }
 
   function getMessageTextElement(row) {
-    return row.querySelector("[class*='message_text' i], [class*='chatting_message_text' i]");
+    return row.querySelector("[class*='live_chatting_message_text' i]");
   }
 
   function isBeforeMessageText(row, element) {
@@ -540,18 +525,25 @@
       return true;
     }
 
-    if (tagName === "img" && /badge|profile_image|emblem|grade/i.test(source)) {
+    if (tagName === "img" && /badge|emblem|grade/i.test(source)) {
       return true;
     }
 
     return tagName === "svg" && /badge|grade/i.test(className);
   }
 
+  function isInsideLiveChatNicknameShell(element) {
+    return Boolean(
+      element.closest(
+        "button[class*='live_chatting_message_nickname' i], [class*='live_chatting_username_container' i]"
+      )
+    );
+  }
+
   function isLikelyNickname(element) {
     const tagName = element.tagName.toLowerCase();
     const className = getClassName(element);
     const testId = String(element.getAttribute("data-testid") ?? "");
-    const label = String(element.getAttribute("aria-label") ?? "");
     const text = element.textContent?.trim() ?? "";
 
     if (!text || text.length > 80 || looksLikeTimestamp(element)) {
@@ -570,12 +562,11 @@
       return false;
     }
 
-    if (/닉네임/.test(label)) {
-      return true;
-    }
-
-    return /username_nickname|(?:^|[_-])nickname(?:__|[_-]|$)|name_text|chatting_name|author/i.test(
-      `${className} ${testId}`
+    return (
+      /live_chatting_username_nickname|live_chatting_nickname|(?:^|[_-])nickname(?:__|[_-]|$)/i.test(
+        `${className} ${testId}`
+      ) ||
+      isInsideLiveChatNicknameShell(element)
     );
   }
 
@@ -594,6 +585,10 @@
       }
 
       if (role === "nickname" && !isLikelyNickname(element)) {
+        continue;
+      }
+
+      if (role === "nickname" && !isBeforeMessageText(row, element)) {
         continue;
       }
 
@@ -661,13 +656,14 @@
       return false;
     }
 
+    const nicknameButton = row.querySelector("button[class*='live_chatting_message_nickname' i]");
+    const messageContainer = row.querySelector("[class*='live_chatting_message_container' i]");
     const messageText = getMessageTextElement(row);
     const hasChatMessageShell = Boolean(
-      messageText &&
-        (
-          /live_chatting|chatting_list_item|chatting_message/i.test(className) ||
-          row.querySelector("[class*='live_chatting_message_container' i], [class*='live_chatting_message_text' i]")
-        )
+      /live_chatting_list_item/i.test(className) &&
+        nicknameButton &&
+        messageContainer &&
+        messageText
     );
 
     if (!hasChatMessageShell) {
