@@ -1,18 +1,9 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
 const SET_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_OPTIONS";
-const OPEN_INCOGNITO_CHAT_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_INCOGNITO_CHAT";
 const CONTENT_SCRIPT_FILE = "content.js";
-const CHZZK_ORIGIN = "https://chzzk.naver.com";
 const CHZZK_HOST_SUFFIX = ".chzzk.naver.com";
 const INJECTION_DELAYS_MS = [0, 250, 1000, 2500, 5000];
-const LIVE_CHANNEL_ID_PATTERN = /^[0-9a-f]{32}$/i;
-const CHAT_POPUP_WINDOW = {
-  width: 400,
-  height: 550,
-  left: 50,
-  top: 50
-};
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const NAMED_CHAT_BOX_COLORS = {
   gray: "#808080",
@@ -118,74 +109,6 @@ function isChzzkUrl(url) {
   }
 }
 
-function extractLiveChannelId(url) {
-  try {
-    const parsedUrl = new URL(url);
-
-    if (!isChzzkUrl(url)) {
-      return null;
-    }
-
-    const pathParts = parsedUrl.pathname.split("/").filter(Boolean);
-
-    if (pathParts[0] === "live" && LIVE_CHANNEL_ID_PATTERN.test(pathParts[1] || "")) {
-      return pathParts[1].toLowerCase();
-    }
-
-    if (pathParts.length === 1 && LIVE_CHANNEL_ID_PATTERN.test(pathParts[0])) {
-      return pathParts[0].toLowerCase();
-    }
-
-    return null;
-  } catch (_error) {
-    return null;
-  }
-}
-
-function getLiveChatPopupUrl(pageUrl) {
-  const channelId = extractLiveChannelId(pageUrl);
-
-  return channelId ? `${CHZZK_ORIGIN}/live/${channelId}/chat` : null;
-}
-
-function openIncognitoChatPopup(pageUrl, sendResponse) {
-  const chatUrl = getLiveChatPopupUrl(pageUrl);
-
-  if (!chatUrl) {
-    sendResponse({ ok: false, error: "unsupported-url" });
-    return;
-  }
-
-  if (!chrome.windows?.create) {
-    sendResponse({ ok: false, error: "windows-api-unavailable" });
-    return;
-  }
-
-  chrome.windows.create(
-    {
-      url: chatUrl,
-      type: "popup",
-      incognito: true,
-      focused: true,
-      ...CHAT_POPUP_WINDOW
-    },
-    (window) => {
-      const error = chrome.runtime.lastError;
-
-      if (error) {
-        sendResponse({ ok: false, error: error.message || "window-create-failed" });
-        return;
-      }
-
-      sendResponse({
-        ok: true,
-        url: chatUrl,
-        windowId: Number.isInteger(window?.id) ? window.id : null
-      });
-    }
-  );
-}
-
 function injectContentScript(tabId) {
   if (!Number.isInteger(tabId) || tabId < 0 || !chrome.scripting?.executeScript) {
     return;
@@ -286,11 +209,6 @@ chrome.webNavigation.onCompleted.addListener((details) => {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === READ_OPTIONS_MESSAGE) {
     getStoredOptions(sendResponse);
-    return true;
-  }
-
-  if (message?.type === OPEN_INCOGNITO_CHAT_MESSAGE) {
-    openIncognitoChatPopup(message.pageUrl, sendResponse);
     return true;
   }
 

@@ -143,10 +143,6 @@ if (!backgroundSource.includes('const SET_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGL
   throw new Error("background script must define the options-push message.");
 }
 
-if (!backgroundSource.includes('const OPEN_INCOGNITO_CHAT_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_INCOGNITO_CHAT";')) {
-  throw new Error("background script must define the incognito chat popup message.");
-}
-
 if (!backgroundSource.includes("chrome.runtime.onMessage.addListener")) {
   throw new Error("background script must answer content-script option requests.");
 }
@@ -177,34 +173,29 @@ for (const token of requiredBackgroundInjectionTokens) {
   }
 }
 
-const requiredIncognitoChatTokens = [
-  "function getLiveChatPopupUrl(pageUrl)",
-  "function openIncognitoChatPopup(pageUrl, sendResponse)",
-  '`${CHZZK_ORIGIN}/live/${channelId}/chat`',
+const removedIncognitoChatTokens = [
+  "CHZZK_CHAT_UI_TOGGLE_OPEN_INCOGNITO_CHAT",
+  "OPEN_INCOGNITO_CHAT_MESSAGE",
+  "INCOGNITO_CHAT_BUTTON_ID",
+  "chzzk-chat-ui-toggle-incognito-chat-button",
+  "getLiveChatPopupUrl",
+  "openIncognitoChatPopup",
+  "createIncognitoChatButton",
+  "ensureIncognitoChatButton",
+  "openCurrentIncognitoChat",
+  "findHeaderIncognitoChatTarget",
   "chrome.windows.create(",
-  'type: "popup"',
   "incognito: true"
 ];
 
-for (const token of requiredIncognitoChatTokens) {
-  if (!backgroundSource.includes(token)) {
-    throw new Error(`background script must open CHZZK chat in an incognito popup: ${token}`);
-  }
-}
-
-const requiredContentIncognitoChatTokens = [
-  'const OPEN_INCOGNITO_CHAT_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_INCOGNITO_CHAT";',
-  'const INCOGNITO_CHAT_BUTTON_ID = "chzzk-chat-ui-toggle-incognito-chat-button";',
-  "function createIncognitoChatButton()",
-  "function ensureIncognitoChatButton()",
-  "function openCurrentIncognitoChat(button)",
-  "function findHeaderIncognitoChatTarget()",
-  "ensureIncognitoChatButton();"
-];
-
-for (const token of requiredContentIncognitoChatTokens) {
-  if (!contentSource.includes(token)) {
-    throw new Error(`content script must render an incognito chat icon button: ${token}`);
+for (const token of removedIncognitoChatTokens) {
+  if (
+    backgroundSource.includes(token) ||
+    contentSource.includes(token) ||
+    popupMarkup.includes(token) ||
+    popupSource.includes(token)
+  ) {
+    throw new Error(`incognito chat popup feature must remain removed: ${token}`);
   }
 }
 
