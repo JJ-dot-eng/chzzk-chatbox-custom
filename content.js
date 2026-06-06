@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.25";
+  const SCRIPT_VERSION = "0.1.26";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -714,6 +714,83 @@
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [contenteditable="true"] {
         background-color: #ffffff !important;
         color: #1f2328 !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] input::placeholder,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] textarea::placeholder {
+        color: #8b95a1 !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_input" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="chatting_input" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="input_container" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="input_area" i] {
+        background-color: #ffffff !important;
+        border-color: #d7dbe0 !important;
+        color: #1f2328 !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_input" i] *,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="chatting_input" i] *,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="input_container" i] *,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="input_area" i] * {
+        border-color: #d7dbe0 !important;
+        color: #1f2328 !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_header" i] button,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_header" i] [role="button"] {
+        background-color: transparent !important;
+        color: #1f2328 !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_input" i] button,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="chatting_input" i] button {
+        background-color: #f1f3f5 !important;
+        color: #1f2328 !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_input" i] button:disabled,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="chatting_input" i] button:disabled {
+        background-color: #e9ecef !important;
+        color: #8b95a1 !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="notice" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="guide" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="clean" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="filter" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="policy" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="blind" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="banner" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="alert" i] {
+        background-color: #f5f6f8 !important;
+        border-color: #e1e5e9 !important;
+        color: #1f2328 !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="notice" i] *,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="guide" i] *,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="clean" i] *,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="filter" i] *,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="policy" i] *,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="banner" i] *,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="alert" i] * {
+        background-color: transparent !important;
+        color: #1f2328 !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_header" i] button svg,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_header" i] [role="button"] svg,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_input" i] button svg,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="chatting_input" i] button svg,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="notice" i] svg,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="guide" i] svg,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="clean" i] svg,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="filter" i] svg {
+        color: #5c6470 !important;
+        fill: currentColor !important;
+        stroke: currentColor !important;
       }
 
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] {
