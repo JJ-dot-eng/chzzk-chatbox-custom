@@ -381,20 +381,33 @@ if (!popupSource.includes('"useGuestChatFrame"')) {
 
 const requiredHeaderSettingsTokens = [
   'const SETTINGS_BUTTON_ID = "chzzk-chat-ui-toggle-settings-button";',
-  'const SETTINGS_PANEL_ID = "chzzk-chat-ui-toggle-settings-panel";',
-  "const SETTINGS_TOGGLE_OPTIONS = [",
+  'const OPEN_SETTINGS_POPUP_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_SETTINGS_POPUP";',
   "function findSettingsButtonTarget()",
-  "function createSettingsPanel()",
-  "function updateSettingsOption(key, value)",
+  "function openSettingsPopupFromHeader(button)",
   "function ensureSettingsButton()",
   "button.id = SETTINGS_BUTTON_ID;",
-  "writeOptionsToStorageLocal(nextOptions)",
+  "runtime.runtime.sendMessage({ type: OPEN_SETTINGS_POPUP_MESSAGE }",
   "ensureSettingsButton();"
 ];
 
 for (const token of requiredHeaderSettingsTokens) {
   if (!contentSource.includes(token)) {
     throw new Error(`content script must support the chat header settings button: ${token}`);
+  }
+}
+
+const requiredSettingsPopupBackgroundTokens = [
+  'const OPEN_SETTINGS_POPUP_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_SETTINGS_POPUP";',
+  "function openSettingsPopup(tabId, sendResponse)",
+  "chrome.action.openPopup()",
+  "function openSettingsFallbackTab(tabId, sendResponse)",
+  'chrome.runtime.getURL("popup.html")',
+  "message?.type === OPEN_SETTINGS_POPUP_MESSAGE"
+];
+
+for (const token of requiredSettingsPopupBackgroundTokens) {
+  if (!backgroundSource.includes(token)) {
+    throw new Error(`background script must open the existing settings popup from the chat header: ${token}`);
   }
 }
 

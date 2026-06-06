@@ -1,6 +1,7 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
 const SET_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_OPTIONS";
+const OPEN_SETTINGS_POPUP_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_SETTINGS_POPUP";
 const READ_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_GUEST_CHAT_THEME";
 const SET_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_GUEST_CHAT_THEME";
 const APPLY_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_APPLY_GUEST_CHAT_THEME";
@@ -203,6 +204,62 @@ function pushStoredOptionsToTab(tabId) {
   });
 }
 
+function getSettingsPopupUrl(tabId = null) {
+  const popupUrl = new URL(chrome.runtime.getURL("popup.html"));
+
+  if (Number.isInteger(tabId) && tabId >= 0) {
+    popupUrl.searchParams.set("tabId", String(tabId));
+  }
+
+  return popupUrl.toString();
+}
+
+function openSettingsFallbackTab(tabId, sendResponse) {
+  const createProperties = {
+    active: true,
+    url: getSettingsPopupUrl(tabId)
+  };
+
+  if (Number.isInteger(tabId)) {
+    createProperties.openerTabId = tabId;
+  }
+
+  chrome.tabs.create(createProperties, (tab) => {
+    const error = chrome.runtime.lastError;
+
+    if (error) {
+      sendResponse({ ok: false, error: error.message || "settings-popup-open-failed" });
+      return;
+    }
+
+    sendResponse({ ok: true, source: "settings-tab", tabId: tab?.id || null });
+  });
+}
+
+function openSettingsPopup(tabId, sendResponse) {
+  if (!chrome.action?.openPopup) {
+    openSettingsFallbackTab(tabId, sendResponse);
+    return true;
+  }
+
+  try {
+    const result = chrome.action.openPopup();
+
+    if (result?.then) {
+      result
+        .then(() => sendResponse({ ok: true, source: "action-popup" }))
+        .catch(() => openSettingsFallbackTab(tabId, sendResponse));
+      return true;
+    }
+
+    sendResponse({ ok: true, source: "action-popup" });
+    return false;
+  } catch (_error) {
+    openSettingsFallbackTab(tabId, sendResponse);
+    return true;
+  }
+}
+
 function scheduleContentScriptInjection(tabId) {
   for (const delay of INJECTION_DELAYS_MS) {
     setTimeout(() => injectContentScript(tabId), delay);
@@ -269,6 +326,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === READ_OPTIONS_MESSAGE) {
     getStoredOptions(sendResponse);
     return true;
+  }
+
+  if (message?.type === OPEN_SETTINGS_POPUP_MESSAGE) {
+    return openSettingsPopup(_sender.tab?.id, sendResponse);
   }
 
   if (message?.type === SET_GUEST_CHAT_THEME_MESSAGE) {

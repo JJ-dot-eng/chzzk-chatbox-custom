@@ -1,5 +1,5 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
-const CONTENT_VERSION = "0.2.2";
+const CONTENT_VERSION = "0.2.3";
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const NAMED_CHAT_BOX_COLORS = {
   gray: "#808080",
@@ -246,8 +246,28 @@ function setStoredOptions(options) {
   });
 }
 
+function getTargetTabIdFromSearch() {
+  const tabId = Number(new URLSearchParams(window.location.search).get("tabId"));
+
+  return Number.isInteger(tabId) && tabId >= 0 ? tabId : null;
+}
+
 function queryActiveTab() {
   return new Promise((resolve) => {
+    const targetTabId = getTargetTabIdFromSearch();
+
+    if (targetTabId !== null) {
+      chrome.tabs.get(targetTabId, (tab) => {
+        if (chrome.runtime.lastError) {
+          resolve(null);
+          return;
+        }
+
+        resolve(tab);
+      });
+      return;
+    }
+
     chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
       resolve(tab);
     });
