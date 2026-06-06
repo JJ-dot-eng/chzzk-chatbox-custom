@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.10";
+  const SCRIPT_VERSION = "0.1.11";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -11,6 +11,7 @@
   const STORAGE_KEY = "chzzkChatUiToggleOptions";
   const ROLE_ATTR = "data-chzzk-chat-ui-toggle-role";
   const CHAT_ROW_ATTR = "data-chzzk-chat-ui-toggle-chat-row";
+  const CHAT_ROW_SCOPE_SELECTOR = `[class*="live_chatting_list_item" i][${CHAT_ROW_ATTR}="true"]`;
   const STYLE_ID = "chzzk-chat-ui-toggle-style";
   const CACHE_KEY = "chzzkChatUiToggleOptionsCache";
   const SCAN_DELAY_MS = 0;
@@ -219,7 +220,7 @@
       }
 
       html[data-chzzk-chat-ui-toggle-chat-boxes="on"]
-        [${CHAT_ROW_ATTR}="true"] {
+        ${CHAT_ROW_SCOPE_SELECTOR} {
         width: fit-content !important;
         max-width: calc(100% - 16px) !important;
         margin: 3px 8px !important;
@@ -231,24 +232,24 @@
       }
 
       html[data-chzzk-chat-ui-toggle-chat-boxes="on"]
-        [${CHAT_ROW_ATTR}="true"]:hover {
+        ${CHAT_ROW_SCOPE_SELECTOR}:hover {
         background: var(--chzzk-chat-ui-toggle-box-bg-hover) !important;
       }
 
       html[data-chzzk-chat-ui-toggle-large-text="on"]
-        [${CHAT_ROW_ATTR}="true"] {
+        ${CHAT_ROW_SCOPE_SELECTOR} {
         font-size: 17px !important;
         line-height: 1.45 !important;
       }
 
       html[data-chzzk-chat-ui-toggle-large-text="on"]
-        [${CHAT_ROW_ATTR}="true"]
+        ${CHAT_ROW_SCOPE_SELECTOR}
         [class*="live_chatting_message_text" i],
       html[data-chzzk-chat-ui-toggle-large-text="on"]
-        [${CHAT_ROW_ATTR}="true"]
+        ${CHAT_ROW_SCOPE_SELECTOR}
         [class*="live_chatting_username_nickname" i],
       html[data-chzzk-chat-ui-toggle-large-text="on"]
-        [${CHAT_ROW_ATTR}="true"]
+        ${CHAT_ROW_SCOPE_SELECTOR}
         [class*="name_text" i],
       html[data-chzzk-chat-ui-toggle-large-text="on"]
         .chzzk-chat-ui-toggle-timestamp {
@@ -257,18 +258,18 @@
       }
 
       html[data-chzzk-chat-ui-toggle-bold-text="on"]
-        [${CHAT_ROW_ATTR}="true"] {
+        ${CHAT_ROW_SCOPE_SELECTOR} {
         font-weight: 600 !important;
       }
 
       html[data-chzzk-chat-ui-toggle-bold-text="on"]
-        [${CHAT_ROW_ATTR}="true"]
+        ${CHAT_ROW_SCOPE_SELECTOR}
         [class*="live_chatting_message_text" i],
       html[data-chzzk-chat-ui-toggle-bold-text="on"]
-        [${CHAT_ROW_ATTR}="true"]
+        ${CHAT_ROW_SCOPE_SELECTOR}
         [class*="live_chatting_username_nickname" i],
       html[data-chzzk-chat-ui-toggle-bold-text="on"]
-        [${CHAT_ROW_ATTR}="true"]
+        ${CHAT_ROW_SCOPE_SELECTOR}
         [class*="name_text" i],
       html[data-chzzk-chat-ui-toggle-bold-text="on"]
         .chzzk-chat-ui-toggle-timestamp {
@@ -276,51 +277,47 @@
       }
 
       html[data-chzzk-chat-ui-toggle-timestamps="on"]
-        [${CHAT_ROW_ATTR}="true"]:has([class*="live_chatting_message_nickname" i]):not(:has(.chzzk-chat-ui-toggle-timestamp)) {
+        ${CHAT_ROW_SCOPE_SELECTOR}:has([class*="live_chatting_message_nickname" i]):not(:has(.chzzk-chat-ui-toggle-timestamp)) {
         visibility: hidden !important;
       }
 
       html[data-chzzk-chat-ui-toggle-nicknames="off"]
-        [${CHAT_ROW_ATTR}="true"]
+        ${CHAT_ROW_SCOPE_SELECTOR}
         [class*="live_chatting_username_nickname" i],
       html[data-chzzk-chat-ui-toggle-nicknames="off"]
-        [${CHAT_ROW_ATTR}="true"]
+        ${CHAT_ROW_SCOPE_SELECTOR}
         [class*="name_text" i] {
         display: none !important;
       }
 
       html[data-chzzk-chat-ui-toggle-badges="off"]
-        [${CHAT_ROW_ATTR}="true"]
+        ${CHAT_ROW_SCOPE_SELECTOR}
         button[class*="live_chatting_message_nickname" i],
       html[data-chzzk-chat-ui-toggle-badges="off"]
-        [${CHAT_ROW_ATTR}="true"]
+        ${CHAT_ROW_SCOPE_SELECTOR}
         [class*="live_chatting_username_container" i] {
         column-gap: 0 !important;
         gap: 0 !important;
       }
 
       html[data-chzzk-chat-ui-toggle-badges="off"]
-        [${CHAT_ROW_ATTR}="true"]
+        ${CHAT_ROW_SCOPE_SELECTOR}
         button[class*="live_chatting_message_nickname" i]
         [class*="live_chatting_username_wrapper" i]:has(img, svg),
       html[data-chzzk-chat-ui-toggle-badges="off"]
-        [${CHAT_ROW_ATTR}="true"]
+        ${CHAT_ROW_SCOPE_SELECTOR}
         button[class*="live_chatting_message_nickname" i]
         [class*="live_chatting_username_icon" i],
       html[data-chzzk-chat-ui-toggle-badges="off"]
-        [${CHAT_ROW_ATTR}="true"]
+        ${CHAT_ROW_SCOPE_SELECTOR}
         button[class*="live_chatting_message_nickname" i]
         [class*="badge_container" i],
       html[data-chzzk-chat-ui-toggle-badges="off"]
-        [${CHAT_ROW_ATTR}="true"]
+        ${CHAT_ROW_SCOPE_SELECTOR}
         button[class*="live_chatting_message_nickname" i]
         img[src*="badge" i],
       html[data-chzzk-chat-ui-toggle-badges="off"]
-        [${CHAT_ROW_ATTR}="true"]
-        button[class*="live_chatting_message_nickname" i]
-        img[src*="profile_image" i],
-      html[data-chzzk-chat-ui-toggle-badges="off"]
-        [${CHAT_ROW_ATTR}="true"]
+        ${CHAT_ROW_SCOPE_SELECTOR}
         button[class*="live_chatting_message_nickname" i]
         svg {
         display: none !important;
@@ -331,18 +328,18 @@
         padding: 0 !important;
       }
 
-      html[data-chzzk-chat-ui-toggle-nicknames="off"] [${CHAT_ROW_ATTR}="true"] [${ROLE_ATTR}~="nickname"],
-      html[data-chzzk-chat-ui-toggle-badges="off"] [${CHAT_ROW_ATTR}="true"] [${ROLE_ATTR}~="badge"],
-      html[data-chzzk-chat-ui-toggle-timestamps="off"] [${CHAT_ROW_ATTR}="true"] [${ROLE_ATTR}~="timestamp"] {
+      html[data-chzzk-chat-ui-toggle-nicknames="off"] ${CHAT_ROW_SCOPE_SELECTOR} [${ROLE_ATTR}~="nickname"],
+      html[data-chzzk-chat-ui-toggle-badges="off"] ${CHAT_ROW_SCOPE_SELECTOR} [${ROLE_ATTR}~="badge"],
+      html[data-chzzk-chat-ui-toggle-timestamps="off"] ${CHAT_ROW_SCOPE_SELECTOR} [${ROLE_ATTR}~="timestamp"] {
         display: none !important;
       }
 
-      html[data-chzzk-chat-ui-toggle-badges="off"] [${CHAT_ROW_ATTR}="true"] [${MESSAGE_PREFIX_ATTR}] {
+      html[data-chzzk-chat-ui-toggle-badges="off"] ${CHAT_ROW_SCOPE_SELECTOR} [${MESSAGE_PREFIX_ATTR}] {
         column-gap: 0 !important;
         gap: 0 !important;
       }
 
-      html[data-chzzk-chat-ui-toggle-badges="off"] [${CHAT_ROW_ATTR}="true"] [${ROLE_ATTR}~="badge"] {
+      html[data-chzzk-chat-ui-toggle-badges="off"] ${CHAT_ROW_SCOPE_SELECTOR} [${ROLE_ATTR}~="badge"] {
         width: 0 !important;
         min-width: 0 !important;
         max-width: 0 !important;
@@ -351,7 +348,7 @@
       }
 
       html[data-chzzk-chat-ui-toggle-nicknames="off"][data-chzzk-chat-ui-toggle-badges="off"][data-chzzk-chat-ui-toggle-timestamps="off"]
-        [${CHAT_ROW_ATTR}="true"] [${MESSAGE_PREFIX_ATTR}] {
+        ${CHAT_ROW_SCOPE_SELECTOR} [${MESSAGE_PREFIX_ATTR}] {
         display: none !important;
         width: 0 !important;
         min-width: 0 !important;
@@ -361,10 +358,10 @@
       }
 
       html[data-chzzk-chat-ui-toggle-nicknames="off"][data-chzzk-chat-ui-toggle-badges="off"][data-chzzk-chat-ui-toggle-timestamps="off"]
-        [${CHAT_ROW_ATTR}="true"]
+        ${CHAT_ROW_SCOPE_SELECTOR}
         [class*="live_chatting_message_container" i],
       html[data-chzzk-chat-ui-toggle-nicknames="off"][data-chzzk-chat-ui-toggle-badges="off"][data-chzzk-chat-ui-toggle-timestamps="off"]
-        [${CHAT_ROW_ATTR}="true"]
+        ${CHAT_ROW_SCOPE_SELECTOR}
         [class*="live_chatting_message_text" i] {
         column-gap: 0 !important;
         gap: 0 !important;
@@ -383,6 +380,7 @@
   }
 
   function applyOptions(options, { markAsReady = true } = {}) {
+    cleanupUnscopedAnnotations();
     currentOptions = normalizeOptions(options);
     writeCachedOptions(currentOptions);
     document.documentElement.dataset.chzzkChatUiToggleVersion = SCRIPT_VERSION;

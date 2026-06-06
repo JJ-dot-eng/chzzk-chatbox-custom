@@ -88,6 +88,10 @@ if (!contentSource.includes('const CHAT_ROW_ATTR = "data-chzzk-chat-ui-toggle-ch
   throw new Error("content script must define a chat-row scope attribute.");
 }
 
+if (!contentSource.includes('const CHAT_ROW_SCOPE_SELECTOR = `[class*="live_chatting_list_item" i][${CHAT_ROW_ATTR}="true"]`;')) {
+  throw new Error("content script must scope styling to native live chat row elements.");
+}
+
 const unsafeRoleSelectors = [
   'html[data-chzzk-chat-ui-toggle-nicknames="off"] [${ROLE_ATTR}~="nickname"]',
   'html[data-chzzk-chat-ui-toggle-badges="off"] [${ROLE_ATTR}~="badge"]',
@@ -101,9 +105,9 @@ for (const selector of unsafeRoleSelectors) {
 }
 
 const scopedRoleSelectors = [
-  '[${CHAT_ROW_ATTR}="true"] [${ROLE_ATTR}~="nickname"]',
-  '[${CHAT_ROW_ATTR}="true"] [${ROLE_ATTR}~="badge"]',
-  '[${CHAT_ROW_ATTR}="true"] [${ROLE_ATTR}~="timestamp"]'
+  '${CHAT_ROW_SCOPE_SELECTOR} [${ROLE_ATTR}~="nickname"]',
+  '${CHAT_ROW_SCOPE_SELECTOR} [${ROLE_ATTR}~="badge"]',
+  '${CHAT_ROW_SCOPE_SELECTOR} [${ROLE_ATTR}~="timestamp"]'
 ];
 
 for (const selector of scopedRoleSelectors) {
@@ -143,6 +147,10 @@ for (const token of unsafeDetectionTokens) {
   if (contentSource.includes(token)) {
     throw new Error(`content script has an unsafe broad detection token: ${token}`);
   }
+}
+
+if (contentSource.includes('html[data-chzzk-chat-ui-toggle-nicknames="off"] [${CHAT_ROW_ATTR}="true"]')) {
+  throw new Error("nickname hiding must use CHAT_ROW_SCOPE_SELECTOR, not bare CHAT_ROW_ATTR.");
 }
 
 console.log("Extension manifest and root files are valid.");
