@@ -203,11 +203,20 @@ const requiredGuestChatTokens = [
   "useGuestChatFrame: false",
   'useGuestChatFrame: "chzzkChatUiToggleGuestChatFrame"',
   'const GUEST_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-guest-chat-frame";',
+  'const GUEST_CHAT_TOGGLE_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-toggle";',
+  'const GUEST_CHAT_CONTROL_HOST_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-control-host";',
+  "function writeOptionsToStorageLocal(options)",
   "function syncGuestChatFrame()",
+  "function ensureGuestChatToggleButton()",
+  "function toggleGuestChatFrame(button)",
+  "function findGuestChatToggleTarget()",
   "function supportsCredentiallessIframe()",
   "function isGuestChatFrameEligibleContext()",
   "iframe.credentialless = true",
-  "syncGuestChatFrame();"
+  "runtime.storage.local.set({ [STORAGE_KEY]: normalizedOptions }",
+  'button.id = GUEST_CHAT_TOGGLE_BUTTON_ID;',
+  "syncGuestChatFrame();",
+  "ensureGuestChatToggleButton();"
 ];
 
 for (const token of requiredGuestChatTokens) {

@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.19";
+  const SCRIPT_VERSION = "0.1.20";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -27,6 +27,10 @@
   const GUEST_CHAT_FRAME_CONTAINER_ID = "chzzk-chat-ui-toggle-guest-chat-frame-container";
   const GUEST_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-guest-chat-frame";
   const GUEST_CHAT_HOST_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-host";
+  const GUEST_CHAT_CONTROL_HOST_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-control-host";
+  const GUEST_CHAT_TOGGLE_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-toggle";
+  const GUEST_CHAT_TOGGLE_BUTTON_ICON_CLASS = "chzzk-chat-ui-toggle-guest-chat-toggle__icon";
+  const GUEST_CHAT_TOGGLE_BUTTON_SLASH_CLASS = "chzzk-chat-ui-toggle-guest-chat-toggle__slash";
   const LIVE_CHANNEL_ID_PATTERN = /^[0-9a-f]{32}$/i;
 
   const DEFAULT_OPTIONS = {
@@ -76,6 +80,13 @@
     "[class*='live_chatting_header_menu' i]",
     "[class*='live_chatting_header_wrapper' i]",
     "[class*='live_chatting_header_container' i]"
+  ];
+
+  const CHAT_HEADER_ACTION_BUTTON_SELECTORS = [
+    "button",
+    "[role='button']",
+    "a[href]",
+    "[tabindex]:not([tabindex='-1'])"
   ];
 
   const CHAT_ACTION_HOST_SELECTORS = [
@@ -352,6 +363,32 @@
     };
   }
 
+  function writeOptionsToStorageLocal(options) {
+    const runtime = getRuntime();
+    const normalizedOptions = normalizeOptions(options);
+
+    if (!runtime?.storage?.local) {
+      return Promise.resolve({ ok: false, error: "storage-local-unavailable" });
+    }
+
+    return new Promise((resolve) => {
+      try {
+        runtime.storage.local.set({ [STORAGE_KEY]: normalizedOptions }, () => {
+          const error = runtime.runtime?.lastError;
+
+          if (error) {
+            resolve({ ok: false, error: error.message || "storage-local-set-error" });
+            return;
+          }
+
+          resolve({ ok: true, options: normalizedOptions });
+        });
+      } catch (error) {
+        resolve({ ok: false, error: String(error?.message || error) });
+      }
+    });
+  }
+
   function injectStyle() {
     const existingStyle = document.getElementById(STYLE_ID);
 
@@ -389,6 +426,95 @@
         user-select: none;
       }
 
+      .chzzk-chat-ui-toggle-guest-chat-toggle {
+        display: inline-flex !important;
+        flex: 0 0 auto !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 28px !important;
+        height: 28px !important;
+        min-width: 28px !important;
+        min-height: 28px !important;
+        margin: 0 2px !important;
+        padding: 0 !important;
+        border: 0 !important;
+        border-radius: 6px !important;
+        background: transparent !important;
+        color: rgba(32, 36, 40, 0.72) !important;
+        box-shadow: none !important;
+        cursor: pointer !important;
+        z-index: 2147483646 !important;
+      }
+
+      .chzzk-chat-ui-toggle-guest-chat-toggle:hover {
+        background: rgba(32, 36, 40, 0.08) !important;
+        color: rgba(32, 36, 40, 0.92) !important;
+      }
+
+      .chzzk-chat-ui-toggle-guest-chat-toggle:focus-visible {
+        outline: 2px solid rgba(0, 196, 113, 0.42) !important;
+        outline-offset: 2px !important;
+      }
+
+      .chzzk-chat-ui-toggle-guest-chat-toggle[aria-pressed="true"] {
+        background: rgba(0, 196, 113, 0.14) !important;
+        color: #00a862 !important;
+      }
+
+      .chzzk-chat-ui-toggle-guest-chat-toggle[data-state="loading"] {
+        cursor: wait !important;
+        opacity: 0.68 !important;
+      }
+
+      .chzzk-chat-ui-toggle-guest-chat-toggle[data-state="error"] {
+        background: rgba(224, 49, 49, 0.12) !important;
+        color: #c92a2a !important;
+      }
+
+      .${GUEST_CHAT_TOGGLE_BUTTON_ICON_CLASS} {
+        position: relative !important;
+        display: block !important;
+        width: 17px !important;
+        height: 17px !important;
+        color: inherit !important;
+      }
+
+      .${GUEST_CHAT_TOGGLE_BUTTON_ICON_CLASS}::before {
+        content: "" !important;
+        position: absolute !important;
+        top: 2px !important;
+        left: 5px !important;
+        width: 5px !important;
+        height: 5px !important;
+        border: 1.8px solid currentColor !important;
+        border-radius: 50% !important;
+        box-sizing: border-box !important;
+      }
+
+      .${GUEST_CHAT_TOGGLE_BUTTON_ICON_CLASS}::after {
+        content: "" !important;
+        position: absolute !important;
+        left: 2px !important;
+        bottom: 2px !important;
+        width: 11px !important;
+        height: 6px !important;
+        border: 1.8px solid currentColor !important;
+        border-radius: 9px 9px 3px 3px !important;
+        box-sizing: border-box !important;
+      }
+
+      .${GUEST_CHAT_TOGGLE_BUTTON_SLASH_CLASS} {
+        position: absolute !important;
+        left: 1px !important;
+        top: 8px !important;
+        width: 16px !important;
+        height: 2px !important;
+        border-radius: 999px !important;
+        background: currentColor !important;
+        transform: rotate(-45deg) !important;
+        transform-origin: center !important;
+      }
+
       html[data-chzzk-chat-ui-toggle-guest-chat-frame="on"]
         [${GUEST_CHAT_HOST_ATTR}="true"] {
         position: relative !important;
@@ -399,7 +525,22 @@
       }
 
       html[data-chzzk-chat-ui-toggle-guest-chat-frame="on"]
-        [${GUEST_CHAT_HOST_ATTR}="true"] > :not(#${GUEST_CHAT_FRAME_CONTAINER_ID}) {
+        [${GUEST_CHAT_HOST_ATTR}="true"] > :not(#${GUEST_CHAT_FRAME_CONTAINER_ID}):not([${GUEST_CHAT_CONTROL_HOST_ATTR}="true"]) {
+        display: none !important;
+      }
+
+      html[data-chzzk-chat-ui-toggle-guest-chat-frame="on"]
+        [${GUEST_CHAT_HOST_ATTR}="true"] > [${GUEST_CHAT_CONTROL_HOST_ATTR}="true"]
+        [class*="live_chatting_list" i],
+      html[data-chzzk-chat-ui-toggle-guest-chat-frame="on"]
+        [${GUEST_CHAT_HOST_ATTR}="true"] > [${GUEST_CHAT_CONTROL_HOST_ATTR}="true"]
+        [class*="chatting_list" i],
+      html[data-chzzk-chat-ui-toggle-guest-chat-frame="on"]
+        [${GUEST_CHAT_HOST_ATTR}="true"] > [${GUEST_CHAT_CONTROL_HOST_ATTR}="true"]
+        [class*="live_chatting_input" i],
+      html[data-chzzk-chat-ui-toggle-guest-chat-frame="on"]
+        [${GUEST_CHAT_HOST_ATTR}="true"] > [${GUEST_CHAT_CONTROL_HOST_ATTR}="true"]
+        [class*="chatting_input" i] {
         display: none !important;
       }
 
@@ -608,6 +749,7 @@
     }
 
     syncGuestChatFrame();
+    ensureGuestChatToggleButton();
 
     if (markAsReady) {
       markReady();
@@ -723,6 +865,7 @@
   function removeGuestChatFrame() {
     document.getElementById(GUEST_CHAT_FRAME_CONTAINER_ID)?.remove();
     clearGuestChatHosts();
+    clearGuestChatControlHosts();
   }
 
   function createGuestChatFrameContainer() {
@@ -859,6 +1002,199 @@
     }
 
     return null;
+  }
+
+  function clearGuestChatControlHosts(activeHost = null) {
+    const hosts = document.querySelectorAll(`[${GUEST_CHAT_CONTROL_HOST_ATTR}="true"]`);
+
+    for (const host of hosts) {
+      if (host !== activeHost) {
+        host.removeAttribute(GUEST_CHAT_CONTROL_HOST_ATTR);
+      }
+    }
+  }
+
+  function getChatHeaderBar() {
+    const target = findChatHeaderTarget();
+
+    if (!target) {
+      return null;
+    }
+
+    for (let current = target; current && current !== document.body; current = current.parentElement) {
+      if (!(current instanceof HTMLElement)) {
+        continue;
+      }
+
+      if (/live_chatting_header_(container|wrapper)/i.test(getClassName(current))) {
+        return current;
+      }
+    }
+
+    return target;
+  }
+
+  function isNestedHeaderAction(element, actions) {
+    return actions.some((candidate) => candidate !== element && candidate.contains(element));
+  }
+
+  function findGuestChatToggleTarget() {
+    if (!isGuestChatFrameEligibleContext()) {
+      return null;
+    }
+
+    const header = getChatHeaderBar();
+
+    if (!header) {
+      return null;
+    }
+
+    const headerRect = header.getBoundingClientRect();
+    const rightSideStart = headerRect.left + headerRect.width * 0.45;
+    const actions = queryAllSafe(header, CHAT_HEADER_ACTION_BUTTON_SELECTORS)
+      .filter((element) => element instanceof HTMLElement)
+      .filter((element) => element.id !== GUEST_CHAT_TOGGLE_BUTTON_ID)
+      .filter((element) => !element.closest(`#${GUEST_CHAT_TOGGLE_BUTTON_ID}`))
+      .filter(isElementVisible);
+
+    const candidates = actions
+      .filter((element) => !isNestedHeaderAction(element, actions))
+      .map((element) => ({ element, rect: element.getBoundingClientRect() }))
+      .filter(({ rect }) => rect.width > 0 && rect.height > 0 && rect.left >= rightSideStart)
+      .sort((left, right) => right.rect.right - left.rect.right || right.rect.left - left.rect.left);
+
+    const before = candidates[0]?.element || null;
+    const container = before?.parentElement instanceof HTMLElement ? before.parentElement : header;
+
+    return { before, container, header };
+  }
+
+  function markGuestChatToggleControlHost(header) {
+    const guestHost = findGuestChatHost();
+
+    if (!guestHost || !header) {
+      clearGuestChatControlHosts();
+      return;
+    }
+
+    let controlHost = header;
+
+    while (controlHost.parentElement && controlHost.parentElement !== guestHost) {
+      controlHost = controlHost.parentElement;
+    }
+
+    if (controlHost.parentElement === guestHost) {
+      controlHost.setAttribute(GUEST_CHAT_CONTROL_HOST_ATTR, "true");
+      clearGuestChatControlHosts(controlHost);
+      return;
+    }
+
+    clearGuestChatControlHosts();
+  }
+
+  function setGuestChatToggleButtonState(button, state = currentOptions.useGuestChatFrame ? "on" : "off") {
+    const labels = {
+      off: "비로그인 채팅 켜기",
+      on: "비로그인 채팅 끄기",
+      loading: "비로그인 채팅 변경 중",
+      error: "비로그인 채팅 변경 실패"
+    };
+    const isOn = currentOptions.useGuestChatFrame === true;
+    const label = labels[state] || labels.off;
+
+    button.dataset.state = state;
+    button.disabled = state === "loading";
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    button.setAttribute("aria-pressed", String(isOn));
+  }
+
+  function resetGuestChatToggleButtonStateLater(button) {
+    window.setTimeout(() => {
+      if (button.isConnected && button.dataset.state !== "loading") {
+        setGuestChatToggleButtonState(button);
+      }
+    }, 1800);
+  }
+
+  async function toggleGuestChatFrame(button) {
+    const previousOptions = currentOptions;
+    const nextOptions = normalizeOptions({
+      ...currentOptions,
+      useGuestChatFrame: !currentOptions.useGuestChatFrame
+    });
+
+    setGuestChatToggleButtonState(button, "loading");
+
+    const result = await writeOptionsToStorageLocal(nextOptions);
+
+    if (!result.ok) {
+      applyOptions(previousOptions, { source: "header-toggle-error" });
+      scan();
+      setGuestChatToggleButtonState(button, "error");
+      resetGuestChatToggleButtonStateLater(button);
+      return;
+    }
+
+    applyOptions(result.options, { source: "header-toggle" });
+    scan();
+  }
+
+  function createGuestChatToggleButton() {
+    const button = document.createElement("button");
+    const icon = document.createElement("span");
+    const slash = document.createElement("span");
+
+    button.id = GUEST_CHAT_TOGGLE_BUTTON_ID;
+    button.type = "button";
+    button.className = "chzzk-chat-ui-toggle-guest-chat-toggle";
+    icon.className = GUEST_CHAT_TOGGLE_BUTTON_ICON_CLASS;
+    slash.className = GUEST_CHAT_TOGGLE_BUTTON_SLASH_CLASS;
+    icon.setAttribute("aria-hidden", "true");
+    slash.setAttribute("aria-hidden", "true");
+    icon.append(slash);
+    button.append(icon);
+    setGuestChatToggleButtonState(button);
+
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleGuestChatFrame(button);
+    });
+
+    return button;
+  }
+
+  function ensureGuestChatToggleButton() {
+    const existingButton = document.getElementById(GUEST_CHAT_TOGGLE_BUTTON_ID);
+
+    if (!isGuestChatFrameEligibleContext()) {
+      existingButton?.remove();
+      clearGuestChatControlHosts();
+      return;
+    }
+
+    const target = findGuestChatToggleTarget();
+
+    if (!target) {
+      if (existingButton instanceof HTMLButtonElement) {
+        setGuestChatToggleButtonState(existingButton);
+      }
+
+      clearGuestChatControlHosts();
+      return;
+    }
+
+    const button =
+      existingButton instanceof HTMLButtonElement ? existingButton : createGuestChatToggleButton();
+
+    setGuestChatToggleButtonState(button);
+
+    if (button.parentElement !== target.container || button.nextSibling !== target.before) {
+      target.container.insertBefore(button, target.before);
+    }
+
+    markGuestChatToggleControlHost(target.header);
   }
 
   function hasChatLikeText(element) {
@@ -1258,6 +1594,7 @@
       }
 
       syncGuestChatFrame();
+      ensureGuestChatToggleButton();
     } finally {
       isScanning = false;
     }
@@ -1340,6 +1677,7 @@
         if (addedRows.length > 0) {
           scanRows(addedRows);
           syncGuestChatFrame();
+          ensureGuestChatToggleButton();
         } else {
           scan();
         }
