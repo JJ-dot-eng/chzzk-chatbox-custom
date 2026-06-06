@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.20";
+  const SCRIPT_VERSION = "0.1.21";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -427,8 +427,10 @@
       }
 
       .chzzk-chat-ui-toggle-guest-chat-toggle {
+        position: relative !important;
         display: inline-flex !important;
         flex: 0 0 auto !important;
+        align-self: center !important;
         align-items: center !important;
         justify-content: center !important;
         width: 28px !important;
@@ -437,6 +439,7 @@
         min-height: 28px !important;
         margin: 0 2px !important;
         padding: 0 !important;
+        top: 4px !important;
         border: 0 !important;
         border-radius: 6px !important;
         background: transparent !important;

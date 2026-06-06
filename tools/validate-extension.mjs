@@ -8,6 +8,7 @@ const contentSource = await readFile(path.join(root, "content.js"), "utf8");
 const backgroundSource = await readFile(path.join(root, "background.js"), "utf8");
 const popupMarkup = await readFile(path.join(root, "popup.html"), "utf8");
 const popupSource = await readFile(path.join(root, "popup.js"), "utf8");
+const normalizedContentSource = contentSource.replace(/\r\n/g, "\n");
 
 const requiredRootFiles = [
   "manifest.json",
@@ -111,7 +112,7 @@ if (!contentSource.includes("function readOptionsFromBackground()")) {
   throw new Error("content script must fall back to background options loading.");
 }
 
-if (!contentSource.includes("Promise.all([\n      readOptionsFromStorageLocal(),\n      readOptionsFromBackground()\n    ])")) {
+if (!normalizedContentSource.includes("Promise.all([\n      readOptionsFromStorageLocal(),\n      readOptionsFromBackground()\n    ])")) {
   throw new Error("content script must load direct and background options in parallel.");
 }
 
@@ -269,7 +270,7 @@ const unsafeLiveChatClassRules = [
 ];
 
 for (const selector of unsafeLiveChatClassRules) {
-  if (contentSource.includes(selector)) {
+  if (normalizedContentSource.includes(selector)) {
     throw new Error(`content script has an unsafe unscoped live-chat class rule: ${selector}`);
   }
 }
@@ -308,7 +309,7 @@ const nativeStyleSelectors = [
 ];
 
 for (const selector of nativeStyleSelectors) {
-  if (!contentSource.includes(selector)) {
+  if (!normalizedContentSource.includes(selector)) {
     throw new Error(`content script must apply style before annotation with ${selector}`);
   }
 }
