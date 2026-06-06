@@ -10,7 +10,8 @@
   const STORAGE_KEY = "chzzkChatUiToggleOptions";
   const ROLE_ATTR = "data-chzzk-chat-ui-toggle-role";
   const STYLE_ID = "chzzk-chat-ui-toggle-style";
-  const SCAN_DELAY_MS = 120;
+  const CACHE_KEY = "chzzkChatUiToggleOptionsCache";
+  const SCAN_DELAY_MS = 0;
   const SCAN_INTERVAL_MS = 2000;
   const GENERATED_TIMESTAMP_ATTR = "data-chzzk-chat-ui-toggle-generated-timestamp";
   const MESSAGE_PREFIX_ATTR = "data-chzzk-chat-ui-toggle-prefix";
@@ -103,6 +104,24 @@
     };
   }
 
+  function readCachedOptions() {
+    try {
+      const raw = window.localStorage?.getItem(CACHE_KEY);
+
+      return raw ? normalizeOptions(JSON.parse(raw)) : null;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function writeCachedOptions(options) {
+    try {
+      window.localStorage?.setItem(CACHE_KEY, JSON.stringify(normalizeOptions(options)));
+    } catch (_error) {
+      // Storage can be blocked in some contexts. chrome.storage remains authoritative.
+    }
+  }
+
   function readOptions() {
     const runtime = getRuntime();
 
@@ -125,6 +144,11 @@
     const style = document.createElement("style");
     style.id = STYLE_ID;
     style.textContent = `
+      html:not([data-chzzk-chat-ui-toggle-ready="true"])
+        [class*="live_chatting_list_item" i] {
+        visibility: hidden !important;
+      }
+
       .chzzk-chat-ui-toggle-timestamp {
         display: inline-flex;
         flex: 0 0 auto;
@@ -135,6 +159,62 @@
         line-height: inherit;
         white-space: nowrap;
         user-select: none;
+      }
+
+      html[data-chzzk-chat-ui-toggle-timestamps="on"]
+        [class*="live_chatting_list_item" i]:has([class*="live_chatting_message_nickname" i]):not(:has(.chzzk-chat-ui-toggle-timestamp)) {
+        visibility: hidden !important;
+      }
+
+      html[data-chzzk-chat-ui-toggle-nicknames="off"]
+        [class*="live_chatting_list_item" i]
+        [class*="live_chatting_username_nickname" i],
+      html[data-chzzk-chat-ui-toggle-nicknames="off"]
+        [class*="live_chatting_list_item" i]
+        [class*="name_text" i] {
+        display: none !important;
+      }
+
+      html[data-chzzk-chat-ui-toggle-badges="off"]
+        [class*="live_chatting_list_item" i]
+        button[class*="live_chatting_message_nickname" i],
+      html[data-chzzk-chat-ui-toggle-badges="off"]
+        [class*="live_chatting_list_item" i]
+        [class*="live_chatting_username_container" i] {
+        column-gap: 0 !important;
+        gap: 0 !important;
+      }
+
+      html[data-chzzk-chat-ui-toggle-badges="off"]
+        [class*="live_chatting_list_item" i]
+        button[class*="live_chatting_message_nickname" i]
+        [class*="live_chatting_username_wrapper" i]:has(img, svg),
+      html[data-chzzk-chat-ui-toggle-badges="off"]
+        [class*="live_chatting_list_item" i]
+        button[class*="live_chatting_message_nickname" i]
+        [class*="live_chatting_username_icon" i],
+      html[data-chzzk-chat-ui-toggle-badges="off"]
+        [class*="live_chatting_list_item" i]
+        button[class*="live_chatting_message_nickname" i]
+        [class*="badge_container" i],
+      html[data-chzzk-chat-ui-toggle-badges="off"]
+        [class*="live_chatting_list_item" i]
+        button[class*="live_chatting_message_nickname" i]
+        img[src*="badge" i],
+      html[data-chzzk-chat-ui-toggle-badges="off"]
+        [class*="live_chatting_list_item" i]
+        button[class*="live_chatting_message_nickname" i]
+        img[src*="profile_image" i],
+      html[data-chzzk-chat-ui-toggle-badges="off"]
+        [class*="live_chatting_list_item" i]
+        button[class*="live_chatting_message_nickname" i]
+        svg {
+        display: none !important;
+        width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
       }
 
       html[data-chzzk-chat-ui-toggle-nicknames="off"] [${ROLE_ATTR}~="nickname"],
@@ -161,6 +241,8 @@
 
   function applyOptions(options) {
     currentOptions = normalizeOptions(options);
+    writeCachedOptions(currentOptions);
+    document.documentElement.dataset.chzzkChatUiToggleReady = "true";
 
     for (const [optionKey, datasetKey] of Object.entries(DATASET_KEYS)) {
       document.documentElement.dataset[datasetKey] = currentOptions[optionKey] ? "on" : "off";
@@ -500,7 +582,9 @@
   }
 
   function connectObserver() {
-    if (observer || !document.body) {
+    const target = document.body ?? document.documentElement;
+
+    if (observer || !target) {
       return;
     }
 
@@ -510,7 +594,7 @@
       }
     });
 
-    observer.observe(document.body, {
+    observer.observe(target, {
       childList: true,
       subtree: true
     });
@@ -559,19 +643,24 @@
 
   function start() {
     injectStyle();
+
+    const cachedOptions = readCachedOptions();
+
+    if (cachedOptions) {
+      applyOptions(cachedOptions);
+    }
+
+    connectObserver();
+    scheduleScan();
+
     readOptions().then((options) => {
       applyOptions(options);
       scan();
-      connectObserver();
       connectMessages();
       connectStorageListener();
       window.setInterval(scan, SCAN_INTERVAL_MS);
     });
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", start, { once: true });
-  } else {
-    start();
-  }
+  start();
 })();

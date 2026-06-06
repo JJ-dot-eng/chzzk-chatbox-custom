@@ -48,4 +48,8 @@ if (!contentScript?.all_frames) {
   throw new Error("content script should run in all CHZZK frames.");
 }
 
+if (contentScript.run_at !== "document_start") {
+  throw new Error("content script must run at document_start to avoid raw chat flashes.");
+}
+
 console.log("Extension manifest and root files are valid.");
