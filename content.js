@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.27";
+  const SCRIPT_VERSION = "0.1.28";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -100,6 +100,17 @@
     "[class*='live_chatting' i]",
     "[class*='chatting_area' i]",
     "[class*='chat_area' i]"
+  ];
+
+  const PAGE_THEME_BACKGROUND_SELECTORS = [
+    "[class*='gnb' i]",
+    "[class*='header' i]",
+    "[class*='navigation' i]",
+    "[class*='live_container' i]",
+    "[class*='live_content' i]",
+    "[class*='live_detail' i]",
+    "[class*='content' i]",
+    "main"
   ];
 
   const TARGET_SELECTORS = {
@@ -490,14 +501,10 @@
       document.documentElement,
       document.body,
       document.getElementById("root"),
-      ...queryAllSafe(document, [
-        "[class*='live_container' i]",
-        "[class*='live_chatting' i]",
-        "[class*='chatting_area' i]",
-        "[class*='content' i]",
-        "main"
-      ]).filter((element) => element instanceof HTMLElement).slice(0, 8)
-    ].filter((element) => element instanceof HTMLElement);
+      ...queryAllSafe(document, PAGE_THEME_BACKGROUND_SELECTORS)
+        .filter((element) => element instanceof HTMLElement)
+        .slice(0, 12)
+    ].filter((element) => element instanceof HTMLElement && !isChatThemeCandidate(element));
 
     for (const element of candidates) {
       const color = parseRgbColor(window.getComputedStyle(element).backgroundColor);
@@ -518,6 +525,36 @@
     }
 
     return null;
+  }
+
+  function closestSafe(element, selector) {
+    try {
+      return element.closest(selector);
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function isChatThemeCandidate(element) {
+    if (!(element instanceof HTMLElement)) {
+      return true;
+    }
+
+    if (
+      closestSafe(
+        element,
+        `#${GUEST_CHAT_FRAME_CONTAINER_ID}, [${GUEST_CHAT_HOST_ATTR}="true"], [${GUEST_CHAT_CONTROL_HOST_ATTR}="true"]`
+      )
+    ) {
+      return true;
+    }
+
+    return Boolean(
+      closestSafe(
+        element,
+        "[class*='live_chatting' i], [class*='chatting_area' i], [class*='chatting_list' i], [class*='chat_list' i], [class*='chat_area' i]"
+      )
+    );
   }
 
   function detectPageTheme() {
@@ -650,9 +687,14 @@
     }
 
     const detectedTheme = detectPageTheme();
+    const previousGuestChatTheme = currentGuestChatTheme;
     currentGuestChatTheme = detectedTheme;
     document.documentElement.dataset.chzzkChatUiToggleDetectedTheme = detectedTheme;
     publishGuestChatThemeToBackground(detectedTheme);
+
+    if (previousGuestChatTheme !== detectedTheme) {
+      syncGuestChatFrame();
+    }
   }
 
   function injectStyle() {
@@ -1100,6 +1142,14 @@
     }
   }
 
+  function getGuestChatFrameTheme() {
+    if (window.self === window.top && !isLiveChatFrameUrl(window.location.href)) {
+      return detectPageTheme();
+    }
+
+    return normalizeGuestChatTheme(currentGuestChatTheme);
+  }
+
   function getGuestChatFrameUrl() {
     const pageUrl = getCurrentLivePageUrl();
     const channelId = extractLiveChannelIdFromUrl(pageUrl);
@@ -1109,7 +1159,7 @@
     }
 
     const frameUrl = new URL(`${CHZZK_ORIGIN}/live/${channelId}/chat`);
-    const theme = normalizeGuestChatTheme(currentGuestChatTheme) || detectPageTheme();
+    const theme = getGuestChatFrameTheme();
 
     if (theme) {
       frameUrl.searchParams.set("theme", theme);

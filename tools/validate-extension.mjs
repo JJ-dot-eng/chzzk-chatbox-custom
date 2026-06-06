@@ -210,14 +210,17 @@ const requiredGuestChatTokens = [
   'const READ_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_GUEST_CHAT_THEME";',
   'const SET_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_GUEST_CHAT_THEME";',
   'const APPLY_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_APPLY_GUEST_CHAT_THEME";',
+  "const PAGE_THEME_BACKGROUND_SELECTORS = [",
   "function writeOptionsToStorageLocal(options)",
   "function syncGuestChatFrame()",
   "function syncGuestChatTheme()",
   "function detectPageTheme()",
+  "function isChatThemeCandidate(element)",
   "function applyGuestChatTheme(theme",
   "const frameUrl = new URL(`${CHZZK_ORIGIN}/live/${channelId}/chat`);",
-  "const theme = normalizeGuestChatTheme(currentGuestChatTheme) || detectPageTheme();",
+  "const theme = getGuestChatFrameTheme();",
   'frameUrl.searchParams.set("theme", theme);',
+  "if (previousGuestChatTheme !== detectedTheme) {",
   "function ensureGuestChatToggleButton()",
   "function toggleGuestChatFrame(button)",
   "function findGuestChatToggleTarget()",
@@ -247,6 +250,19 @@ const unsafeGuestChatThemeSelectors = [
 for (const selector of unsafeGuestChatThemeSelectors) {
   if (contentSource.includes(selector)) {
     throw new Error(`guest chat theme must be delegated to the native iframe theme parameter: ${selector}`);
+  }
+}
+
+const computedThemeStart = contentSource.indexOf("function getThemeFromComputedBackground()");
+const computedThemeEnd = contentSource.indexOf("function closestSafe(", computedThemeStart);
+const computedThemeSource =
+  computedThemeStart >= 0 && computedThemeEnd > computedThemeStart
+    ? contentSource.slice(computedThemeStart, computedThemeEnd)
+    : "";
+
+for (const token of ["live_chatting", "chatting_area", "chat_area"]) {
+  if (computedThemeSource.includes(token)) {
+    throw new Error(`outer page theme detection must not sample chat UI backgrounds: ${token}`);
   }
 }
 
