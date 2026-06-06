@@ -208,8 +208,11 @@ const requiredGuestChatTokens = [
   'const GUEST_CHAT_CONTROL_HOST_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-control-host";',
   'const GUEST_CHAT_THEME_ATTR = "data-chzzk-chat-ui-toggle-guest-theme";',
   'const GUEST_CHAT_EMBED_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-embed";',
+  'const GUEST_CHAT_CLEANBOT_DEFAULT_ATTR = "data-chzzk-chat-ui-toggle-guest-cleanbot-default";',
   'const GUEST_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleGuest";',
   'const GUEST_CHAT_NATIVE_THEME_CLASSES = ["light", "dark", "theme_light", "theme_dark"];',
+  'const GUEST_CHAT_CLEANBOT_STORAGE_KEY = "cleanbot";',
+  'const GUEST_CHAT_CLEANBOT_DISABLED_VALUE = "false";',
   'const READ_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_GUEST_CHAT_THEME";',
   'const SET_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_GUEST_CHAT_THEME";',
   'const APPLY_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_APPLY_GUEST_CHAT_THEME";',
@@ -230,6 +233,10 @@ const requiredGuestChatTokens = [
   "function isNativeGuestChatThemeClassSynced(theme)",
   "function scheduleNativeGuestChatThemeClassRetries(theme)",
   "function clearNativeGuestChatThemeClassRetries({ keepTheme = false } = {})",
+  "function applyGuestChatCleanBotDefault()",
+  "window.localStorage?.setItem(GUEST_CHAT_CLEANBOT_STORAGE_KEY, GUEST_CHAT_CLEANBOT_DISABLED_VALUE);",
+  'document.documentElement.setAttribute(GUEST_CHAT_CLEANBOT_DEFAULT_ATTR, "off");',
+  "applyGuestChatCleanBotDefault();",
   "let nativeGuestChatThemeRetryTimers = [];",
   "clearNativeGuestChatThemeClassRetries({ keepTheme: true });",
   "for (const delay of [50, 150, 400, 1000, 2500])",
@@ -266,6 +273,34 @@ for (const token of requiredGuestChatTokens) {
   if (!contentSource.includes(token)) {
     throw new Error(`content script must support the credentialless guest chat experiment: ${token}`);
   }
+}
+
+const cleanBotDefaultStart = contentSource.indexOf("function applyGuestChatCleanBotDefault()");
+const cleanBotDefaultEnd = contentSource.indexOf("function getGuestChatFrameTheme()", cleanBotDefaultStart);
+const cleanBotDefaultSource =
+  cleanBotDefaultStart >= 0 && cleanBotDefaultEnd > cleanBotDefaultStart
+    ? contentSource.slice(cleanBotDefaultStart, cleanBotDefaultEnd)
+    : "";
+
+if (
+  !cleanBotDefaultSource.includes("if (!isGuestChatFrameEmbedUrl(window.location.href))") ||
+  cleanBotDefaultSource.indexOf("window.localStorage?.setItem") <
+    cleanBotDefaultSource.indexOf("if (!isGuestChatFrameEmbedUrl(window.location.href))")
+) {
+  throw new Error("guest cleanbot default must only write localStorage inside the guest iframe guard.");
+}
+
+const startFunctionStart = contentSource.indexOf("function start()");
+const startFunctionEnd = contentSource.indexOf("start();", startFunctionStart);
+const startFunctionSource =
+  startFunctionStart >= 0 && startFunctionEnd > startFunctionStart
+    ? contentSource.slice(startFunctionStart, startFunctionEnd)
+    : "";
+const cleanBotDefaultCallIndex = startFunctionSource.indexOf("applyGuestChatCleanBotDefault();");
+const injectStyleCallIndex = startFunctionSource.indexOf("injectStyle();");
+
+if (cleanBotDefaultCallIndex < 0 || injectStyleCallIndex < 0 || cleanBotDefaultCallIndex > injectStyleCallIndex) {
+  throw new Error("guest cleanbot default must be applied before normal content script initialization.");
 }
 
 const syncGuestChatFrameStart = contentSource.indexOf("function syncGuestChatFrame()");

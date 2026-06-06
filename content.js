@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.34";
+  const SCRIPT_VERSION = "0.1.35";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -34,9 +34,12 @@
   const GUEST_CHAT_CONTROL_HOST_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-control-host";
   const GUEST_CHAT_THEME_ATTR = "data-chzzk-chat-ui-toggle-guest-theme";
   const GUEST_CHAT_EMBED_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-embed";
+  const GUEST_CHAT_CLEANBOT_DEFAULT_ATTR = "data-chzzk-chat-ui-toggle-guest-cleanbot-default";
   const LIVE_CHAT_FRAME_ATTR = "data-chzzk-chat-ui-toggle-live-chat-frame";
   const GUEST_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleGuest";
   const GUEST_CHAT_NATIVE_THEME_CLASSES = ["light", "dark", "theme_light", "theme_dark"];
+  const GUEST_CHAT_CLEANBOT_STORAGE_KEY = "cleanbot";
+  const GUEST_CHAT_CLEANBOT_DISABLED_VALUE = "false";
   const GUEST_CHAT_TOGGLE_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-toggle";
   const GUEST_CHAT_TOGGLE_BUTTON_ICON_CLASS = "chzzk-chat-ui-toggle-guest-chat-toggle__icon";
   const GUEST_CHAT_TOGGLE_BUTTON_SLASH_CLASS = "chzzk-chat-ui-toggle-guest-chat-toggle__slash";
@@ -1369,6 +1372,7 @@
       optionsSource: lastOptionsSource,
       optionsLoadError: lastOptionsLoadError,
       guestChatTheme: currentGuestChatTheme,
+      guestCleanBotDefault: document.documentElement.getAttribute(GUEST_CHAT_CLEANBOT_DEFAULT_ATTR),
       detectedTheme: document.documentElement.dataset.chzzkChatUiToggleDetectedTheme || null,
       detectedThemeSource: document.documentElement.dataset.chzzkChatUiToggleDetectedThemeSource || null
     };
@@ -1443,6 +1447,20 @@
       return isLiveChatFrameUrl(url) && parsedUrl.searchParams.get(GUEST_CHAT_FRAME_MARKER_PARAM) === "1";
     } catch (_error) {
       return false;
+    }
+  }
+
+  function applyGuestChatCleanBotDefault() {
+    if (!isGuestChatFrameEmbedUrl(window.location.href)) {
+      document.documentElement.removeAttribute(GUEST_CHAT_CLEANBOT_DEFAULT_ATTR);
+      return;
+    }
+
+    try {
+      window.localStorage?.setItem(GUEST_CHAT_CLEANBOT_STORAGE_KEY, GUEST_CHAT_CLEANBOT_DISABLED_VALUE);
+      document.documentElement.setAttribute(GUEST_CHAT_CLEANBOT_DEFAULT_ATTR, "off");
+    } catch (_error) {
+      document.documentElement.setAttribute(GUEST_CHAT_CLEANBOT_DEFAULT_ATTR, "blocked");
     }
   }
 
@@ -2491,6 +2509,7 @@
   }
 
   function start() {
+    applyGuestChatCleanBotDefault();
     injectStyle();
     connectMessages();
     connectStorageListener();
