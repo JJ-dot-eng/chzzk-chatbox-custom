@@ -1,5 +1,8 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
+const CONTENT_SCRIPT_FILE = "content.js";
+const CHZZK_HOST_SUFFIX = ".chzzk.naver.com";
+const INJECTION_DELAYS_MS = [0, 250, 1000, 2500, 5000];
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const NAMED_CHAT_BOX_COLORS = {
   gray: "#808080",
@@ -76,8 +79,93 @@ function getStoredOptions(sendResponse) {
   });
 }
 
+function isChzzkUrl(url) {
+  try {
+    const parsedUrl = new URL(url);
+
+    return (
+      parsedUrl.protocol === "https:" &&
+      (parsedUrl.hostname === "chzzk.naver.com" || parsedUrl.hostname.endsWith(CHZZK_HOST_SUFFIX))
+    );
+  } catch (_error) {
+    return false;
+  }
+}
+
+function injectContentScript(tabId) {
+  if (!Number.isInteger(tabId) || tabId < 0 || !chrome.scripting?.executeScript) {
+    return;
+  }
+
+  chrome.scripting.executeScript(
+    {
+      target: { tabId, allFrames: true },
+      files: [CONTENT_SCRIPT_FILE]
+    },
+    () => {
+      // Some subframes can be unavailable or outside granted origins during navigation.
+      // The manifest content script still handles matched frames; this is only a repair pass.
+      void chrome.runtime.lastError;
+    }
+  );
+}
+
+function scheduleContentScriptInjection(tabId) {
+  for (const delay of INJECTION_DELAYS_MS) {
+    setTimeout(() => injectContentScript(tabId), delay);
+  }
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   // Keeps a stable MV3 service worker target available for extension verification.
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  chrome.tabs.query({ url: ["https://chzzk.naver.com/*", "https://*.chzzk.naver.com/*"] }, (tabs) => {
+    if (chrome.runtime.lastError) {
+      return;
+    }
+
+    for (const tab of tabs) {
+      scheduleContentScriptInjection(tab.id);
+    }
+  });
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (!isChzzkUrl(changeInfo.url || tab.url || "")) {
+    return;
+  }
+
+  if (changeInfo.status && changeInfo.status !== "loading" && changeInfo.status !== "complete") {
+    return;
+  }
+
+  scheduleContentScriptInjection(tabId);
+});
+
+chrome.webNavigation.onCommitted.addListener((details) => {
+  if (details.frameId !== 0 || !isChzzkUrl(details.url)) {
+    return;
+  }
+
+  scheduleContentScriptInjection(details.tabId);
+});
+
+chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
+  if (details.frameId !== 0 || !isChzzkUrl(details.url)) {
+    return;
+  }
+
+  scheduleContentScriptInjection(details.tabId);
+});
+
+chrome.webNavigation.onCompleted.addListener((details) => {
+  if (details.frameId !== 0 || !isChzzkUrl(details.url)) {
+    return;
+  }
+
+  scheduleContentScriptInjection(details.tabId);
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

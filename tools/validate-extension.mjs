@@ -43,6 +43,10 @@ if (!manifest.permissions?.includes("scripting")) {
   throw new Error("scripting permission is required for stale content-script refresh.");
 }
 
+if (!manifest.permissions?.includes("webNavigation")) {
+  throw new Error("webNavigation permission is required for automatic CHZZK navigation reinjection.");
+}
+
 if (!manifest.host_permissions?.includes("https://chzzk.naver.com/*")) {
   throw new Error("CHZZK host permission is missing.");
 }
@@ -143,6 +147,22 @@ if (!backgroundSource.includes("chrome.storage.local.get(STORAGE_KEY")) {
 
 if (backgroundSource.includes("chrome.storage.local.set({ [STORAGE_KEY]: DEFAULT_OPTIONS })")) {
   throw new Error("background script must not overwrite saved options with defaults.");
+}
+
+const requiredBackgroundInjectionTokens = [
+  'const CONTENT_SCRIPT_FILE = "content.js";',
+  "function scheduleContentScriptInjection(tabId)",
+  "target: { tabId, allFrames: true }",
+  "chrome.tabs.onUpdated.addListener",
+  "chrome.webNavigation.onCommitted.addListener",
+  "chrome.webNavigation.onHistoryStateUpdated.addListener",
+  "chrome.webNavigation.onCompleted.addListener"
+];
+
+for (const token of requiredBackgroundInjectionTokens) {
+  if (!backgroundSource.includes(token)) {
+    throw new Error(`background script must automatically reinject content script: ${token}`);
+  }
 }
 
 const unsafeRoleSelectors = [
