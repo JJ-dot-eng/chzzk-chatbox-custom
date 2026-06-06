@@ -215,16 +215,9 @@ const requiredGuestChatTokens = [
   "function syncGuestChatTheme()",
   "function detectPageTheme()",
   "function applyGuestChatTheme(theme",
-  'html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}] ${NATIVE_CHAT_ROW_SELECTOR} *',
-  'html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] ${NATIVE_CHAT_ROW_SELECTOR} *',
-  'html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_header" i]',
-  'html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_input" i]',
-  'html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="notice" i]',
-  'html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_header" i] button svg',
-  "color: #1f2328 !important;",
-  "color: #5c6470 !important;",
-  "background-color: #f5f6f8 !important;",
-  "background-color: transparent !important;",
+  "const frameUrl = new URL(`${CHZZK_ORIGIN}/live/${channelId}/chat`);",
+  "const theme = normalizeGuestChatTheme(currentGuestChatTheme) || detectPageTheme();",
+  'frameUrl.searchParams.set("theme", theme);',
   "function ensureGuestChatToggleButton()",
   "function toggleGuestChatFrame(button)",
   "function findGuestChatToggleTarget()",
@@ -245,12 +238,15 @@ for (const token of requiredGuestChatTokens) {
 
 const unsafeGuestChatThemeSelectors = [
   '[${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting" i]',
-  '[${GUEST_CHAT_THEME_ATTR}="dark"] [class*="live_chatting" i]'
+  '[${GUEST_CHAT_THEME_ATTR}="dark"] [class*="live_chatting" i]',
+  'html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}] ${NATIVE_CHAT_ROW_SELECTOR} *',
+  'html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"]',
+  'html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"]'
 ];
 
 for (const selector of unsafeGuestChatThemeSelectors) {
   if (contentSource.includes(selector)) {
-    throw new Error(`guest chat theme styling must not color every live_chatting descendant: ${selector}`);
+    throw new Error(`guest chat theme must be delegated to the native iframe theme parameter: ${selector}`);
   }
 }
 

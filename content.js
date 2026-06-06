@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.26";
+  const SCRIPT_VERSION = "0.1.27";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -692,159 +692,6 @@
         user-select: none;
       }
 
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] {
-        color-scheme: light !important;
-        background: #ffffff !important;
-      }
-
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] body,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] #root,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_area" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_container" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_wrapper" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_header" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="chatting_area" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="chat_area" i] {
-        background-color: #ffffff !important;
-        color: #1f2328 !important;
-      }
-
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] input,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] textarea,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [contenteditable="true"] {
-        background-color: #ffffff !important;
-        color: #1f2328 !important;
-      }
-
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] input::placeholder,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] textarea::placeholder {
-        color: #8b95a1 !important;
-      }
-
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_input" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="chatting_input" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="input_container" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="input_area" i] {
-        background-color: #ffffff !important;
-        border-color: #d7dbe0 !important;
-        color: #1f2328 !important;
-      }
-
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_input" i] *,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="chatting_input" i] *,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="input_container" i] *,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="input_area" i] * {
-        border-color: #d7dbe0 !important;
-        color: #1f2328 !important;
-      }
-
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_header" i] button,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_header" i] [role="button"] {
-        background-color: transparent !important;
-        color: #1f2328 !important;
-      }
-
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_input" i] button,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="chatting_input" i] button {
-        background-color: #f1f3f5 !important;
-        color: #1f2328 !important;
-      }
-
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_input" i] button:disabled,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="chatting_input" i] button:disabled {
-        background-color: #e9ecef !important;
-        color: #8b95a1 !important;
-      }
-
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="notice" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="guide" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="clean" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="filter" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="policy" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="blind" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="banner" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="alert" i] {
-        background-color: #f5f6f8 !important;
-        border-color: #e1e5e9 !important;
-        color: #1f2328 !important;
-      }
-
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="notice" i] *,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="guide" i] *,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="clean" i] *,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="filter" i] *,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="policy" i] *,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="banner" i] *,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="alert" i] * {
-        background-color: transparent !important;
-        color: #1f2328 !important;
-      }
-
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_header" i] button svg,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_header" i] [role="button"] svg,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_input" i] button svg,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="chatting_input" i] button svg,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="notice" i] svg,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="guide" i] svg,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="clean" i] svg,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="filter" i] svg {
-        color: #5c6470 !important;
-        fill: currentColor !important;
-        stroke: currentColor !important;
-      }
-
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] {
-        color-scheme: dark !important;
-        background: #111315 !important;
-      }
-
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] body,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] #root,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [class*="live_chatting_area" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [class*="live_chatting_container" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [class*="live_chatting_wrapper" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [class*="live_chatting_header" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [class*="chatting_area" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [class*="chat_area" i] {
-        background-color: #111315 !important;
-        color: #f1f3f5 !important;
-      }
-
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] input,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] textarea,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [contenteditable="true"] {
-        background-color: #16191c !important;
-        color: #f1f3f5 !important;
-      }
-
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}] ${NATIVE_CHAT_ROW_SELECTOR} *,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}] [class*="live_chatting_message" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}] [class*="message_text" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}] [class*="live_chatting_username" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}] [class*="name_text" i] {
-        background-color: transparent !important;
-      }
-
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] ${NATIVE_CHAT_ROW_SELECTOR},
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] ${NATIVE_CHAT_ROW_SELECTOR} *,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_message" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="message_text" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting_username" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"] [class*="name_text" i] {
-        color: #1f2328 !important;
-        text-shadow: none !important;
-      }
-
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] ${NATIVE_CHAT_ROW_SELECTOR},
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] ${NATIVE_CHAT_ROW_SELECTOR} *,
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [class*="live_chatting_message" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [class*="message_text" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [class*="live_chatting_username" i],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"] [class*="name_text" i] {
-        color: #f1f3f5 !important;
-        text-shadow: none !important;
-      }
-
       .chzzk-chat-ui-toggle-guest-chat-toggle {
         position: relative !important;
         display: inline-flex !important;
@@ -1257,7 +1104,18 @@
     const pageUrl = getCurrentLivePageUrl();
     const channelId = extractLiveChannelIdFromUrl(pageUrl);
 
-    return channelId ? `${CHZZK_ORIGIN}/live/${channelId}/chat` : null;
+    if (!channelId) {
+      return null;
+    }
+
+    const frameUrl = new URL(`${CHZZK_ORIGIN}/live/${channelId}/chat`);
+    const theme = normalizeGuestChatTheme(currentGuestChatTheme) || detectPageTheme();
+
+    if (theme) {
+      frameUrl.searchParams.set("theme", theme);
+    }
+
+    return frameUrl.toString();
   }
 
   function supportsCredentiallessIframe() {
