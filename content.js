@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.21";
+  const SCRIPT_VERSION = "0.1.22";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -439,7 +439,7 @@
         min-height: 28px !important;
         margin: 0 2px !important;
         padding: 0 !important;
-        top: 4px !important;
+        top: 10px !important;
         border: 0 !important;
         border-radius: 6px !important;
         background: transparent !important;
