@@ -215,6 +215,8 @@ const requiredGuestChatTokens = [
   "function syncGuestChatTheme()",
   "function detectPageTheme()",
   "function applyGuestChatTheme(theme",
+  'html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}] ${NATIVE_CHAT_ROW_SELECTOR} *',
+  "background-color: transparent !important;",
   "function ensureGuestChatToggleButton()",
   "function toggleGuestChatFrame(button)",
   "function findGuestChatToggleTarget()",
@@ -230,6 +232,17 @@ const requiredGuestChatTokens = [
 for (const token of requiredGuestChatTokens) {
   if (!contentSource.includes(token)) {
     throw new Error(`content script must support the credentialless guest chat experiment: ${token}`);
+  }
+}
+
+const unsafeGuestChatThemeSelectors = [
+  '[${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting" i]',
+  '[${GUEST_CHAT_THEME_ATTR}="dark"] [class*="live_chatting" i]'
+];
+
+for (const selector of unsafeGuestChatThemeSelectors) {
+  if (contentSource.includes(selector)) {
+    throw new Error(`guest chat theme styling must not color every live_chatting descendant: ${selector}`);
   }
 }
 
