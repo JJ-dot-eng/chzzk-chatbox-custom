@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.32";
+  const SCRIPT_VERSION = "0.1.33";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -36,6 +36,7 @@
   const GUEST_CHAT_EMBED_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-embed";
   const LIVE_CHAT_FRAME_ATTR = "data-chzzk-chat-ui-toggle-live-chat-frame";
   const GUEST_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleGuest";
+  const GUEST_CHAT_NATIVE_THEME_CLASSES = ["light", "dark", "theme_light", "theme_dark"];
   const GUEST_CHAT_TOGGLE_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-toggle";
   const GUEST_CHAT_TOGGLE_BUTTON_ICON_CLASS = "chzzk-chat-ui-toggle-guest-chat-toggle__icon";
   const GUEST_CHAT_TOGGLE_BUTTON_SLASH_CLASS = "chzzk-chat-ui-toggle-guest-chat-toggle__slash";
@@ -176,6 +177,7 @@
   let currentGuestChatTheme = null;
   let lastPublishedGuestChatThemeKey = "";
   let lastPublishedGuestChatThemeAt = 0;
+  let nativeGuestChatThemeObserver = null;
 
   function getRuntime() {
     if (typeof chrome === "undefined") {
@@ -778,18 +780,57 @@
     const normalizedTheme = normalizeGuestChatTheme(theme);
 
     if (!isGuestChatFrameEmbedUrl(window.location.href)) {
+      stopNativeGuestChatThemeObserver();
       return;
     }
 
-    document.documentElement.classList.remove("light", "dark");
+    document.documentElement.dataset.chzzkChatUiToggleNativeTheme = normalizedTheme || "";
+    syncNativeGuestChatThemeClass(normalizedTheme);
+
+    if (!normalizedTheme) {
+      stopNativeGuestChatThemeObserver();
+      return;
+    }
+
+    ensureNativeGuestChatThemeObserver();
+  }
+
+  function syncNativeGuestChatThemeClass(theme) {
+    const normalizedTheme = normalizeGuestChatTheme(theme);
+
+    document.documentElement.classList.remove(...GUEST_CHAT_NATIVE_THEME_CLASSES);
 
     if (!normalizedTheme) {
       document.documentElement.style.removeProperty("color-scheme");
       return;
     }
 
-    document.documentElement.classList.add(normalizedTheme);
+    document.documentElement.classList.add(normalizedTheme, `theme_${normalizedTheme}`);
     document.documentElement.style.colorScheme = normalizedTheme;
+  }
+
+  function ensureNativeGuestChatThemeObserver() {
+    if (nativeGuestChatThemeObserver || typeof MutationObserver === "undefined") {
+      return;
+    }
+
+    nativeGuestChatThemeObserver = new MutationObserver(() => {
+      const theme = normalizeGuestChatTheme(document.documentElement.dataset.chzzkChatUiToggleNativeTheme);
+
+      if (theme) {
+        syncNativeGuestChatThemeClass(theme);
+      }
+    });
+    nativeGuestChatThemeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"]
+    });
+  }
+
+  function stopNativeGuestChatThemeObserver() {
+    nativeGuestChatThemeObserver?.disconnect();
+    nativeGuestChatThemeObserver = null;
+    delete document.documentElement.dataset.chzzkChatUiToggleNativeTheme;
   }
 
   function readGuestChatThemeFromBackground() {
