@@ -22,13 +22,29 @@ const offOptions = {
   showTimestamps: false
 };
 
+const badgeOffOptions = {
+  showNicknames: true,
+  showBadges: false,
+  showTimestamps: true
+};
+
+const nicknameOffOptions = {
+  showNicknames: false,
+  showBadges: true,
+  showTimestamps: true
+};
+
 function summarizeFrameState(frameStates) {
-  return frameStates.reduce(
+  const summary = frameStates.reduce(
     (summary, state) => {
       for (const key of ["nickname", "badge", "timestamp"]) {
         summary.counts[key] += state.counts[key] || 0;
         summary.hidden[key] += state.hidden[key] || 0;
         summary.visible[key] += state.visible[key] || 0;
+      }
+
+      for (const gap of state.layout?.timestampNicknameGaps || []) {
+        summary.layout.timestampNicknameGaps.push(gap);
       }
 
       if (state.hasStyle) {
@@ -46,9 +62,19 @@ function summarizeFrameState(frameStates) {
       framesWithRootDataset: 0,
       counts: { nickname: 0, badge: 0, timestamp: 0 },
       hidden: { nickname: 0, badge: 0, timestamp: 0 },
-      visible: { nickname: 0, badge: 0, timestamp: 0 }
+      visible: { nickname: 0, badge: 0, timestamp: 0 },
+      layout: { timestampNicknameGaps: [] }
     }
   );
+
+  const gaps = summary.layout.timestampNicknameGaps;
+  summary.layout.timestampNicknameGapCount = gaps.length;
+  summary.layout.timestampNicknameGapMax = gaps.length ? Math.max(...gaps) : null;
+  summary.layout.timestampNicknameGapMedian = gaps.length
+    ? [...gaps].sort((a, b) => a - b)[Math.floor(gaps.length / 2)]
+    : null;
+
+  return summary;
 }
 
 async function collectFrameStates(page) {
@@ -80,6 +106,34 @@ async function collectFrameStates(page) {
           }));
         }
 
+        const timestampNicknameGaps = [...document.querySelectorAll("[class*='live_chatting_list_item' i]")]
+          .slice(-80)
+          .map((row) => {
+            const timestamp = row.querySelector(`[${roleAttr}~="timestamp"]`);
+            const nickname = row.querySelector(`[${roleAttr}~="nickname"]`);
+
+            if (!timestamp || !nickname) {
+              return null;
+            }
+
+            const timestampStyle = getComputedStyle(timestamp);
+            const nicknameStyle = getComputedStyle(nickname);
+
+            if (timestampStyle.display === "none" || nicknameStyle.display === "none") {
+              return null;
+            }
+
+            const timestampRect = timestamp.getBoundingClientRect();
+            const nicknameRect = nickname.getBoundingClientRect();
+
+            if (!timestampRect.width || !nicknameRect.width) {
+              return null;
+            }
+
+            return Math.round(nicknameRect.left - timestampRect.right);
+          })
+          .filter((gap) => Number.isFinite(gap) && gap >= 0);
+
         return {
           url: location.href,
           title: document.title,
@@ -94,7 +148,10 @@ async function collectFrameStates(page) {
           counts,
           hidden,
           visible,
-          samples
+          samples,
+          layout: {
+            timestampNicknameGaps
+          }
         };
       }, ROLE_ATTR);
 
@@ -211,6 +268,50 @@ function assertOnState(summary) {
   }
 }
 
+function assertRoleHidden(label, summary, role) {
+  if (summary.hidden[role] !== summary.counts[role]) {
+    throw new Error(`${label}: ${role} hidden ${summary.hidden[role]} of ${summary.counts[role]}`);
+  }
+}
+
+function assertRoleVisible(label, summary, role) {
+  if (summary.visible[role] <= 0) {
+    throw new Error(`${label}: no visible ${role} elements`);
+  }
+}
+
+function assertBadgeGapCollapsed(label, summary) {
+  if (summary.layout.timestampNicknameGapCount <= 0) {
+    throw new Error(`${label}: no timestamp-to-nickname layout samples`);
+  }
+
+  if (summary.layout.timestampNicknameGapMax > 24) {
+    throw new Error(
+      `${label}: badge slot gap is still too wide; max gap ${summary.layout.timestampNicknameGapMax}px`
+    );
+  }
+}
+
+async function collectState(page, label) {
+  await page.bringToFront();
+  await page.waitForTimeout(1500);
+
+  const state = {
+    states: await collectFrameStates(page)
+  };
+  state.summary = summarizeFrameState(state.states);
+  assertSummary(label, state.summary);
+
+  return state;
+}
+
+async function setPopupOptions(popup, options) {
+  await popup.bringToFront();
+  await popup.locator("#showNicknames").setChecked(options.showNicknames);
+  await popup.locator("#showBadges").setChecked(options.showBadges);
+  await popup.locator("#showTimestamps").setChecked(options.showTimestamps);
+}
+
 async function main() {
   mkdirSync(OUTPUT_DIR, { recursive: true });
 
@@ -258,32 +359,32 @@ async function main() {
     timeout: 15000
   });
 
-  for (const id of ["showNicknames", "showBadges", "showTimestamps"]) {
-    await popup.locator(`#${id}`).setChecked(false);
-  }
+  await setPopupOptions(popup, badgeOffOptions);
 
-  await page.bringToFront();
-  await page.waitForTimeout(1500);
-  const off = {
-    states: await collectFrameStates(page)
-  };
-  off.summary = summarizeFrameState(off.states);
-  assertSummary("popup off state", off.summary);
+  const badgeOff = await collectState(page, "badge-only off state");
+  assertRoleVisible("badge-only off state", badgeOff.summary, "nickname");
+  assertRoleHidden("badge-only off state", badgeOff.summary, "badge");
+  assertRoleVisible("badge-only off state", badgeOff.summary, "timestamp");
+  assertBadgeGapCollapsed("badge-only off state", badgeOff.summary);
+  await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-badge-off.png"), fullPage: false });
+
+  await setPopupOptions(popup, nicknameOffOptions);
+
+  const nicknameOff = await collectState(page, "nickname-only off state");
+  assertRoleHidden("nickname-only off state", nicknameOff.summary, "nickname");
+  assertRoleVisible("nickname-only off state", nicknameOff.summary, "badge");
+  assertRoleVisible("nickname-only off state", nicknameOff.summary, "timestamp");
+  await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-nickname-off.png"), fullPage: false });
+
+  await setPopupOptions(popup, offOptions);
+
+  const off = await collectState(page, "popup off state");
   assertOffState(off.summary);
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-off.png"), fullPage: false });
 
-  await popup.bringToFront();
-  for (const id of ["showNicknames", "showBadges", "showTimestamps"]) {
-    await popup.locator(`#${id}`).setChecked(true);
-  }
+  await setPopupOptions(popup, onOptions);
 
-  await page.bringToFront();
-  await page.waitForTimeout(1500);
-  const onAfter = {
-    states: await collectFrameStates(page)
-  };
-  onAfter.summary = summarizeFrameState(onAfter.states);
-  assertSummary("popup on state", onAfter.summary);
+  const onAfter = await collectState(page, "popup on state");
   assertOnState(onAfter.summary);
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-on-after.png"), fullPage: false });
 
@@ -298,11 +399,15 @@ async function main() {
         extensionId,
         screenshots: [
           "output/playwright/chzzk-live-on-before.png",
+          "output/playwright/chzzk-live-badge-off.png",
+          "output/playwright/chzzk-live-nickname-off.png",
           "output/playwright/chzzk-live-off.png",
           "output/playwright/chzzk-live-on-after.png"
         ],
         summaries: {
           before: before.summary,
+          badgeOff: badgeOff.summary,
+          nicknameOff: nicknameOff.summary,
           off: off.summary,
           onAfter: onAfter.summary
         },

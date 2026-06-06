@@ -13,6 +13,7 @@
   const SCAN_DELAY_MS = 120;
   const SCAN_INTERVAL_MS = 2000;
   const GENERATED_TIMESTAMP_ATTR = "data-chzzk-chat-ui-toggle-generated-timestamp";
+  const MESSAGE_PREFIX_ATTR = "data-chzzk-chat-ui-toggle-prefix";
 
   const DEFAULT_OPTIONS = {
     showNicknames: true,
@@ -141,6 +142,19 @@
       html[data-chzzk-chat-ui-toggle-timestamps="off"] [${ROLE_ATTR}~="timestamp"] {
         display: none !important;
       }
+
+      html[data-chzzk-chat-ui-toggle-badges="off"] [${MESSAGE_PREFIX_ATTR}] {
+        column-gap: 0 !important;
+        gap: 0 !important;
+      }
+
+      html[data-chzzk-chat-ui-toggle-badges="off"] [${ROLE_ATTR}~="badge"] {
+        width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
     `;
     document.documentElement.appendChild(style);
   }
@@ -217,9 +231,31 @@
     return `${hours}:${minutes}`;
   }
 
+  function getClassName(element) {
+    return String(element.getAttribute("class") ?? "");
+  }
+
+  function getMessageTextElement(row) {
+    return row.querySelector("[class*='message_text' i], [class*='chatting_message_text' i]");
+  }
+
+  function isBeforeMessageText(row, element) {
+    const messageText = getMessageTextElement(row);
+
+    if (!messageText) {
+      return true;
+    }
+
+    if (messageText.contains(element)) {
+      return false;
+    }
+
+    return Boolean(element.compareDocumentPosition(messageText) & Node.DOCUMENT_POSITION_FOLLOWING);
+  }
+
   function isLikelyBadge(element) {
     const tagName = element.tagName.toLowerCase();
-    const className = String(element.getAttribute("class") ?? "");
+    const className = getClassName(element);
     const source = String(element.getAttribute("src") ?? "");
     const alt = String(element.getAttribute("alt") ?? "");
     const label = String(element.getAttribute("aria-label") ?? "");
@@ -236,26 +272,48 @@
   }
 
   function isLikelyNickname(element) {
-    const className = String(element.getAttribute("class") ?? "");
+    const tagName = element.tagName.toLowerCase();
+    const className = getClassName(element);
     const testId = String(element.getAttribute("data-testid") ?? "");
     const label = String(element.getAttribute("aria-label") ?? "");
+    const text = element.textContent?.trim() ?? "";
+
+    if (!text || text.length > 80 || looksLikeTimestamp(element)) {
+      return false;
+    }
+
+    if (element.querySelector("img, svg, [class*='badge' i], [class*='icon' i]")) {
+      return false;
+    }
+
+    if (/container|wrapper|icon|badge|grade|profile/i.test(className)) {
+      return false;
+    }
+
+    if (tagName === "button" && element.childElementCount > 0) {
+      return false;
+    }
 
     if (/닉네임/.test(label)) {
       return true;
     }
 
-    return /nickname|user[-_]?name|name_text|chatting_name|author/i.test(`${className} ${testId}`);
+    return /username_nickname|(?:^|[_-])nickname(?:__|[_-]|$)|name_text|chatting_name|author/i.test(
+      `${className} ${testId}`
+    );
   }
 
   function annotateSelectorTargets(row, role) {
     const candidates = queryAllSafe(row, TARGET_SELECTORS[role]);
+    const nicknameCandidates =
+      role === "nickname" ? candidates.filter((element) => isLikelyNickname(element)) : [];
 
     for (const element of candidates) {
       if (role === "timestamp" && !looksLikeTimestamp(element)) {
         continue;
       }
 
-      if (role === "badge" && !isLikelyBadge(element)) {
+      if (role === "badge" && (!isBeforeMessageText(row, element) || !isLikelyBadge(element))) {
         continue;
       }
 
@@ -263,7 +321,15 @@
         continue;
       }
 
+      if (role === "nickname" && nicknameCandidates.some((candidate) => candidate !== element && element.contains(candidate))) {
+        continue;
+      }
+
       addRole(element, role);
+
+      if (role === "badge") {
+        annotateBadgeAncestors(row, element);
+      }
     }
   }
 
@@ -309,16 +375,48 @@
       return false;
     }
 
-    const className = String(row.getAttribute("class") ?? "");
+    const className = getClassName(row);
 
     if (/fixed|header|input|textarea|notice|banner/i.test(className)) {
       return false;
     }
 
     const nickname = queryAllSafe(row, TARGET_SELECTORS.nickname).find(isLikelyNickname);
-    const messageText = row.querySelector("[class*='message_text' i], [class*='chatting_message_text' i]");
+    const messageText = getMessageTextElement(row);
 
     return Boolean(nickname && messageText);
+  }
+
+  function getNicknameTextElement(row) {
+    const candidates = queryAllSafe(row, TARGET_SELECTORS.nickname).filter(isLikelyNickname);
+
+    return candidates.find((element) => !candidates.some((candidate) => candidate !== element && element.contains(candidate)));
+  }
+
+  function getMessagePrefixAnchor(row, nickname) {
+    let anchor = nickname;
+    let current = nickname;
+
+    while (current.parentElement && current.parentElement !== row) {
+      const parent = current.parentElement;
+      const parentClass = getClassName(parent);
+
+      if (getMessageTextElement(row)?.contains(parent)) {
+        break;
+      }
+
+      if (/message_nickname|username_container|chatting_name|author|nickname/i.test(parentClass)) {
+        anchor = parent;
+      }
+
+      current = parent;
+    }
+
+    if (anchor instanceof HTMLElement) {
+      anchor.setAttribute(MESSAGE_PREFIX_ATTR, "true");
+    }
+
+    return anchor;
   }
 
   function ensureGeneratedTimestamp(row) {
@@ -326,11 +424,13 @@
       return;
     }
 
-    const nickname = queryAllSafe(row, TARGET_SELECTORS.nickname).find(isLikelyNickname);
+    const nickname = getNicknameTextElement(row);
 
     if (!nickname?.parentElement) {
       return;
     }
+
+    const anchor = getMessagePrefixAnchor(row, nickname);
 
     const timestamp = document.createElement("span");
     timestamp.className = "chzzk-chat-ui-toggle-timestamp";
@@ -338,17 +438,43 @@
     timestamp.setAttribute(GENERATED_TIMESTAMP_ATTR, "true");
     addRole(timestamp, "timestamp");
 
-    nickname.insertAdjacentElement("beforebegin", timestamp);
+    anchor.insertAdjacentElement("beforebegin", timestamp);
+  }
+
+  function annotateBadgeAncestors(row, element) {
+    let current = element.parentElement;
+    let depth = 0;
+
+    while (current && current !== row && depth < 4) {
+      if (!isBeforeMessageText(row, current)) {
+        break;
+      }
+
+      const className = getClassName(current);
+      const text = current.textContent?.trim() ?? "";
+      const hasMedia = Boolean(current.querySelector("img, svg"));
+
+      if (/badge|grade|profile|icon/i.test(className) || (hasMedia && text.length === 0)) {
+        addRole(current, "badge");
+        current = current.parentElement;
+        depth += 1;
+        continue;
+      }
+
+      break;
+    }
   }
 
   function annotateLeadingBadges(row) {
     const mediaCandidates = [...row.querySelectorAll("img, svg")]
       .filter((element) => element instanceof HTMLElement || element instanceof SVGElement)
+      .filter((element) => isBeforeMessageText(row, element))
       .slice(0, 8);
 
     for (const element of mediaCandidates) {
       if (isLikelyBadge(element)) {
         addRole(element, "badge");
+        annotateBadgeAncestors(row, element);
       }
     }
   }
