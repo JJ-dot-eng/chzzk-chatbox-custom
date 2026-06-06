@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.14";
+  const SCRIPT_VERSION = "0.1.15";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -407,22 +407,20 @@
       }
 
       html[data-chzzk-chat-ui-toggle-bold-text="on"]
-        ${NATIVE_CHAT_ROW_SELECTOR} {
-        font-weight: 600 !important;
-      }
-
+        ${NATIVE_CHAT_ROW_SELECTOR},
       html[data-chzzk-chat-ui-toggle-bold-text="on"]
-        ${NATIVE_CHAT_ROW_SELECTOR}
-        [class*="live_chatting_message_text" i],
-      html[data-chzzk-chat-ui-toggle-bold-text="on"]
-        ${NATIVE_CHAT_ROW_SELECTOR}
-        [class*="live_chatting_username_nickname" i],
-      html[data-chzzk-chat-ui-toggle-bold-text="on"]
-        ${NATIVE_CHAT_ROW_SELECTOR}
-        [class*="name_text" i],
-      html[data-chzzk-chat-ui-toggle-bold-text="on"]
-        .chzzk-chat-ui-toggle-timestamp {
-        font-weight: 600 !important;
+        ${NATIVE_CHAT_ROW_SELECTOR} :where(
+          [class*="live_chatting_message_text" i],
+          [class*="live_chatting_message_text" i] *,
+          [class*="message_text" i],
+          [class*="message_text" i] *,
+          [class*="live_chatting_username_nickname" i],
+          [class*="live_chatting_username_nickname" i] *,
+          [class*="name_text" i],
+          [class*="name_text" i] *,
+          .chzzk-chat-ui-toggle-timestamp
+        ) {
+        font-weight: 650 !important;
       }
 
       html[data-chzzk-chat-ui-toggle-timestamps="on"]

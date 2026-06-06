@@ -137,6 +137,10 @@ if (!backgroundSource.includes('const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGG
   throw new Error("background script must define the options-read message.");
 }
 
+if (!backgroundSource.includes('const SET_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_OPTIONS";')) {
+  throw new Error("background script must define the options-push message.");
+}
+
 if (!backgroundSource.includes("chrome.runtime.onMessage.addListener")) {
   throw new Error("background script must answer content-script option requests.");
 }
@@ -152,7 +156,9 @@ if (backgroundSource.includes("chrome.storage.local.set({ [STORAGE_KEY]: DEFAULT
 const requiredBackgroundInjectionTokens = [
   'const CONTENT_SCRIPT_FILE = "content.js";',
   "function scheduleContentScriptInjection(tabId)",
+  "function pushStoredOptionsToTab(tabId)",
   "target: { tabId, allFrames: true }",
+  "chrome.tabs.sendMessage(",
   "chrome.tabs.onUpdated.addListener",
   "chrome.webNavigation.onCommitted.addListener",
   "chrome.webNavigation.onHistoryStateUpdated.addListener",

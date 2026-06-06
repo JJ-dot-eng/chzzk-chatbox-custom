@@ -1,5 +1,6 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
+const SET_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_OPTIONS";
 const CONTENT_SCRIPT_FILE = "content.js";
 const CHZZK_HOST_SUFFIX = ".chzzk.naver.com";
 const INJECTION_DELAYS_MS = [0, 250, 1000, 2500, 5000];
@@ -79,6 +80,20 @@ function getStoredOptions(sendResponse) {
   });
 }
 
+function readStoredOptions(callback) {
+  chrome.storage.local.get(STORAGE_KEY, (result) => {
+    const error = chrome.runtime.lastError;
+
+    if (error) {
+      callback(null);
+      return;
+    }
+
+    const found = hasOwn(result, STORAGE_KEY);
+    callback(normalizeOptions(found ? result[STORAGE_KEY] : DEFAULT_OPTIONS));
+  });
+}
+
 function isChzzkUrl(url) {
   try {
     const parsedUrl = new URL(url);
@@ -106,8 +121,29 @@ function injectContentScript(tabId) {
       // Some subframes can be unavailable or outside granted origins during navigation.
       // The manifest content script still handles matched frames; this is only a repair pass.
       void chrome.runtime.lastError;
+      pushStoredOptionsToTab(tabId);
     }
   );
+}
+
+function pushStoredOptionsToTab(tabId) {
+  readStoredOptions((options) => {
+    if (!options) {
+      return;
+    }
+
+    chrome.tabs.sendMessage(
+      tabId,
+      {
+        type: SET_OPTIONS_MESSAGE,
+        options
+      },
+      () => {
+        // The content script may not be ready yet. Scheduled retries will try again.
+        void chrome.runtime.lastError;
+      }
+    );
+  });
 }
 
 function scheduleContentScriptInjection(tabId) {

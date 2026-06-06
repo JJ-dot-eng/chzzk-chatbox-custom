@@ -152,6 +152,10 @@ function summarizeFrameState(frameStates) {
           summary.layout.chatBoxes.fontWeights.push(fontWeight);
         }
 
+        for (const fontWeight of chatBoxes.messageFontWeights || []) {
+          summary.layout.chatBoxes.messageFontWeights.push(fontWeight);
+        }
+
         for (const backgroundColor of chatBoxes.backgroundColors || []) {
           summary.layout.chatBoxes.backgroundColors.push(backgroundColor);
         }
@@ -196,6 +200,8 @@ function summarizeFrameState(frameStates) {
           maxFontSize: null,
           fontWeights: [],
           maxFontWeight: null,
+          messageFontWeights: [],
+          maxMessageFontWeight: null,
           backgroundColors: [],
           samples: []
         }
@@ -216,6 +222,10 @@ function summarizeFrameState(frameStates) {
   summary.layout.chatBoxes.maxFontSize = fontSizes.length ? Math.max(...fontSizes) : null;
   const fontWeights = summary.layout.chatBoxes.fontWeights;
   summary.layout.chatBoxes.maxFontWeight = fontWeights.length ? Math.max(...fontWeights) : null;
+  const messageFontWeights = summary.layout.chatBoxes.messageFontWeights;
+  summary.layout.chatBoxes.maxMessageFontWeight = messageFontWeights.length
+    ? Math.max(...messageFontWeights)
+    : null;
 
   return summary;
 }
@@ -293,6 +303,10 @@ async function collectFrameStates(page) {
             const fontSize = Number.parseFloat(style.fontSize) || 0;
             const fontWeight = Number.parseInt(style.fontWeight, 10) || 0;
             const messageText = row.querySelector("[class*='live_chatting_message_text' i], [class*='message_text' i]");
+            const messageTextStyle = messageText ? getComputedStyle(messageText) : null;
+            const messageFontWeight = messageTextStyle
+              ? Number.parseInt(messageTextStyle.fontWeight, 10) || 0
+              : 0;
             let textLeftInset = null;
             let textRightInset = null;
 
@@ -318,6 +332,7 @@ async function collectFrameStates(page) {
               marginLeft: Number.parseFloat(style.marginLeft) || 0,
               fontSize,
               fontWeight,
+              messageFontWeight,
               backgroundIsVisible,
               isRounded: borderRadius >= 6,
               isPadded: paddingLeft >= 6,
@@ -340,6 +355,9 @@ async function collectFrameStates(page) {
           .filter((fontSize) => Number.isFinite(fontSize) && fontSize > 0);
         const fontWeights = chatBoxSamples
           .map((sample) => sample.fontWeight)
+          .filter((fontWeight) => Number.isFinite(fontWeight) && fontWeight > 0);
+        const messageFontWeights = chatBoxSamples
+          .map((sample) => sample.messageFontWeight)
           .filter((fontWeight) => Number.isFinite(fontWeight) && fontWeight > 0);
         const backgroundColors = chatBoxSamples.map((sample) => sample.backgroundColor);
 
@@ -376,6 +394,7 @@ async function collectFrameStates(page) {
               textInsetDeltas,
               fontSizes,
               fontWeights,
+              messageFontWeights,
               backgroundColors,
               samples: chatBoxSamples.slice(0, 4)
             }
@@ -701,7 +720,7 @@ function assertLargeTextOff(label, summary) {
 function assertBoldTextOn(label, summary) {
   const chatBoxes = summary.layout.chatBoxes;
 
-  if (chatBoxes.maxFontWeight === null || chatBoxes.maxFontWeight < 600) {
+  if (chatBoxes.maxMessageFontWeight === null || chatBoxes.maxMessageFontWeight < 650) {
     throw new Error(`${label}: bold text font weight was not applied`);
   }
 }
@@ -709,7 +728,7 @@ function assertBoldTextOn(label, summary) {
 function assertBoldTextOff(label, summary) {
   const chatBoxes = summary.layout.chatBoxes;
 
-  if (chatBoxes.maxFontWeight === null || chatBoxes.maxFontWeight >= 600) {
+  if (chatBoxes.maxMessageFontWeight === null || chatBoxes.maxMessageFontWeight >= 650) {
     throw new Error(`${label}: bold text font weight should be off`);
   }
 }
@@ -846,6 +865,22 @@ async function main() {
   assertChatBoxColor("initial on state", before.summary, DEFAULT_CHAT_BOX_COLOR);
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-on-before.png"), fullPage: false });
 
+  await setExtensionOptions(worker, boldTextOptions);
+  await page.reload({ waitUntil: "domcontentloaded", timeout: 45000 });
+
+  const boldReloadNoPopup = await collectState(page, "saved bold reload before popup state");
+  assertOnState(boldReloadNoPopup.summary);
+  assertChatBoxesOn("saved bold reload before popup state", boldReloadNoPopup.summary);
+  assertLargeTextOff("saved bold reload before popup state", boldReloadNoPopup.summary);
+  assertBoldTextOn("saved bold reload before popup state", boldReloadNoPopup.summary);
+  await page.screenshot({
+    path: path.join(OUTPUT_DIR, "chzzk-live-bold-reload-no-popup.png"),
+    fullPage: false
+  });
+
+  await setExtensionOptions(worker, onOptions);
+  await page.waitForTimeout(500);
+
   await setExtensionOptions(worker, offOptions);
   await page.waitForTimeout(500);
   const noFlashProbe = await collectSyntheticFirstMutationState(page);
@@ -931,6 +966,7 @@ async function main() {
         extensionId,
         screenshots: [
           "output/playwright/chzzk-live-on-before.png",
+          "output/playwright/chzzk-live-bold-reload-no-popup.png",
           "output/playwright/chzzk-live-badge-off.png",
           "output/playwright/chzzk-live-nickname-off.png",
           "output/playwright/chzzk-live-large-text-blue.png",
@@ -941,6 +977,7 @@ async function main() {
         ],
         summaries: {
           before: before.summary,
+          boldReloadNoPopup: boldReloadNoPopup.summary,
           badgeOff: badgeOff.summary,
           nicknameOff: nicknameOff.summary,
           largeTextColor: largeTextColor.summary,
