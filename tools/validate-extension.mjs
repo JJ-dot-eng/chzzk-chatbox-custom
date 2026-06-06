@@ -6,6 +6,8 @@ const manifestPath = path.join(root, "manifest.json");
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 const contentSource = await readFile(path.join(root, "content.js"), "utf8");
 const backgroundSource = await readFile(path.join(root, "background.js"), "utf8");
+const popupMarkup = await readFile(path.join(root, "popup.html"), "utf8");
+const popupSource = await readFile(path.join(root, "popup.js"), "utf8");
 
 const requiredRootFiles = [
   "manifest.json",
@@ -141,6 +143,10 @@ if (!backgroundSource.includes('const SET_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGL
   throw new Error("background script must define the options-push message.");
 }
 
+if (!backgroundSource.includes('const OPEN_INCOGNITO_CHAT_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_INCOGNITO_CHAT";')) {
+  throw new Error("background script must define the incognito chat popup message.");
+}
+
 if (!backgroundSource.includes("chrome.runtime.onMessage.addListener")) {
   throw new Error("background script must answer content-script option requests.");
 }
@@ -169,6 +175,33 @@ for (const token of requiredBackgroundInjectionTokens) {
   if (!backgroundSource.includes(token)) {
     throw new Error(`background script must automatically reinject content script: ${token}`);
   }
+}
+
+const requiredIncognitoChatTokens = [
+  "function getLiveChatPopupUrl(pageUrl)",
+  "function openIncognitoChatPopup(pageUrl, sendResponse)",
+  '`${CHZZK_ORIGIN}/live/${channelId}/chat`',
+  "chrome.windows.create(",
+  'type: "popup"',
+  "incognito: true"
+];
+
+for (const token of requiredIncognitoChatTokens) {
+  if (!backgroundSource.includes(token)) {
+    throw new Error(`background script must open CHZZK chat in an incognito popup: ${token}`);
+  }
+}
+
+if (!popupMarkup.includes('id="openIncognitoChat"')) {
+  throw new Error("popup must include an incognito chat button.");
+}
+
+if (!popupSource.includes('const OPEN_INCOGNITO_CHAT_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_INCOGNITO_CHAT";')) {
+  throw new Error("popup script must define the incognito chat popup message.");
+}
+
+if (!popupSource.includes("function handleOpenIncognitoChat()")) {
+  throw new Error("popup script must handle the incognito chat button.");
 }
 
 const unsafeRoleSelectors = [
