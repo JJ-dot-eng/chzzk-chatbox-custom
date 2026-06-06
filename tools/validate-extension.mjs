@@ -5,6 +5,7 @@ const root = process.cwd();
 const manifestPath = path.join(root, "manifest.json");
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 const contentSource = await readFile(path.join(root, "content.js"), "utf8");
+const backgroundSource = await readFile(path.join(root, "background.js"), "utf8");
 
 const requiredRootFiles = [
   "manifest.json",
@@ -94,6 +95,54 @@ if (!contentSource.includes('const CHAT_ROW_SCOPE_SELECTOR = `[class*="live_chat
 
 if (!contentSource.includes('const NATIVE_CHAT_ROW_SELECTOR = `[class*="live_chatting_list_item" i]:has([class*="live_chatting_message_container" i])`;')) {
   throw new Error("content script must define a native chat-row selector for non-hiding styles.");
+}
+
+if (!contentSource.includes('const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";')) {
+  throw new Error("content script must define the background options-read message.");
+}
+
+if (!contentSource.includes("function readOptionsFromBackground()")) {
+  throw new Error("content script must fall back to background options loading.");
+}
+
+if (!contentSource.includes("Promise.all([\n      readOptionsFromStorageLocal(),\n      readOptionsFromBackground()\n    ])")) {
+  throw new Error("content script must load direct and background options in parallel.");
+}
+
+if (!contentSource.includes("OPTIONS_LOAD_MAX_ATTEMPTS")) {
+  throw new Error("content script must retry stored option loading.");
+}
+
+const startIndex = contentSource.indexOf("function start()");
+const connectMessagesIndex = contentSource.indexOf("connectMessages();", startIndex);
+const connectStorageListenerIndex = contentSource.indexOf("connectStorageListener();", startIndex);
+const cachedOptionsIndex = contentSource.indexOf("const cachedOptions = readCachedOptions();", startIndex);
+
+if (
+  startIndex < 0 ||
+  connectMessagesIndex < 0 ||
+  connectStorageListenerIndex < 0 ||
+  cachedOptionsIndex < 0 ||
+  connectMessagesIndex > cachedOptionsIndex ||
+  connectStorageListenerIndex > cachedOptionsIndex
+) {
+  throw new Error("content script must connect listeners before stored options finish loading.");
+}
+
+if (!backgroundSource.includes('const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";')) {
+  throw new Error("background script must define the options-read message.");
+}
+
+if (!backgroundSource.includes("chrome.runtime.onMessage.addListener")) {
+  throw new Error("background script must answer content-script option requests.");
+}
+
+if (!backgroundSource.includes("chrome.storage.local.get(STORAGE_KEY")) {
+  throw new Error("background script must read stored options from chrome.storage.local.");
+}
+
+if (backgroundSource.includes("chrome.storage.local.set({ [STORAGE_KEY]: DEFAULT_OPTIONS })")) {
+  throw new Error("background script must not overwrite saved options with defaults.");
 }
 
 const unsafeRoleSelectors = [

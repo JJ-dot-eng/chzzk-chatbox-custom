@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.12";
+  const SCRIPT_VERSION = "0.1.13";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -15,6 +15,10 @@
   const CHAT_ROW_SCOPE_SELECTOR = `[class*="live_chatting_list_item" i][${CHAT_ROW_ATTR}="true"]`;
   const STYLE_ID = "chzzk-chat-ui-toggle-style";
   const CACHE_KEY = "chzzkChatUiToggleOptionsCache";
+  const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
+  const STORAGE_READ_TIMEOUT_MS = 700;
+  const OPTIONS_LOAD_RETRY_MS = 250;
+  const OPTIONS_LOAD_MAX_ATTEMPTS = 20;
   const SCAN_DELAY_MS = 0;
   const SCAN_INTERVAL_MS = 2000;
   const GENERATED_TIMESTAMP_ATTR = "data-chzzk-chat-ui-toggle-generated-timestamp";
@@ -90,8 +94,14 @@
 
   let currentOptions = { ...DEFAULT_OPTIONS };
   let scanTimer = 0;
+  let optionsLoadTimer = 0;
+  let scanIntervalTimer = 0;
   let isScanning = false;
   let observer = null;
+  let messagesConnected = false;
+  let storageListenerConnected = false;
+  let lastOptionsSource = "default";
+  let lastOptionsLoadError = "";
 
   function getRuntime() {
     if (typeof chrome === "undefined") {
@@ -169,18 +179,156 @@
     }
   }
 
-  function readOptions() {
+  function hasOwn(object, key) {
+    return Object.prototype.hasOwnProperty.call(object ?? {}, key);
+  }
+
+  function createTimeoutResult(resolve, settled, timeoutMs, error) {
+    return window.setTimeout(() => {
+      if (settled.value) {
+        return;
+      }
+
+      settled.value = true;
+      resolve({ ok: false, error });
+    }, timeoutMs);
+  }
+
+  function readOptionsFromStorageLocal() {
     const runtime = getRuntime();
 
     if (!runtime?.storage?.local) {
-      return Promise.resolve({ ...DEFAULT_OPTIONS });
+      return Promise.resolve({ ok: false, error: "storage-local-unavailable" });
     }
 
     return new Promise((resolve) => {
-      runtime.storage.local.get(STORAGE_KEY, (result) => {
-        resolve(normalizeOptions(result?.[STORAGE_KEY]));
-      });
+      const settled = { value: false };
+      const timeout = createTimeoutResult(
+        resolve,
+        settled,
+        STORAGE_READ_TIMEOUT_MS,
+        "storage-local-timeout"
+      );
+
+      try {
+        runtime.storage.local.get(STORAGE_KEY, (result) => {
+          if (settled.value) {
+            return;
+          }
+
+          settled.value = true;
+          window.clearTimeout(timeout);
+
+          const error = runtime.runtime?.lastError;
+
+          if (error) {
+            resolve({ ok: false, error: error.message || "storage-local-error" });
+            return;
+          }
+
+          const found = hasOwn(result, STORAGE_KEY);
+
+          resolve({
+            ok: true,
+            found,
+            source: "storage-local",
+            options: normalizeOptions(found ? result[STORAGE_KEY] : DEFAULT_OPTIONS)
+          });
+        });
+      } catch (error) {
+        if (settled.value) {
+          return;
+        }
+
+        settled.value = true;
+        window.clearTimeout(timeout);
+        resolve({ ok: false, error: String(error?.message || error) });
+      }
     });
+  }
+
+  function readOptionsFromBackground() {
+    const runtime = getRuntime();
+
+    if (!runtime?.runtime?.sendMessage) {
+      return Promise.resolve({ ok: false, error: "runtime-message-unavailable" });
+    }
+
+    return new Promise((resolve) => {
+      const settled = { value: false };
+      const timeout = createTimeoutResult(
+        resolve,
+        settled,
+        STORAGE_READ_TIMEOUT_MS,
+        "background-options-timeout"
+      );
+
+      try {
+        runtime.runtime.sendMessage({ type: READ_OPTIONS_MESSAGE }, (response) => {
+          if (settled.value) {
+            return;
+          }
+
+          settled.value = true;
+          window.clearTimeout(timeout);
+
+          const error = runtime.runtime?.lastError;
+
+          if (error) {
+            resolve({ ok: false, error: error.message || "background-options-error" });
+            return;
+          }
+
+          if (!response?.ok) {
+            resolve({ ok: false, error: response?.error || "background-options-empty" });
+            return;
+          }
+
+          resolve({
+            ok: true,
+            found: response.found === true,
+            source: "background",
+            options: normalizeOptions(response.options)
+          });
+        });
+      } catch (error) {
+        if (settled.value) {
+          return;
+        }
+
+        settled.value = true;
+        window.clearTimeout(timeout);
+        resolve({ ok: false, error: String(error?.message || error) });
+      }
+    });
+  }
+
+  async function readOptions() {
+    const [localResult, backgroundResult] = await Promise.all([
+      readOptionsFromStorageLocal(),
+      readOptionsFromBackground()
+    ]);
+
+    if (localResult.ok && localResult.found) {
+      return localResult;
+    }
+
+    if (backgroundResult.ok && backgroundResult.found) {
+      return backgroundResult;
+    }
+
+    if (localResult.ok) {
+      return localResult;
+    }
+
+    if (backgroundResult.ok) {
+      return backgroundResult;
+    }
+
+    return {
+      ok: false,
+      error: `${localResult.error || "storage-local-failed"}; ${backgroundResult.error || "background-failed"}`
+    };
   }
 
   function injectStyle() {
@@ -380,10 +528,16 @@
     document.documentElement.dataset.chzzkChatUiToggleReady = "true";
   }
 
-  function applyOptions(options, { markAsReady = true } = {}) {
+  function applyOptions(options, { markAsReady = true, cache = true, source = "direct" } = {}) {
     cleanupUnscopedAnnotations();
     currentOptions = normalizeOptions(options);
-    writeCachedOptions(currentOptions);
+    lastOptionsSource = source;
+    lastOptionsLoadError = "";
+
+    if (cache) {
+      writeCachedOptions(currentOptions);
+    }
+
     document.documentElement.dataset.chzzkChatUiToggleVersion = SCRIPT_VERSION;
     document.documentElement.dataset.chzzkChatUiToggleChatBoxColor = currentOptions.chatBoxColor;
 
@@ -410,7 +564,9 @@
       ok: true,
       version: SCRIPT_VERSION,
       styleVersion: document.getElementById(STYLE_ID)?.dataset.chzzkChatUiToggleVersion || null,
-      options: currentOptions
+      options: currentOptions,
+      optionsSource: lastOptionsSource,
+      optionsLoadError: lastOptionsLoadError
     };
   }
 
@@ -917,11 +1073,17 @@
   }
 
   function connectMessages() {
+    if (messagesConnected) {
+      return;
+    }
+
     const runtime = getRuntime();
 
     if (!runtime?.runtime?.onMessage) {
       return;
     }
+
+    messagesConnected = true;
 
     runtime.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       if (message?.type === "CHZZK_CHAT_UI_TOGGLE_GET_STATUS") {
@@ -936,16 +1098,17 @@
 
       if (message?.type === "CHZZK_CHAT_UI_TOGGLE_REFRESH") {
         injectStyle();
-        applyOptions(currentOptions, { markAsReady: false });
-        scan();
-        markReady();
-        sendResponse(getStatus());
-        return false;
+        loadStoredOptions(1, { allowFallback: true }).then(() => {
+          scan();
+          markReady();
+          sendResponse(getStatus());
+        });
+        return true;
       }
 
       if (message?.type === "CHZZK_CHAT_UI_TOGGLE_SET_OPTIONS") {
         injectStyle();
-        applyOptions(message.options);
+        applyOptions(message.options, { source: "popup-message" });
         scan();
         sendResponse(getStatus());
         return false;
@@ -956,44 +1119,89 @@
   }
 
   function connectStorageListener() {
+    if (storageListenerConnected) {
+      return;
+    }
+
     const runtime = getRuntime();
 
     if (!runtime?.storage?.onChanged) {
       return;
     }
 
+    storageListenerConnected = true;
+
     runtime.storage.onChanged.addListener((changes, areaName) => {
       if (areaName !== "local" || !changes[STORAGE_KEY]) {
         return;
       }
 
-      applyOptions(changes[STORAGE_KEY].newValue);
+      applyOptions(changes[STORAGE_KEY].newValue, { source: "storage-change" });
       scan();
     });
   }
 
-  function start() {
-    injectStyle();
+  async function loadStoredOptions(attempt = 1, { allowFallback = false } = {}) {
+    window.clearTimeout(optionsLoadTimer);
+    connectMessages();
+    connectStorageListener();
 
-    const cachedOptions = readCachedOptions();
+    const result = await readOptions();
 
-    if (cachedOptions) {
-      applyOptions(cachedOptions, { markAsReady: false });
+    if (result.ok) {
+      applyOptions(result.options, {
+        markAsReady: false,
+        cache: true,
+        source: result.source || "stored-options"
+      });
+      scan();
+      markReady();
+      return true;
+    }
+
+    lastOptionsLoadError = result.error || "stored-options-unavailable";
+
+    if (attempt < OPTIONS_LOAD_MAX_ATTEMPTS) {
+      optionsLoadTimer = window.setTimeout(() => {
+        loadStoredOptions(attempt + 1, { allowFallback });
+      }, OPTIONS_LOAD_RETRY_MS);
+      return false;
+    }
+
+    if (allowFallback) {
+      const cachedOptions = readCachedOptions();
+
+      applyOptions(cachedOptions || DEFAULT_OPTIONS, {
+        markAsReady: false,
+        cache: false,
+        source: cachedOptions ? "cache-fallback" : "default-fallback"
+      });
       scan();
       markReady();
     }
 
+    return false;
+  }
+
+  function start() {
+    injectStyle();
+    connectMessages();
+    connectStorageListener();
+
+    const cachedOptions = readCachedOptions();
+
+    if (cachedOptions) {
+      applyOptions(cachedOptions, { markAsReady: false, cache: false, source: "page-cache" });
+      scan();
+    }
+
     connectObserver();
     scheduleScan();
+    loadStoredOptions(1, { allowFallback: true });
 
-    readOptions().then((options) => {
-      applyOptions(options, { markAsReady: false });
-      scan();
-      markReady();
-      connectMessages();
-      connectStorageListener();
-      window.setInterval(scan, SCAN_INTERVAL_MS);
-    });
+    if (!scanIntervalTimer) {
+      scanIntervalTimer = window.setInterval(scan, SCAN_INTERVAL_MS);
+    }
   }
 
   start();
