@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.31";
+  const SCRIPT_VERSION = "0.1.32";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -121,6 +121,18 @@
     "[class*='live_chatting_header_wrapper' i]",
     "[class*='live_chatting_header' i]",
     "[class*='chatting_header' i]"
+  ];
+
+  const CHAT_THEME_FOREGROUND_SELECTORS = [
+    "button",
+    "[role='button']",
+    "svg",
+    "span",
+    "strong",
+    "h1",
+    "h2",
+    "h3",
+    "[class*='title' i]"
   ];
 
   const TARGET_SELECTORS = {
@@ -424,6 +436,14 @@
     return value === "dark" || value === "light" ? value : null;
   }
 
+  function getGuestChatThemeFromUrl(url) {
+    try {
+      return normalizeGuestChatTheme(new URL(url).searchParams.get("theme"));
+    } catch (_error) {
+      return null;
+    }
+  }
+
   function getThemeFromText(value) {
     const text = String(value || "").toLowerCase();
 
@@ -530,6 +550,30 @@
     return null;
   }
 
+  function getThemeFromForegroundElement(element) {
+    if (!(element instanceof HTMLElement)) {
+      return null;
+    }
+
+    const color = parseRgbColor(window.getComputedStyle(element).color);
+
+    if (!color) {
+      return null;
+    }
+
+    const luminance = getRelativeLuminance(color);
+
+    if (luminance <= 0.28) {
+      return "light";
+    }
+
+    if (luminance >= 0.72) {
+      return "dark";
+    }
+
+    return null;
+  }
+
   function getThemeFromComputedBackground() {
     const candidates = [
       ...queryAllSafe(document, PAGE_THEME_BACKGROUND_SELECTORS)
@@ -614,7 +658,50 @@
     return null;
   }
 
+  function getThemeFromChatChromeForeground() {
+    if (window.self !== window.top) {
+      return null;
+    }
+
+    const candidates = [
+      findChatHeaderTarget(),
+      ...queryAllSafe(document, CHAT_THEME_CHROME_SELECTORS)
+    ].filter((element) => element instanceof HTMLElement && isElementVisible(element));
+    const foregroundElements = [];
+
+    for (const candidate of candidates) {
+      if (closestSafe(candidate, `#${GUEST_CHAT_FRAME_CONTAINER_ID}`)) {
+        continue;
+      }
+
+      foregroundElements.push(candidate);
+      foregroundElements.push(
+        ...queryAllSafe(candidate, CHAT_THEME_FOREGROUND_SELECTORS)
+          .filter((element) => element instanceof HTMLElement)
+          .filter(isElementVisible)
+          .slice(0, 24)
+      );
+    }
+
+    for (const element of [...new Set(foregroundElements)]) {
+      const theme = getThemeFromForegroundElement(element);
+
+      if (theme) {
+        return theme;
+      }
+    }
+
+    return null;
+  }
+
   function detectPageTheme() {
+    const chatChromeForegroundTheme = getThemeFromChatChromeForeground();
+
+    if (chatChromeForegroundTheme) {
+      document.documentElement.dataset.chzzkChatUiToggleDetectedThemeSource = "chat-chrome-foreground";
+      return chatChromeForegroundTheme;
+    }
+
     const chatChromeTheme = getThemeFromChatChromeBackground();
 
     if (chatChromeTheme) {
@@ -668,6 +755,8 @@
         document.documentElement.removeAttribute(GUEST_CHAT_EMBED_ATTR);
       }
 
+      applyNativeGuestChatThemeClass(normalizedTheme);
+
       if (normalizedTheme) {
         document.documentElement.setAttribute(GUEST_CHAT_THEME_ATTR, normalizedTheme);
         document.documentElement.dataset.chzzkChatUiToggleGuestThemeSource = source;
@@ -683,6 +772,24 @@
     document.documentElement.removeAttribute(GUEST_CHAT_EMBED_ATTR);
     document.documentElement.removeAttribute(GUEST_CHAT_THEME_ATTR);
     delete document.documentElement.dataset.chzzkChatUiToggleGuestThemeSource;
+  }
+
+  function applyNativeGuestChatThemeClass(theme) {
+    const normalizedTheme = normalizeGuestChatTheme(theme);
+
+    if (!isGuestChatFrameEmbedUrl(window.location.href)) {
+      return;
+    }
+
+    document.documentElement.classList.remove("light", "dark");
+
+    if (!normalizedTheme) {
+      document.documentElement.style.removeProperty("color-scheme");
+      return;
+    }
+
+    document.documentElement.classList.add(normalizedTheme);
+    document.documentElement.style.colorScheme = normalizedTheme;
   }
 
   function readGuestChatThemeFromBackground() {
@@ -760,6 +867,7 @@
         document.documentElement.removeAttribute(GUEST_CHAT_EMBED_ATTR);
       }
 
+      applyNativeGuestChatThemeClass(getGuestChatThemeFromUrl(window.location.href));
       readGuestChatThemeFromBackground();
       return;
     }
