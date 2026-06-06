@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.6";
+  const SCRIPT_VERSION = "0.1.7";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -102,6 +102,7 @@
 
   let currentOptions = { ...DEFAULT_OPTIONS };
   let scanTimer = 0;
+  let isScanning = false;
   let observer = null;
 
   function getRuntime() {
@@ -391,10 +392,13 @@
     }
   }
 
-  function applyOptions(options) {
+  function markReady() {
+    document.documentElement.dataset.chzzkChatUiToggleReady = "true";
+  }
+
+  function applyOptions(options, { markAsReady = true } = {}) {
     currentOptions = normalizeOptions(options);
     writeCachedOptions(currentOptions);
-    document.documentElement.dataset.chzzkChatUiToggleReady = "true";
     document.documentElement.dataset.chzzkChatUiToggleVersion = SCRIPT_VERSION;
     document.documentElement.dataset.chzzkChatUiToggleChatBoxColor = currentOptions.chatBoxColor;
 
@@ -409,6 +413,10 @@
 
     for (const [optionKey, datasetKey] of Object.entries(DATASET_KEYS)) {
       document.documentElement.dataset[datasetKey] = currentOptions[optionKey] ? "on" : "off";
+    }
+
+    if (markAsReady) {
+      markReady();
     }
   }
 
@@ -733,19 +741,94 @@
     }
   }
 
+  function annotateChatRow(row) {
+    annotateSelectorTargets(row, "timestamp");
+    annotateTimestampLeaves(row);
+    ensureGeneratedTimestamp(row);
+    annotateSelectorTargets(row, "badge");
+    annotateLeadingBadges(row);
+    annotateSelectorTargets(row, "nickname");
+  }
+
+  function scanRows(rows) {
+    for (const row of [...new Set(rows)].filter((element) => element instanceof HTMLElement && hasChatLikeText(element))) {
+      annotateChatRow(row);
+    }
+  }
+
   function scan() {
+    if (isScanning) {
+      return;
+    }
+
+    isScanning = true;
     const roots = getChatRoots();
 
-    for (const root of roots) {
-      for (const row of getChatRows(root)) {
-        annotateSelectorTargets(row, "timestamp");
-        annotateTimestampLeaves(row);
-        ensureGeneratedTimestamp(row);
-        annotateSelectorTargets(row, "badge");
-        annotateLeadingBadges(row);
-        annotateSelectorTargets(row, "nickname");
+    try {
+      for (const root of roots) {
+        scanRows(getChatRows(root));
+      }
+    } finally {
+      isScanning = false;
+    }
+  }
+
+  function matchesAnySafe(element, selectors) {
+    for (const selector of selectors) {
+      try {
+        if (element.matches(selector)) {
+          return true;
+        }
+      } catch (_error) {
+        // A selector mismatch should not break processing for new chat rows.
       }
     }
+
+    return false;
+  }
+
+  function closestAnySafe(element, selectors) {
+    for (const selector of selectors) {
+      try {
+        const closest = element.closest(selector);
+
+        if (closest instanceof HTMLElement) {
+          return closest;
+        }
+      } catch (_error) {
+        // A selector mismatch should not break processing for new chat rows.
+      }
+    }
+
+    return null;
+  }
+
+  function collectAddedChatRows(mutations) {
+    const rows = [];
+
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        const element = node instanceof Element ? node : node.parentElement;
+
+        if (!element) {
+          continue;
+        }
+
+        if (element instanceof HTMLElement && matchesAnySafe(element, CHAT_ROW_SELECTORS)) {
+          rows.push(element);
+        }
+
+        rows.push(...queryAllSafe(element, CHAT_ROW_SELECTORS).filter((row) => row instanceof HTMLElement));
+
+        const closestRow = closestAnySafe(element, CHAT_ROW_SELECTORS);
+
+        if (closestRow) {
+          rows.push(closestRow);
+        }
+      }
+    }
+
+    return rows;
   }
 
   function scheduleScan() {
@@ -762,7 +845,13 @@
 
     observer = new MutationObserver((mutations) => {
       if (mutations.some((mutation) => mutation.addedNodes.length > 0)) {
-        scheduleScan();
+        const addedRows = collectAddedChatRows(mutations);
+
+        if (addedRows.length > 0) {
+          scanRows(addedRows);
+        } else {
+          scan();
+        }
       }
     });
 
@@ -792,8 +881,9 @@
 
       if (message?.type === "CHZZK_CHAT_UI_TOGGLE_REFRESH") {
         injectStyle();
-        applyOptions(currentOptions);
+        applyOptions(currentOptions, { markAsReady: false });
         scan();
+        markReady();
         sendResponse(getStatus());
         return false;
       }
@@ -801,7 +891,7 @@
       if (message?.type === "CHZZK_CHAT_UI_TOGGLE_SET_OPTIONS") {
         injectStyle();
         applyOptions(message.options);
-        scheduleScan();
+        scan();
         sendResponse(getStatus());
         return false;
       }
@@ -823,7 +913,7 @@
       }
 
       applyOptions(changes[STORAGE_KEY].newValue);
-      scheduleScan();
+      scan();
     });
   }
 
@@ -833,15 +923,18 @@
     const cachedOptions = readCachedOptions();
 
     if (cachedOptions) {
-      applyOptions(cachedOptions);
+      applyOptions(cachedOptions, { markAsReady: false });
+      scan();
+      markReady();
     }
 
     connectObserver();
     scheduleScan();
 
     readOptions().then((options) => {
-      applyOptions(options);
+      applyOptions(options, { markAsReady: false });
       scan();
+      markReady();
       connectMessages();
       connectStorageListener();
       window.setInterval(scan, SCAN_INTERVAL_MS);

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "CHZZK Chat UI Toggle",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "치지직 채팅창의 텍스트 표시와 꾸미기 옵션을 내 브라우저에서만 토글합니다.",
   "action": {
     "default_title": "치지직 채팅 설정",

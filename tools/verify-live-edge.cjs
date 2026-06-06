@@ -459,6 +459,151 @@ async function setExtensionOptions(worker, options) {
   );
 }
 
+async function collectSyntheticFirstMutationState(page) {
+  return page.evaluate(
+    ({ roleAttr }) =>
+      new Promise((resolve) => {
+        const rootId = `chzzk-chat-ui-toggle-probe-${Date.now()}`;
+        const rowId = `${rootId}-row`;
+
+        function readElementState(row, selector) {
+          const element = row.querySelector(selector);
+
+          if (!element) {
+            return { exists: false };
+          }
+
+          const style = getComputedStyle(element);
+          const rect = element.getBoundingClientRect();
+
+          return {
+            exists: true,
+            display: style.display,
+            visibility: style.visibility,
+            width: Math.round(rect.width),
+            height: Math.round(rect.height),
+            role: element.getAttribute(roleAttr) || ""
+          };
+        }
+
+        function isVisible(state) {
+          return (
+            state.exists &&
+            state.display !== "none" &&
+            state.visibility !== "hidden" &&
+            state.width > 0 &&
+            state.height > 0
+          );
+        }
+
+        const probeObserver = new MutationObserver(() => {
+          const row = document.getElementById(rowId);
+
+          if (!row) {
+            return;
+          }
+
+          probeObserver.disconnect();
+
+          const state = {
+            row: readElementState(document, `#${rowId}`),
+            nickname: readElementState(row, "[data-probe='nickname']"),
+            badge: readElementState(row, "[data-probe='badge']"),
+            timestamp: readElementState(row, ".chzzk-chat-ui-toggle-timestamp"),
+            message: readElementState(row, "[data-probe='message']"),
+            rootDataset: {
+              nicknames: document.documentElement.dataset.chzzkChatUiToggleNicknames || null,
+              badges: document.documentElement.dataset.chzzkChatUiToggleBadges || null,
+              timestamps: document.documentElement.dataset.chzzkChatUiToggleTimestamps || null
+            }
+          };
+
+          state.visible = {
+            row: isVisible(state.row),
+            nickname: isVisible(state.nickname),
+            badge: isVisible(state.badge),
+            timestamp: isVisible(state.timestamp),
+            message: isVisible(state.message)
+          };
+
+          document.getElementById(rootId)?.remove();
+          resolve(state);
+        });
+
+        const root = document.createElement("ul");
+        root.id = rootId;
+        root.className = "live_chatting_list__probe";
+
+        const row = document.createElement("li");
+        row.id = rowId;
+        row.className = "live_chatting_list_item__probe";
+
+        const nicknameButton = document.createElement("button");
+        nicknameButton.type = "button";
+        nicknameButton.className = "live_chatting_message_nickname__probe";
+
+        const badgeWrapper = document.createElement("span");
+        badgeWrapper.className = "live_chatting_username_wrapper__probe badge_container__probe";
+
+        const badge = document.createElement("img");
+        badge.dataset.probe = "badge";
+        badge.alt = "배지";
+        badge.src = "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
+        badge.width = 18;
+        badge.height = 18;
+        badgeWrapper.appendChild(badge);
+
+        const nickname = document.createElement("span");
+        nickname.dataset.probe = "nickname";
+        nickname.className = "name_text__probe live_chatting_username_nickname__probe";
+        nickname.textContent = "probeUser";
+
+        const messageContainer = document.createElement("span");
+        messageContainer.className = "live_chatting_message_container__probe";
+
+        const message = document.createElement("span");
+        message.dataset.probe = "message";
+        message.className = "live_chatting_message_text__probe";
+        message.textContent = "probe message";
+
+        nicknameButton.append(badgeWrapper, nickname);
+        messageContainer.appendChild(message);
+        row.append(nicknameButton, messageContainer);
+        root.appendChild(row);
+
+        probeObserver.observe(document.body, {
+          childList: true,
+          subtree: true
+        });
+
+        document.body.appendChild(root);
+      }),
+    { roleAttr: ROLE_ATTR }
+  );
+}
+
+function assertSyntheticNoRawPrefixFlash(label, state) {
+  const hiddenTargets = ["nickname", "badge", "timestamp"];
+
+  for (const target of hiddenTargets) {
+    if (!state[target].exists) {
+      throw new Error(`${label}: synthetic ${target} was not annotated before first mutation observer check`);
+    }
+
+    if (!state[target].role.includes(target)) {
+      throw new Error(`${label}: synthetic ${target} role missing before first mutation observer check`);
+    }
+
+    if (state.visible[target]) {
+      throw new Error(`${label}: synthetic ${target} was visible before processing completed`);
+    }
+  }
+
+  if (!state.visible.message) {
+    throw new Error(`${label}: synthetic message text was not visible after processing`);
+  }
+}
+
 function assertSummary(label, summary) {
   const missing = [];
 
@@ -695,6 +840,13 @@ async function main() {
   assertChatBoxColor("initial on state", before.summary, DEFAULT_CHAT_BOX_COLOR);
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-on-before.png"), fullPage: false });
 
+  await setExtensionOptions(worker, offOptions);
+  await page.waitForTimeout(500);
+  const noFlashProbe = await collectSyntheticFirstMutationState(page);
+  assertSyntheticNoRawPrefixFlash("synthetic first-frame off state", noFlashProbe);
+  await setExtensionOptions(worker, onOptions);
+  await page.waitForTimeout(500);
+
   const popup = await context.newPage();
   await popup.goto(`chrome-extension://${extensionId}/popup.html`, {
     waitUntil: "domcontentloaded",
@@ -791,6 +943,7 @@ async function main() {
           off: off.summary,
           onAfter: onAfter.summary
         },
+        noFlashProbe,
         sampleFrames: before.states
           .filter((state) => state.counts.nickname || state.counts.badge || state.counts.timestamp)
           .slice(0, 3)
