@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.1.28";
+  const SCRIPT_VERSION = "0.1.29";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -111,6 +111,14 @@
     "[class*='live_detail' i]",
     "[class*='content' i]",
     "main"
+  ];
+
+  const CHAT_THEME_CHROME_SELECTORS = [
+    `[${GUEST_CHAT_CONTROL_HOST_ATTR}="true"]`,
+    "[class*='live_chatting_header_container' i]",
+    "[class*='live_chatting_header_wrapper' i]",
+    "[class*='live_chatting_header' i]",
+    "[class*='chatting_header' i]"
   ];
 
   const TARGET_SELECTORS = {
@@ -496,31 +504,42 @@
     return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
   }
 
+  function getThemeFromBackgroundElement(element) {
+    if (!(element instanceof HTMLElement)) {
+      return null;
+    }
+
+    const color = parseRgbColor(window.getComputedStyle(element).backgroundColor);
+
+    if (!color) {
+      return null;
+    }
+
+    const luminance = getRelativeLuminance(color);
+
+    if (luminance <= 0.28) {
+      return "dark";
+    }
+
+    if (luminance >= 0.72) {
+      return "light";
+    }
+
+    return null;
+  }
+
   function getThemeFromComputedBackground() {
     const candidates = [
-      document.documentElement,
-      document.body,
-      document.getElementById("root"),
       ...queryAllSafe(document, PAGE_THEME_BACKGROUND_SELECTORS)
         .filter((element) => element instanceof HTMLElement)
         .slice(0, 12)
     ].filter((element) => element instanceof HTMLElement && !isChatThemeCandidate(element));
 
     for (const element of candidates) {
-      const color = parseRgbColor(window.getComputedStyle(element).backgroundColor);
+      const theme = getThemeFromBackgroundElement(element);
 
-      if (!color) {
-        continue;
-      }
-
-      const luminance = getRelativeLuminance(color);
-
-      if (luminance <= 0.28) {
-        return "dark";
-      }
-
-      if (luminance >= 0.72) {
-        return "light";
+      if (theme) {
+        return theme;
       }
     }
 
@@ -557,7 +576,50 @@
     );
   }
 
+  function getThemeFromChatChromeBackground() {
+    if (window.self !== window.top) {
+      return null;
+    }
+
+    const candidates = [
+      findChatHeaderTarget(),
+      ...queryAllSafe(document, CHAT_THEME_CHROME_SELECTORS)
+    ].filter((element) => element instanceof HTMLElement && isElementVisible(element));
+    const surfaces = [];
+
+    for (const candidate of candidates) {
+      for (
+        let element = candidate, depth = 0;
+        element instanceof HTMLElement && element !== document.body && depth < 6;
+        element = element.parentElement, depth += 1
+      ) {
+        if (closestSafe(element, `#${GUEST_CHAT_FRAME_CONTAINER_ID}`)) {
+          break;
+        }
+
+        surfaces.push(element);
+      }
+    }
+
+    for (const element of [...new Set(surfaces)]) {
+      const theme = getThemeFromBackgroundElement(element);
+
+      if (theme) {
+        return theme;
+      }
+    }
+
+    return null;
+  }
+
   function detectPageTheme() {
+    const chatChromeTheme = getThemeFromChatChromeBackground();
+
+    if (chatChromeTheme) {
+      document.documentElement.dataset.chzzkChatUiToggleDetectedThemeSource = "chat-chrome";
+      return chatChromeTheme;
+    }
+
     const hintElements = [document.documentElement, document.body].filter(
       (element) => element instanceof HTMLElement
     );
@@ -566,6 +628,7 @@
       const theme = getThemeFromElementHints(element);
 
       if (theme) {
+        document.documentElement.dataset.chzzkChatUiToggleDetectedThemeSource = "page-hint";
         return theme;
       }
     }
@@ -573,13 +636,16 @@
     const computedTheme = getThemeFromComputedBackground();
 
     if (computedTheme) {
+      document.documentElement.dataset.chzzkChatUiToggleDetectedThemeSource = "page-background";
       return computedTheme;
     }
 
     if (window.matchMedia?.("(prefers-color-scheme: dark)")?.matches) {
+      document.documentElement.dataset.chzzkChatUiToggleDetectedThemeSource = "system";
       return "dark";
     }
 
+    document.documentElement.dataset.chzzkChatUiToggleDetectedThemeSource = "fallback";
     return "light";
   }
 
@@ -1076,7 +1142,8 @@
       optionsSource: lastOptionsSource,
       optionsLoadError: lastOptionsLoadError,
       guestChatTheme: currentGuestChatTheme,
-      detectedTheme: document.documentElement.dataset.chzzkChatUiToggleDetectedTheme || null
+      detectedTheme: document.documentElement.dataset.chzzkChatUiToggleDetectedTheme || null,
+      detectedThemeSource: document.documentElement.dataset.chzzkChatUiToggleDetectedThemeSource || null
     };
   }
 

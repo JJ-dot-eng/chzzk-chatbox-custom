@@ -211,12 +211,15 @@ const requiredGuestChatTokens = [
   'const SET_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_GUEST_CHAT_THEME";',
   'const APPLY_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_APPLY_GUEST_CHAT_THEME";',
   "const PAGE_THEME_BACKGROUND_SELECTORS = [",
+  "const CHAT_THEME_CHROME_SELECTORS = [",
   "function writeOptionsToStorageLocal(options)",
   "function syncGuestChatFrame()",
   "function syncGuestChatTheme()",
   "function detectPageTheme()",
   "function isChatThemeCandidate(element)",
+  "function getThemeFromChatChromeBackground()",
   "function applyGuestChatTheme(theme",
+  'document.documentElement.dataset.chzzkChatUiToggleDetectedThemeSource = "chat-chrome";',
   "const frameUrl = new URL(`${CHZZK_ORIGIN}/live/${channelId}/chat`);",
   "const theme = getGuestChatFrameTheme();",
   'frameUrl.searchParams.set("theme", theme);',
@@ -263,6 +266,12 @@ const computedThemeSource =
 for (const token of ["live_chatting", "chatting_area", "chat_area"]) {
   if (computedThemeSource.includes(token)) {
     throw new Error(`outer page theme detection must not sample chat UI backgrounds: ${token}`);
+  }
+}
+
+for (const token of ["document.documentElement", "document.body", 'document.getElementById("root")']) {
+  if (computedThemeSource.includes(token)) {
+    throw new Error(`outer page theme detection must not sample broad page shell backgrounds: ${token}`);
   }
 }
 
