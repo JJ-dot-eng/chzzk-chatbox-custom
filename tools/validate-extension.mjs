@@ -30,12 +30,12 @@ if (manifest.manifest_version !== 3) {
   throw new Error("manifest_version must be 3.");
 }
 
-if (manifest.name !== "치지직 채팅 UI 설정") {
-  throw new Error("manifest name must be 치지직 채팅 UI 설정.");
+if (manifest.name !== "치지직 채팅 커스텀") {
+  throw new Error("manifest name must be 치지직 채팅 커스텀.");
 }
 
-if (manifest.short_name !== "치지직 채팅 설정") {
-  throw new Error("manifest short_name must be 치지직 채팅 설정.");
+if (manifest.short_name !== "채팅 커스텀") {
+  throw new Error("manifest short_name must be 채팅 커스텀.");
 }
 
 if (!manifest.permissions?.includes("storage")) {
