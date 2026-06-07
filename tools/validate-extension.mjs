@@ -523,6 +523,36 @@ if (!contentSource.includes("function cleanupUnscopedAnnotations")) {
   throw new Error("content script must clean stale annotations outside confirmed chat rows.");
 }
 
+const scanRowsStart = contentSource.indexOf("function scanRows(rows)");
+const scanRowsEnd = contentSource.indexOf("function scan()", scanRowsStart);
+const scanRowsSource =
+  scanRowsStart >= 0 && scanRowsEnd > scanRowsStart
+    ? contentSource.slice(scanRowsStart, scanRowsEnd)
+    : "";
+
+if (!scanRowsSource.includes("cleanupRows(uniqueRows);")) {
+  throw new Error("content script must keep row-level scans scoped to the collected chat rows.");
+}
+
+if (scanRowsSource.includes("cleanupUnscopedAnnotations();")) {
+  throw new Error("content script must not run full-document cleanup for each row-level scan.");
+}
+
+const observerStart = contentSource.indexOf("observer = new MutationObserver");
+const observerEnd = contentSource.indexOf("observer.observe(target", observerStart);
+const observerSource =
+  observerStart >= 0 && observerEnd > observerStart
+    ? contentSource.slice(observerStart, observerEnd)
+    : "";
+
+if (!observerSource.includes("scheduleScan();")) {
+  throw new Error("content script must coalesce non-row mutation fallback scans.");
+}
+
+if (observerSource.includes("} else {\n          scan();")) {
+  throw new Error("content script must not run immediate full scans for non-row mutations.");
+}
+
 const unsafeDetectionTokens = [
   "[role='listitem']",
   '"li"',

@@ -24,8 +24,10 @@
   const STORAGE_READ_TIMEOUT_MS = 700;
   const OPTIONS_LOAD_RETRY_MS = 250;
   const OPTIONS_LOAD_MAX_ATTEMPTS = 20;
-  const SCAN_DELAY_MS = 0;
-  const SCAN_INTERVAL_MS = 2000;
+  const SCAN_DELAY_MS = 50;
+  const SCAN_INTERVAL_MS = 5000;
+  const FULL_CLEANUP_INTERVAL_MS = 10000;
+  const UI_SYNC_DELAY_MS = 100;
   const THEME_SYNC_INTERVAL_MS = 3000;
   const GENERATED_TIMESTAMP_ATTR = "data-chzzk-chat-ui-toggle-generated-timestamp";
   const MESSAGE_PREFIX_ATTR = "data-chzzk-chat-ui-toggle-prefix";
@@ -175,10 +177,12 @@
 
   let currentOptions = { ...DEFAULT_OPTIONS };
   let scanTimer = 0;
+  let uiSyncTimer = 0;
   let optionsLoadTimer = 0;
   let scanIntervalTimer = 0;
   let isScanning = false;
   let observer = null;
+  let lastFullCleanupAt = 0;
   let messagesConnected = false;
   let storageListenerConnected = false;
   let themeSyncTimer = 0;
@@ -1425,6 +1429,7 @@
 
   function applyOptions(options, { markAsReady = true, cache = true, source = "direct" } = {}) {
     cleanupUnscopedAnnotations();
+    lastFullCleanupAt = Date.now();
     currentOptions = normalizeOptions(options);
     lastOptionsSource = source;
     lastOptionsLoadError = "";
@@ -1449,8 +1454,7 @@
       document.documentElement.dataset[datasetKey] = currentOptions[optionKey] ? "on" : "off";
     }
 
-    syncGuestChatFrame();
-    ensureGuestChatToggleButton();
+    syncGuestChatUi();
 
     if (markAsReady) {
       markReady();
@@ -1483,6 +1487,17 @@
       }
     }
 
+    return [...new Set(results)];
+  }
+
+  function queryAllIncludingRootSafe(root, selectorList) {
+    const results = [];
+
+    if (root instanceof Element && matchesAnySafe(root, selectorList)) {
+      results.push(root);
+    }
+
+    results.push(...queryAllSafe(root, selectorList));
     return [...new Set(results)];
   }
 
@@ -2435,7 +2450,7 @@
   }
 
   function cleanupUnscopedAnnotations(root = document) {
-    const annotatedElements = queryAllSafe(root, [
+    const annotatedElements = queryAllIncludingRootSafe(root, [
       `[${CHAT_ROW_ATTR}="true"]`,
       `[${ROLE_ATTR}]`,
       `[${MESSAGE_PREFIX_ATTR}]`,
@@ -2457,10 +2472,29 @@
     }
   }
 
-  function scanRows(rows) {
-    cleanupUnscopedAnnotations();
+  function cleanupRows(rows) {
+    for (const row of [...new Set(rows)].filter((element) => element instanceof HTMLElement)) {
+      cleanupUnscopedAnnotations(row);
+    }
+  }
 
-    for (const row of [...new Set(rows)].filter((element) => element instanceof HTMLElement && hasChatLikeText(element))) {
+  function cleanupUnscopedAnnotationsWhenDue() {
+    const now = Date.now();
+
+    if (now - lastFullCleanupAt < FULL_CLEANUP_INTERVAL_MS) {
+      return;
+    }
+
+    lastFullCleanupAt = now;
+    cleanupUnscopedAnnotations();
+  }
+
+  function scanRows(rows) {
+    const uniqueRows = [...new Set(rows)].filter((element) => element instanceof HTMLElement);
+
+    cleanupRows(uniqueRows);
+
+    for (const row of uniqueRows.filter(hasChatLikeText)) {
       annotateChatRow(row);
     }
   }
@@ -2474,12 +2508,13 @@
     const roots = getChatRoots();
 
     try {
+      cleanupUnscopedAnnotationsWhenDue();
+
       for (const root of roots) {
         scanRows(getChatRows(root));
       }
 
-      syncGuestChatFrame();
-      ensureGuestChatToggleButton();
+      syncGuestChatUi();
     } finally {
       isScanning = false;
     }
@@ -2548,6 +2583,27 @@
     scanTimer = window.setTimeout(scan, SCAN_DELAY_MS);
   }
 
+  function syncGuestChatUi() {
+    if (uiSyncTimer) {
+      window.clearTimeout(uiSyncTimer);
+      uiSyncTimer = 0;
+    }
+
+    syncGuestChatFrame();
+    ensureGuestChatToggleButton();
+  }
+
+  function scheduleGuestChatUiSync() {
+    if (uiSyncTimer) {
+      return;
+    }
+
+    uiSyncTimer = window.setTimeout(() => {
+      uiSyncTimer = 0;
+      syncGuestChatUi();
+    }, UI_SYNC_DELAY_MS);
+  }
+
   function connectObserver() {
     const target = document.body ?? document.documentElement;
 
@@ -2561,10 +2617,9 @@
 
         if (addedRows.length > 0) {
           scanRows(addedRows);
-          syncGuestChatFrame();
-          ensureGuestChatToggleButton();
+          scheduleGuestChatUiSync();
         } else {
-          scan();
+          scheduleScan();
         }
       }
     });
