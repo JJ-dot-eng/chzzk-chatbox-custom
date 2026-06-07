@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.7";
+  const SCRIPT_VERSION = "0.2.8";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -16,6 +16,7 @@
   const STYLE_ID = "chzzk-chat-ui-toggle-style";
   const CACHE_KEY = "chzzkChatUiToggleOptionsCache";
   const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
+  const OPEN_POPUP_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_POPUP";
   const READ_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_GUEST_CHAT_THEME";
   const SET_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_GUEST_CHAT_THEME";
   const APPLY_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_APPLY_GUEST_CHAT_THEME";
@@ -43,6 +44,8 @@
   const GUEST_CHAT_TOGGLE_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-toggle";
   const GUEST_CHAT_TOGGLE_BUTTON_ICON_CLASS = "chzzk-chat-ui-toggle-guest-chat-toggle__icon";
   const GUEST_CHAT_TOGGLE_BUTTON_SLASH_CLASS = "chzzk-chat-ui-toggle-guest-chat-toggle__slash";
+  const HEADER_SETTINGS_BUTTON_ID = "chzzk-chat-ui-toggle-header-settings";
+  const HEADER_SETTINGS_BUTTON_ICON_CLASS = "chzzk-chat-ui-toggle-header-settings__icon";
   const LIVE_CHANNEL_ID_PATTERN = /^[0-9a-f]{32}$/i;
 
   const DEFAULT_OPTIONS = {
@@ -381,6 +384,31 @@
 
         settled.value = true;
         window.clearTimeout(timeout);
+        resolve({ ok: false, error: String(error?.message || error) });
+      }
+    });
+  }
+
+  function sendOpenPopupMessage() {
+    const runtime = getRuntime();
+
+    if (!runtime?.runtime?.sendMessage) {
+      return Promise.resolve({ ok: false, error: "runtime-message-unavailable" });
+    }
+
+    return new Promise((resolve) => {
+      try {
+        runtime.runtime.sendMessage({ type: OPEN_POPUP_MESSAGE }, (response) => {
+          const error = runtime.runtime?.lastError;
+
+          if (error) {
+            resolve({ ok: false, error: error.message || "open-popup-message-error" });
+            return;
+          }
+
+          resolve(response || { ok: false, error: "open-popup-empty-response" });
+        });
+      } catch (error) {
         resolve({ ok: false, error: String(error?.message || error) });
       }
     });
@@ -1082,6 +1110,65 @@
         color: #c92a2a !important;
       }
 
+      .chzzk-chat-ui-toggle-header-settings {
+        position: relative !important;
+        display: inline-flex !important;
+        flex: 0 0 auto !important;
+        align-self: center !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 28px !important;
+        height: 28px !important;
+        min-width: 28px !important;
+        min-height: 28px !important;
+        margin: 0 2px !important;
+        padding: 0 !important;
+        left: -3px !important;
+        top: 8px !important;
+        border: 0 !important;
+        border-radius: 6px !important;
+        background: transparent !important;
+        color: rgba(32, 36, 40, 0.72) !important;
+        box-shadow: none !important;
+        cursor: pointer !important;
+        z-index: 2147483646 !important;
+      }
+
+      .chzzk-chat-ui-toggle-header-settings:hover {
+        background: rgba(32, 36, 40, 0.08) !important;
+        color: rgba(32, 36, 40, 0.92) !important;
+      }
+
+      .chzzk-chat-ui-toggle-header-settings:focus-visible {
+        outline: 2px solid rgba(0, 196, 113, 0.42) !important;
+        outline-offset: 2px !important;
+      }
+
+      .chzzk-chat-ui-toggle-header-settings[data-state="loading"] {
+        cursor: wait !important;
+        opacity: 0.68 !important;
+      }
+
+      .chzzk-chat-ui-toggle-header-settings[data-state="error"] {
+        background: rgba(224, 49, 49, 0.12) !important;
+        color: #c92a2a !important;
+      }
+
+      .${HEADER_SETTINGS_BUTTON_ICON_CLASS} {
+        display: block !important;
+        width: 18px !important;
+        height: 18px !important;
+        color: inherit !important;
+        pointer-events: none !important;
+      }
+
+      .${HEADER_SETTINGS_BUTTON_ICON_CLASS} svg {
+        display: block !important;
+        width: 18px !important;
+        height: 18px !important;
+        stroke: currentColor !important;
+      }
+
       .${GUEST_CHAT_TOGGLE_BUTTON_ICON_CLASS} {
         position: relative !important;
         display: block !important;
@@ -1756,7 +1843,9 @@
     const actions = queryAllSafe(header, CHAT_HEADER_ACTION_BUTTON_SELECTORS)
       .filter((element) => element instanceof HTMLElement)
       .filter((element) => element.id !== GUEST_CHAT_TOGGLE_BUTTON_ID)
+      .filter((element) => element.id !== HEADER_SETTINGS_BUTTON_ID)
       .filter((element) => !element.closest(`#${GUEST_CHAT_TOGGLE_BUTTON_ID}`))
+      .filter((element) => !element.closest(`#${HEADER_SETTINGS_BUTTON_ID}`))
       .filter(isElementVisible);
 
     const candidates = actions
@@ -1809,6 +1898,42 @@
     }, 1800);
   }
 
+  function setHeaderSettingsButtonState(button, state = "idle") {
+    const labels = {
+      idle: "채팅 설정 열기",
+      loading: "채팅 설정 여는 중",
+      error: "채팅 설정 열기 실패"
+    };
+    const label = labels[state] || labels.idle;
+
+    button.dataset.state = state;
+    button.disabled = state === "loading";
+    button.title = label;
+    button.setAttribute("aria-label", label);
+  }
+
+  function resetHeaderSettingsButtonStateLater(button) {
+    window.setTimeout(() => {
+      if (button.isConnected && button.dataset.state !== "loading") {
+        setHeaderSettingsButtonState(button);
+      }
+    }, 1800);
+  }
+
+  async function openExtensionPopupFromHeader(button) {
+    setHeaderSettingsButtonState(button, "loading");
+
+    const result = await sendOpenPopupMessage();
+
+    if (!result.ok) {
+      setHeaderSettingsButtonState(button, "error");
+      resetHeaderSettingsButtonStateLater(button);
+      return;
+    }
+
+    setHeaderSettingsButtonState(button);
+  }
+
   async function toggleGuestChatFrame(button) {
     const previousOptions = currentOptions;
     const nextOptions = normalizeOptions({
@@ -1857,27 +1982,44 @@
     return button;
   }
 
+  function canRenderHeaderSettingsButton() {
+    return document.readyState !== "loading";
+  }
+
+  function createHeaderSettingsButton() {
+    const button = document.createElement("button");
+    const icon = document.createElement("span");
+
+    button.id = HEADER_SETTINGS_BUTTON_ID;
+    button.type = "button";
+    button.className = "chzzk-chat-ui-toggle-header-settings";
+    icon.className = HEADER_SETTINGS_BUTTON_ICON_CLASS;
+    icon.setAttribute("aria-hidden", "true");
+    icon.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.52a2 2 0 0 1-1 1.72l-.15.1a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.52a2 2 0 0 1 1-1.72l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+        <circle cx="12" cy="12" r="3"></circle>
+      </svg>`;
+    button.append(icon);
+    setHeaderSettingsButtonState(button);
+
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openExtensionPopupFromHeader(button);
+    });
+
+    return button;
+  }
+
   function ensureGuestChatToggleButton() {
     const existingButton = document.getElementById(GUEST_CHAT_TOGGLE_BUTTON_ID);
+    const existingSettingsButton = document.getElementById(HEADER_SETTINGS_BUTTON_ID);
 
     if (!isGuestChatFrameEligibleContext()) {
       existingButton?.remove();
+      existingSettingsButton?.remove();
       clearGuestChatControlHosts();
-      return;
-    }
-
-    if (!currentOptions.showGuestChatToggleButton) {
-      existingButton?.remove();
-
-      if (currentOptions.useGuestChatFrame) {
-        const guestHost = findGuestChatHost();
-
-        if (guestHost) {
-          markGuestChatControlHost(guestHost);
-        }
-      } else {
-        clearGuestChatControlHosts();
-      }
       return;
     }
 
@@ -1888,6 +2030,10 @@
         setGuestChatToggleButtonState(existingButton);
       }
 
+      if (existingSettingsButton instanceof HTMLButtonElement) {
+        setHeaderSettingsButtonState(existingSettingsButton);
+      }
+
       if (currentOptions.useGuestChatFrame) {
         const guestHost = findGuestChatHost();
 
@@ -1900,13 +2046,34 @@
       return;
     }
 
-    const button =
-      existingButton instanceof HTMLButtonElement ? existingButton : createGuestChatToggleButton();
+    const settingsButton = canRenderHeaderSettingsButton()
+      ? existingSettingsButton instanceof HTMLButtonElement
+        ? existingSettingsButton
+        : createHeaderSettingsButton()
+      : null;
 
-    setGuestChatToggleButtonState(button);
+    if (settingsButton instanceof HTMLButtonElement) {
+      setHeaderSettingsButtonState(settingsButton);
 
-    if (button.parentElement !== target.container || button.nextSibling !== target.before) {
-      target.container.insertBefore(button, target.before);
+      if (settingsButton.parentElement !== target.container || settingsButton.nextSibling !== target.before) {
+        target.container.insertBefore(settingsButton, target.before);
+      }
+    } else {
+      existingSettingsButton?.remove();
+    }
+
+    if (currentOptions.showGuestChatToggleButton) {
+      const button =
+        existingButton instanceof HTMLButtonElement ? existingButton : createGuestChatToggleButton();
+      const nextSibling = settingsButton instanceof HTMLButtonElement ? settingsButton : target.before;
+
+      setGuestChatToggleButtonState(button);
+
+      if (button.parentElement !== target.container || button.nextSibling !== nextSibling) {
+        target.container.insertBefore(button, nextSibling);
+      }
+    } else {
+      existingButton?.remove();
     }
 
     markGuestChatToggleControlHost(target.header);

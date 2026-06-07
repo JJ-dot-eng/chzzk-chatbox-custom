@@ -200,6 +200,50 @@ for (const token of removedIncognitoChatTokens) {
   }
 }
 
+const removedFloatingSettingsTokens = [
+  "FLOATING_SETTINGS",
+  "chzzk-chat-ui-floating",
+  "chzzk-chat-ui-toggle-settings-popover"
+];
+
+for (const token of removedFloatingSettingsTokens) {
+  if (contentSource.includes(token)) {
+    throw new Error(`content script must not reintroduce the in-page floating settings panel: ${token}`);
+  }
+}
+
+const requiredHeaderPopupContentTokens = [
+  'const OPEN_POPUP_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_POPUP";',
+  'const HEADER_SETTINGS_BUTTON_ID = "chzzk-chat-ui-toggle-header-settings";',
+  "function sendOpenPopupMessage()",
+  "function createHeaderSettingsButton()",
+  "function openExtensionPopupFromHeader(button)",
+  "sendOpenPopupMessage()",
+  ".filter((element) => element.id !== HEADER_SETTINGS_BUTTON_ID)",
+  "target.container.insertBefore(settingsButton, target.before);",
+  "target.container.insertBefore(button, nextSibling);"
+];
+
+for (const token of requiredHeaderPopupContentTokens) {
+  if (!contentSource.includes(token)) {
+    throw new Error(`content script must open the existing extension popup from the chat header: ${token}`);
+  }
+}
+
+const requiredHeaderPopupBackgroundTokens = [
+  'const OPEN_POPUP_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_POPUP";',
+  "function openExtensionPopup(sendResponse)",
+  "chrome.action.openPopup()",
+  "message?.type === OPEN_POPUP_MESSAGE",
+  "return openExtensionPopup(sendResponse);"
+];
+
+for (const token of requiredHeaderPopupBackgroundTokens) {
+  if (!backgroundSource.includes(token)) {
+    throw new Error(`background script must open the existing extension popup on request: ${token}`);
+  }
+}
+
 const requiredGuestChatTokens = [
   "useGuestChatFrame: false",
   "showGuestChatToggleButton: true",
@@ -359,19 +403,27 @@ if (!backgroundSource.includes("showGuestChatToggleButton: options?.showGuestCha
   throw new Error("background script must normalize the guest chat button visibility option.");
 }
 
-const guestChatToggleVisibilityStart = contentSource.indexOf("if (!currentOptions.showGuestChatToggleButton)");
-const guestChatToggleTargetStart = contentSource.indexOf("const target = findGuestChatToggleTarget();");
+const guestChatToggleVisibilityStart = contentSource.indexOf("function ensureGuestChatToggleButton()");
+const guestChatToggleTargetStart = contentSource.indexOf("function hasChatLikeText", guestChatToggleVisibilityStart);
 const guestChatToggleVisibilitySource =
   guestChatToggleVisibilityStart >= 0 && guestChatToggleTargetStart > guestChatToggleVisibilityStart
     ? contentSource.slice(guestChatToggleVisibilityStart, guestChatToggleTargetStart)
     : "";
 
+if (!guestChatToggleVisibilitySource.includes("if (currentOptions.showGuestChatToggleButton)")) {
+  throw new Error("content script must gate only the guest chat header button behind its visibility option.");
+}
+
 if (!guestChatToggleVisibilitySource.includes("existingButton?.remove();")) {
   throw new Error("content script must remove the guest chat header button when its visibility option is off.");
 }
 
-if (!guestChatToggleVisibilitySource.includes("markGuestChatControlHost(guestHost);")) {
-  throw new Error("content script must preserve the guest chat control host when hiding the header button.");
+if (!guestChatToggleVisibilitySource.includes("const nextSibling = settingsButton instanceof HTMLButtonElement ? settingsButton : target.before;")) {
+  throw new Error("content script must keep the settings button to the right of the guest chat header button.");
+}
+
+if (!guestChatToggleVisibilitySource.includes("target.container.insertBefore(settingsButton, target.before);")) {
+  throw new Error("content script must keep the settings button available when the guest chat button is hidden.");
 }
 
 const requiredGuestChatThemeBackgroundTokens = [

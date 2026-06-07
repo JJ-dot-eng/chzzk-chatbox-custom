@@ -1,6 +1,7 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
 const SET_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_OPTIONS";
+const OPEN_POPUP_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_POPUP";
 const READ_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_GUEST_CHAT_THEME";
 const SET_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_GUEST_CHAT_THEME";
 const APPLY_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_APPLY_GUEST_CHAT_THEME";
@@ -211,6 +212,32 @@ function scheduleContentScriptInjection(tabId) {
   }
 }
 
+function openExtensionPopup(sendResponse) {
+  if (!chrome.action?.openPopup) {
+    sendResponse({ ok: false, error: "open-popup-unavailable" });
+    return false;
+  }
+
+  try {
+    const result = chrome.action.openPopup();
+
+    if (result && typeof result.then === "function") {
+      result
+        .then(() => sendResponse({ ok: true }))
+        .catch((error) => {
+          sendResponse({ ok: false, error: error?.message || String(error) });
+        });
+      return true;
+    }
+
+    sendResponse({ ok: true });
+    return false;
+  } catch (error) {
+    sendResponse({ ok: false, error: error?.message || String(error) });
+    return false;
+  }
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   // Keeps a stable MV3 service worker target available for extension verification.
 });
@@ -271,6 +298,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === READ_OPTIONS_MESSAGE) {
     getStoredOptions(sendResponse);
     return true;
+  }
+
+  if (message?.type === OPEN_POPUP_MESSAGE) {
+    return openExtensionPopup(sendResponse);
   }
 
   if (message?.type === SET_GUEST_CHAT_THEME_MESSAGE) {
