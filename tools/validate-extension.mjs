@@ -382,8 +382,22 @@ if (!ensureGuestChatControlsSource.includes("target.container.insertBefore(setti
   throw new Error("settings button must be inserted into the chat header action row.");
 }
 
-if (!ensureGuestChatControlsSource.includes("target.container.insertBefore(button, settingsButton);")) {
+if (
+  !ensureGuestChatControlsSource.includes("const nextSibling = settingsButton instanceof HTMLButtonElement ? settingsButton : target.before;") ||
+  !ensureGuestChatControlsSource.includes("target.container.insertBefore(button, nextSibling);")
+) {
   throw new Error("settings button must be placed to the right of the guest chat button.");
+}
+
+if (
+  !contentSource.includes("function canRenderFloatingSettingsControls()") ||
+  !ensureGuestChatControlsSource.includes("const canRenderSettingsButton = canRenderFloatingSettingsControls();")
+) {
+  throw new Error("floating settings controls must not be inserted during document_start.");
+}
+
+if (!contentSource.includes("document.body.append(panel);")) {
+  throw new Error("floating settings panel must be attached inside document.body.");
 }
 
 if (!ensureGuestChatControlsSource.includes("existingButton?.remove();")) {

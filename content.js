@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.4";
+  const SCRIPT_VERSION = "0.2.5";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -2322,6 +2322,10 @@
   }
 
   function createFloatingSettingsPanel() {
+    if (!document.body) {
+      return null;
+    }
+
     const panel = document.createElement("section");
 
     panel.id = FLOATING_SETTINGS_PANEL_ID;
@@ -2386,7 +2390,7 @@ ${createFloatingToggleMarkup("showGuestChatToggleButton", "비로그인 버튼 �
       </section>`;
 
     connectFloatingSettingsPanel(panel);
-    document.documentElement.append(panel);
+    document.body.append(panel);
     return panel;
   }
 
@@ -2394,6 +2398,10 @@ ${createFloatingToggleMarkup("showGuestChatToggleButton", "비로그인 버튼 �
     const existingPanel = document.getElementById(FLOATING_SETTINGS_PANEL_ID);
 
     return existingPanel instanceof HTMLElement ? existingPanel : createFloatingSettingsPanel();
+  }
+
+  function canRenderFloatingSettingsControls() {
+    return document.readyState !== "loading" && Boolean(document.body);
   }
 
   function getFloatingSettingsControls(panel) {
@@ -2778,6 +2786,10 @@ ${createFloatingToggleMarkup("showGuestChatToggleButton", "비로그인 버튼 �
   function openFloatingSettingsPanel(anchorButton) {
     const panel = getFloatingSettingsPanel();
 
+    if (!(panel instanceof HTMLElement)) {
+      return;
+    }
+
     floatingSettingsPanelAnchor = anchorButton;
     setFloatingSettingsPanelControls(currentOptions);
     setFloatingSettingsStatus("대기 중");
@@ -2923,15 +2935,23 @@ ${createFloatingToggleMarkup("showGuestChatToggleButton", "비로그인 버튼 �
       return;
     }
 
-    const settingsButton =
-      existingSettingsButton instanceof HTMLButtonElement
+    const canRenderSettingsButton = canRenderFloatingSettingsControls();
+    const settingsButton = canRenderSettingsButton
+      ? existingSettingsButton instanceof HTMLButtonElement
         ? existingSettingsButton
-        : createGuestChatSettingsButton();
+        : createGuestChatSettingsButton()
+      : null;
 
-    setGuestChatSettingsButtonState(settingsButton);
+    if (!canRenderSettingsButton) {
+      existingSettingsButton?.remove();
+    }
 
-    if (settingsButton.parentElement !== target.container || settingsButton.nextSibling !== target.before) {
-      target.container.insertBefore(settingsButton, target.before);
+    if (settingsButton instanceof HTMLButtonElement) {
+      setGuestChatSettingsButtonState(settingsButton);
+
+      if (settingsButton.parentElement !== target.container || settingsButton.nextSibling !== target.before) {
+        target.container.insertBefore(settingsButton, target.before);
+      }
     }
 
     if (currentOptions.showGuestChatToggleButton) {
@@ -2940,8 +2960,10 @@ ${createFloatingToggleMarkup("showGuestChatToggleButton", "비로그인 버튼 �
 
       setGuestChatToggleButtonState(button);
 
-      if (button.parentElement !== target.container || button.nextSibling !== settingsButton) {
-        target.container.insertBefore(button, settingsButton);
+      const nextSibling = settingsButton instanceof HTMLButtonElement ? settingsButton : target.before;
+
+      if (button.parentElement !== target.container || button.nextSibling !== nextSibling) {
+        target.container.insertBefore(button, nextSibling);
       }
     } else {
       existingButton?.remove();
@@ -3588,6 +3610,11 @@ ${createFloatingToggleMarkup("showGuestChatToggleButton", "비로그인 버튼 �
     connectObserver();
     syncGuestChatTheme();
     scheduleScan();
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", scheduleScan, { once: true });
+    }
+
     loadStoredOptions(1, { allowFallback: true });
 
     if (!scanIntervalTimer) {
