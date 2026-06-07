@@ -208,6 +208,7 @@ const requiredGuestChatTokens = [
   'const GUEST_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-guest-chat-frame";',
   'const GUEST_CHAT_TOGGLE_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-toggle";',
   'const GUEST_CHAT_SETTINGS_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-settings";',
+  'const FLOATING_SETTINGS_STYLE_ID = "chzzk-chat-ui-toggle-settings-style";',
   'const FLOATING_SETTINGS_PANEL_ID = "chzzk-chat-ui-toggle-settings-popover";',
   'const GUEST_CHAT_CONTROL_HOST_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-control-host";',
   'const GUEST_CHAT_THEME_ATTR = "data-chzzk-chat-ui-toggle-guest-theme";',
@@ -261,6 +262,7 @@ const requiredGuestChatTokens = [
   "function ensureGuestChatToggleButton()",
   "function toggleGuestChatFrame(button)",
   "function createGuestChatSettingsButton()",
+  "function injectFloatingSettingsStyle()",
   "function createFloatingSettingsPanel()",
   "function openFloatingSettingsPanel(anchorButton)",
   "function closeFloatingSettingsPanel()",
@@ -398,6 +400,20 @@ if (
 
 if (!contentSource.includes("document.body.append(panel);")) {
   throw new Error("floating settings panel must be attached inside document.body.");
+}
+
+if (
+  !contentSource.includes("const floatingSettingsStyleStart = styleText.indexOf(") ||
+  !contentSource.includes("styleText.slice(0, floatingSettingsStyleStart) + styleText.slice(floatingSettingsStyleEnd)")
+) {
+  throw new Error("floating settings CSS must be removed from the document_start style injection.");
+}
+
+if (
+  !contentSource.includes("injectFloatingSettingsStyle();\n\n    const panel = document.createElement(\"section\");") ||
+  !contentSource.includes("injectFloatingSettingsStyle();\n\n    const button = document.createElement(\"button\");")
+) {
+  throw new Error("floating settings CSS must be injected only when creating settings controls.");
 }
 
 if (!ensureGuestChatControlsSource.includes("existingButton?.remove();")) {
