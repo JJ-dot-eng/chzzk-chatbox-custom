@@ -207,6 +207,8 @@ const requiredGuestChatTokens = [
   'showGuestChatToggleButton: "chzzkChatUiToggleGuestChatToggleButton"',
   'const GUEST_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-guest-chat-frame";',
   'const GUEST_CHAT_TOGGLE_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-toggle";',
+  'const GUEST_CHAT_SETTINGS_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-settings";',
+  'const FLOATING_SETTINGS_PANEL_ID = "chzzk-chat-ui-toggle-settings-popover";',
   'const GUEST_CHAT_CONTROL_HOST_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-control-host";',
   'const GUEST_CHAT_THEME_ATTR = "data-chzzk-chat-ui-toggle-guest-theme";',
   'const GUEST_CHAT_EMBED_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-embed";',
@@ -258,6 +260,10 @@ const requiredGuestChatTokens = [
   "if (previousGuestChatTheme !== detectedTheme) {",
   "function ensureGuestChatToggleButton()",
   "function toggleGuestChatFrame(button)",
+  "function createGuestChatSettingsButton()",
+  "function createFloatingSettingsPanel()",
+  "function openFloatingSettingsPanel(anchorButton)",
+  "function closeFloatingSettingsPanel()",
   "function findGuestChatToggleTarget()",
   "function findGuestChatControlHost(guestHost, header = null)",
   "function markGuestChatControlHost(guestHost, header = null)",
@@ -359,18 +365,32 @@ if (!backgroundSource.includes("showGuestChatToggleButton: options?.showGuestCha
   throw new Error("background script must normalize the guest chat button visibility option.");
 }
 
-const guestChatToggleVisibilityStart = contentSource.indexOf("if (!currentOptions.showGuestChatToggleButton)");
-const guestChatToggleTargetStart = contentSource.indexOf("const target = findGuestChatToggleTarget();");
-const guestChatToggleVisibilitySource =
-  guestChatToggleVisibilityStart >= 0 && guestChatToggleTargetStart > guestChatToggleVisibilityStart
-    ? contentSource.slice(guestChatToggleVisibilityStart, guestChatToggleTargetStart)
+for (const token of ["chrome.action.openPopup", "window.open(", "chrome.windows.create("]) {
+  if (contentSource.includes(token)) {
+    throw new Error(`header settings button must use an in-page floating panel, not a popup or new window: ${token}`);
+  }
+}
+
+const ensureGuestChatControlsStart = contentSource.indexOf("function ensureGuestChatToggleButton()");
+const ensureGuestChatControlsEnd = contentSource.indexOf("function hasChatLikeText(element)", ensureGuestChatControlsStart);
+const ensureGuestChatControlsSource =
+  ensureGuestChatControlsStart >= 0 && ensureGuestChatControlsEnd > ensureGuestChatControlsStart
+    ? contentSource.slice(ensureGuestChatControlsStart, ensureGuestChatControlsEnd)
     : "";
 
-if (!guestChatToggleVisibilitySource.includes("existingButton?.remove();")) {
+if (!ensureGuestChatControlsSource.includes("target.container.insertBefore(settingsButton, target.before);")) {
+  throw new Error("settings button must be inserted into the chat header action row.");
+}
+
+if (!ensureGuestChatControlsSource.includes("target.container.insertBefore(button, settingsButton);")) {
+  throw new Error("settings button must be placed to the right of the guest chat button.");
+}
+
+if (!ensureGuestChatControlsSource.includes("existingButton?.remove();")) {
   throw new Error("content script must remove the guest chat header button when its visibility option is off.");
 }
 
-if (!guestChatToggleVisibilitySource.includes("markGuestChatControlHost(guestHost);")) {
+if (!ensureGuestChatControlsSource.includes("markGuestChatToggleControlHost(target.header);")) {
   throw new Error("content script must preserve the guest chat control host when hiding the header button.");
 }
 

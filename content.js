@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.3";
+  const SCRIPT_VERSION = "0.2.4";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -43,6 +43,12 @@
   const GUEST_CHAT_TOGGLE_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-toggle";
   const GUEST_CHAT_TOGGLE_BUTTON_ICON_CLASS = "chzzk-chat-ui-toggle-guest-chat-toggle__icon";
   const GUEST_CHAT_TOGGLE_BUTTON_SLASH_CLASS = "chzzk-chat-ui-toggle-guest-chat-toggle__slash";
+  const GUEST_CHAT_SETTINGS_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-settings";
+  const GUEST_CHAT_SETTINGS_BUTTON_ICON_CLASS = "chzzk-chat-ui-toggle-guest-chat-settings__icon";
+  const FLOATING_SETTINGS_PANEL_ID = "chzzk-chat-ui-toggle-settings-popover";
+  const FLOATING_SETTINGS_OPTION_ATTR = "data-chzzk-chat-ui-toggle-settings-option";
+  const FLOATING_SETTINGS_TAB_TARGET_ATTR = "data-chzzk-chat-ui-toggle-settings-tab-target";
+  const FLOATING_SETTINGS_PANEL_ATTR = "data-chzzk-chat-ui-toggle-settings-panel";
   const LIVE_CHANNEL_ID_PATTERN = /^[0-9a-f]{32}$/i;
 
   const DEFAULT_OPTIONS = {
@@ -183,6 +189,10 @@
   let lastPublishedGuestChatThemeKey = "";
   let lastPublishedGuestChatThemeAt = 0;
   let nativeGuestChatThemeRetryTimers = [];
+  let floatingSettingsColor = DEFAULT_OPTIONS.chatBoxColor;
+  let floatingSettingsHsv = { hue: 0, saturation: 0, value: 0.5 };
+  let floatingSettingsColorApplyTimer = 0;
+  let floatingSettingsPanelAnchor = null;
 
   function getRuntime() {
     if (typeof chrome === "undefined") {
@@ -226,6 +236,91 @@
     const { red, green, blue } = hexToRgb(hexColor);
 
     return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+  }
+
+  function isValidHexInput(value) {
+    const trimmed = String(value || "").trim();
+
+    return /^#?[0-9a-f]{3}$/i.test(trimmed) || /^#?[0-9a-f]{6}$/i.test(trimmed);
+  }
+
+  function isCompleteHexInput(value) {
+    return /^#?[0-9a-f]{6}$/i.test(String(value || "").trim());
+  }
+
+  function isPendingHexInput(value) {
+    return /^#?[0-9a-f]{0,6}$/i.test(String(value || "").trim());
+  }
+
+  function rgbToHex({ red, green, blue }) {
+    return `#${[red, green, blue]
+      .map((value) => Math.round(value).toString(16).padStart(2, "0"))
+      .join("")}`;
+  }
+
+  function rgbToHsv({ red, green, blue }) {
+    const r = red / 255;
+    const g = green / 255;
+    const b = blue / 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const delta = max - min;
+    let hue = 0;
+
+    if (delta > 0) {
+      if (max === r) {
+        hue = 60 * (((g - b) / delta) % 6);
+      } else if (max === g) {
+        hue = 60 * ((b - r) / delta + 2);
+      } else {
+        hue = 60 * ((r - g) / delta + 4);
+      }
+    }
+
+    return {
+      hue: Math.round((hue + 360) % 360),
+      saturation: max === 0 ? 0 : delta / max,
+      value: max
+    };
+  }
+
+  function hsvToRgb({ hue, saturation, value }) {
+    const chroma = value * saturation;
+    const x = chroma * (1 - Math.abs(((hue / 60) % 2) - 1));
+    const m = value - chroma;
+    let r = 0;
+    let g = 0;
+    let b = 0;
+
+    if (hue < 60) {
+      r = chroma;
+      g = x;
+    } else if (hue < 120) {
+      r = x;
+      g = chroma;
+    } else if (hue < 180) {
+      g = chroma;
+      b = x;
+    } else if (hue < 240) {
+      g = x;
+      b = chroma;
+    } else if (hue < 300) {
+      r = x;
+      b = chroma;
+    } else {
+      r = chroma;
+      b = x;
+    }
+
+    return {
+      red: (r + m) * 255,
+      green: (g + m) * 255,
+      blue: (b + m) * 255
+    };
+  }
+
+  function hueToHex(hue) {
+    return rgbToHex(hsvToRgb({ hue, saturation: 1, value: 1 }));
   }
 
   function normalizeOptions(options) {
@@ -1082,6 +1177,387 @@
         color: #c92a2a !important;
       }
 
+      .chzzk-chat-ui-toggle-guest-chat-settings {
+        position: relative !important;
+        display: inline-flex !important;
+        flex: 0 0 auto !important;
+        align-self: center !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 28px !important;
+        height: 28px !important;
+        min-width: 28px !important;
+        min-height: 28px !important;
+        margin: 0 2px !important;
+        padding: 0 !important;
+        left: -3px !important;
+        top: 8px !important;
+        border: 0 !important;
+        border-radius: 6px !important;
+        background: transparent !important;
+        color: rgba(32, 36, 40, 0.72) !important;
+        box-shadow: none !important;
+        cursor: pointer !important;
+        z-index: 2147483646 !important;
+      }
+
+      .chzzk-chat-ui-toggle-guest-chat-settings:hover,
+      .chzzk-chat-ui-toggle-guest-chat-settings[aria-expanded="true"] {
+        background: rgba(32, 36, 40, 0.08) !important;
+        color: rgba(32, 36, 40, 0.92) !important;
+      }
+
+      .chzzk-chat-ui-toggle-guest-chat-settings:focus-visible {
+        outline: 2px solid rgba(0, 196, 113, 0.42) !important;
+        outline-offset: 2px !important;
+      }
+
+      .${GUEST_CHAT_SETTINGS_BUTTON_ICON_CLASS} {
+        display: block !important;
+        width: 18px !important;
+        height: 18px !important;
+        pointer-events: none !important;
+      }
+
+      .${GUEST_CHAT_SETTINGS_BUTTON_ICON_CLASS} svg {
+        display: block !important;
+        width: 18px !important;
+        height: 18px !important;
+        stroke: currentColor !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} {
+        position: fixed !important;
+        width: 320px !important;
+        max-width: calc(100vw - 16px) !important;
+        max-height: calc(100vh - 16px) !important;
+        overflow: auto !important;
+        padding: 14px !important;
+        border: 1px solid #dfe4ea !important;
+        border-radius: 8px !important;
+        background: #f7f8fa !important;
+        color: #101418 !important;
+        box-shadow: 0 16px 38px rgba(10, 18, 28, 0.22) !important;
+        color-scheme: light !important;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+        z-index: 2147483647 !important;
+        --chzzk-chat-ui-floating-surface: #ffffff;
+        --chzzk-chat-ui-floating-text: #101418;
+        --chzzk-chat-ui-floating-muted: #66707c;
+        --chzzk-chat-ui-floating-line: #dfe4ea;
+        --chzzk-chat-ui-floating-accent: #00c471;
+        --chzzk-chat-ui-floating-accent-strong: #009f5b;
+        --chzzk-chat-ui-floating-shadow: 0 10px 26px rgba(10, 18, 28, 0.12);
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID}[hidden] {
+        display: none !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID},
+      #${FLOATING_SETTINGS_PANEL_ID} * {
+        box-sizing: border-box !important;
+        letter-spacing: 0 !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-header {
+        display: flex !important;
+        align-items: flex-start !important;
+        justify-content: space-between !important;
+        gap: 12px !important;
+        margin-bottom: 12px !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-title {
+        margin: 0 !important;
+        color: var(--chzzk-chat-ui-floating-text) !important;
+        font-size: 16px !important;
+        line-height: 1.25 !important;
+        font-weight: 700 !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-header-actions {
+        display: flex !important;
+        align-items: flex-start !important;
+        gap: 8px !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-status {
+        max-width: 92px !important;
+        margin: 1px 0 0 !important;
+        color: var(--chzzk-chat-ui-floating-muted) !important;
+        font-size: 11px !important;
+        line-height: 1.35 !important;
+        text-align: right !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-close {
+        position: relative !important;
+        flex: 0 0 auto !important;
+        width: 24px !important;
+        height: 24px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        border-radius: 6px !important;
+        background: transparent !important;
+        cursor: pointer !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-close::before,
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-close::after {
+        content: "" !important;
+        position: absolute !important;
+        left: 6px !important;
+        top: 11px !important;
+        width: 12px !important;
+        height: 2px !important;
+        border-radius: 999px !important;
+        background: var(--chzzk-chat-ui-floating-muted) !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-close::before {
+        transform: rotate(45deg) !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-close::after {
+        transform: rotate(-45deg) !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-tabs {
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 4px !important;
+        margin-bottom: 10px !important;
+        padding: 4px !important;
+        border: 1px solid var(--chzzk-chat-ui-floating-line) !important;
+        border-radius: 8px !important;
+        background: #edf1f5 !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-tab {
+        min-width: 0 !important;
+        height: 34px !important;
+        border: 0 !important;
+        border-radius: 6px !important;
+        background: transparent !important;
+        color: var(--chzzk-chat-ui-floating-muted) !important;
+        font: inherit !important;
+        font-size: 13px !important;
+        font-weight: 700 !important;
+        cursor: pointer !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-tab.is-active {
+        background: var(--chzzk-chat-ui-floating-surface) !important;
+        color: var(--chzzk-chat-ui-floating-text) !important;
+        box-shadow: 0 1px 5px rgba(10, 18, 28, 0.12) !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-tab:focus-visible,
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-close:focus-visible {
+        box-shadow: 0 0 0 3px rgba(0, 196, 113, 0.22) !important;
+        outline: none !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-panel[hidden] {
+        display: none !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-toggles {
+        display: grid !important;
+        gap: 8px !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-toggle-row {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 16px !important;
+        min-height: 46px !important;
+        padding: 9px 12px !important;
+        border: 1px solid var(--chzzk-chat-ui-floating-line) !important;
+        border-radius: 8px !important;
+        background: var(--chzzk-chat-ui-floating-surface) !important;
+        box-shadow: var(--chzzk-chat-ui-floating-shadow) !important;
+        cursor: pointer !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-toggle-row span {
+        min-width: 0 !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-toggle-row strong {
+        color: var(--chzzk-chat-ui-floating-text) !important;
+        font-size: 13px !important;
+        line-height: 1.25 !important;
+        font-weight: 700 !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-toggle-row input {
+        appearance: none !important;
+        position: relative !important;
+        flex: 0 0 auto !important;
+        width: 42px !important;
+        height: 24px !important;
+        margin: 0 !important;
+        border: 1px solid #c8d0d8 !important;
+        border-radius: 999px !important;
+        background: #d9dee4 !important;
+        outline: none !important;
+        transition: background-color 140ms ease, border-color 140ms ease !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-toggle-row input::after {
+        content: "" !important;
+        position: absolute !important;
+        top: 2px !important;
+        left: 2px !important;
+        width: 18px !important;
+        height: 18px !important;
+        border-radius: 50% !important;
+        background: #ffffff !important;
+        box-shadow: 0 1px 4px rgba(10, 18, 28, 0.24) !important;
+        transition: transform 140ms ease !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-toggle-row input:checked {
+        border-color: var(--chzzk-chat-ui-floating-accent-strong) !important;
+        background: var(--chzzk-chat-ui-floating-accent) !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-toggle-row input:checked::after {
+        transform: translateX(18px) !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-toggle-row input:focus-visible {
+        box-shadow: 0 0 0 3px rgba(0, 196, 113, 0.22) !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-color-picker {
+        display: grid !important;
+        gap: 10px !important;
+        margin-top: 10px !important;
+        padding: 10px 12px !important;
+        border: 1px solid var(--chzzk-chat-ui-floating-line) !important;
+        border-radius: 8px !important;
+        background: var(--chzzk-chat-ui-floating-surface) !important;
+        box-shadow: var(--chzzk-chat-ui-floating-shadow) !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-color-picker strong {
+        color: var(--chzzk-chat-ui-floating-text) !important;
+        font-size: 13px !important;
+        line-height: 1.25 !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-color-controls {
+        display: grid !important;
+        grid-template-columns: 38px 1fr 56px !important;
+        gap: 8px !important;
+        align-items: center !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-color-preview {
+        width: 38px !important;
+        height: 34px !important;
+        border: 1px solid rgba(10, 18, 28, 0.18) !important;
+        border-radius: 8px !important;
+        background: var(--chzzk-chat-ui-floating-current-color, #808080) !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-hex-input,
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-default-button {
+        min-width: 0 !important;
+        height: 34px !important;
+        border: 1px solid #c8d0d8 !important;
+        border-radius: 8px !important;
+        background: #ffffff !important;
+        color: var(--chzzk-chat-ui-floating-text) !important;
+        font: inherit !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-hex-input {
+        padding: 0 9px !important;
+        font-size: 13px !important;
+        text-transform: lowercase !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-hex-input:focus {
+        border-color: var(--chzzk-chat-ui-floating-accent) !important;
+        box-shadow: 0 0 0 3px rgba(0, 196, 113, 0.18) !important;
+        outline: none !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-hex-input.is-invalid {
+        border-color: #e03131 !important;
+        box-shadow: 0 0 0 3px rgba(224, 49, 49, 0.14) !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-default-button {
+        padding: 0 10px !important;
+        font-size: 13px !important;
+        font-weight: 700 !important;
+        cursor: pointer !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-color-body {
+        display: grid !important;
+        grid-template-columns: 1fr 28px !important;
+        gap: 10px !important;
+        min-height: 172px !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-color-field {
+        position: relative !important;
+        min-width: 0 !important;
+        min-height: 172px !important;
+        border: 1px solid rgba(10, 18, 28, 0.18) !important;
+        border-radius: 8px !important;
+        background:
+          linear-gradient(to top, #000000, transparent),
+          linear-gradient(to right, #ffffff, var(--chzzk-chat-ui-floating-field-hue, #ff0000)) !important;
+        cursor: crosshair !important;
+        outline: none !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-color-field:focus-visible {
+        box-shadow: 0 0 0 3px rgba(0, 196, 113, 0.22) !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-color-handle {
+        position: absolute !important;
+        left: calc(var(--chzzk-chat-ui-floating-field-x, 0.5) * 100%) !important;
+        top: calc(var(--chzzk-chat-ui-floating-field-y, 0.5) * 100%) !important;
+        width: 18px !important;
+        height: 18px !important;
+        border: 2px solid #ffffff !important;
+        border-radius: 50% !important;
+        box-shadow: 0 0 0 1px rgba(10, 18, 28, 0.58), 0 1px 4px rgba(10, 18, 28, 0.32) !important;
+        transform: translate(-50%, -50%) !important;
+        pointer-events: none !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-hue-slider {
+        width: 28px !important;
+        height: 172px !important;
+        margin: 0 !important;
+        accent-color: var(--chzzk-chat-ui-floating-current-color, #808080) !important;
+        cursor: pointer !important;
+        writing-mode: vertical-lr !important;
+        direction: rtl !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-hue-slider::-webkit-slider-runnable-track {
+        width: 12px !important;
+        border-radius: 999px !important;
+        background: linear-gradient(to top, #ff0000, #ff00ff, #0000ff, #00ffff, #00ff00, #ffff00, #ff0000) !important;
+      }
+
+      #${FLOATING_SETTINGS_PANEL_ID} .chzzk-chat-ui-floating-hue-slider::-webkit-slider-thumb {
+        margin-left: -6px !important;
+      }
+
       .${GUEST_CHAT_TOGGLE_BUTTON_ICON_CLASS} {
         position: relative !important;
         display: block !important;
@@ -1361,6 +1837,7 @@
 
     syncGuestChatFrame();
     ensureGuestChatToggleButton();
+    syncFloatingSettingsPanelState({ syncColorInput: source !== "floating-settings-color" });
 
     if (markAsReady) {
       markReady();
@@ -1832,6 +2309,560 @@
     scan();
   }
 
+  function getFloatingSettingsOptionId(optionKey) {
+    return `${FLOATING_SETTINGS_PANEL_ID}-${optionKey}`;
+  }
+
+  function createFloatingToggleMarkup(optionKey, label) {
+    return `
+          <label class="chzzk-chat-ui-floating-toggle-row">
+            <span><strong>${label}</strong></span>
+            <input type="checkbox" id="${getFloatingSettingsOptionId(optionKey)}" ${FLOATING_SETTINGS_OPTION_ATTR}="${optionKey}">
+          </label>`;
+  }
+
+  function createFloatingSettingsPanel() {
+    const panel = document.createElement("section");
+
+    panel.id = FLOATING_SETTINGS_PANEL_ID;
+    panel.hidden = true;
+    panel.setAttribute("role", "dialog");
+    panel.setAttribute("aria-label", "채팅 설정");
+    panel.innerHTML = `
+      <header class="chzzk-chat-ui-floating-header">
+        <h1 class="chzzk-chat-ui-floating-title">채팅 설정</h1>
+        <div class="chzzk-chat-ui-floating-header-actions">
+          <p id="${FLOATING_SETTINGS_PANEL_ID}-status" class="chzzk-chat-ui-floating-status" aria-live="polite">대기 중</p>
+          <button type="button" class="chzzk-chat-ui-floating-close" aria-label="설정 닫기"></button>
+        </div>
+      </header>
+
+      <nav class="chzzk-chat-ui-floating-tabs" role="tablist" aria-label="설정 분류">
+        <button type="button" class="chzzk-chat-ui-floating-tab is-active" role="tab" aria-selected="true" aria-controls="${FLOATING_SETTINGS_PANEL_ID}-text-panel" ${FLOATING_SETTINGS_TAB_TARGET_ATTR}="${FLOATING_SETTINGS_PANEL_ID}-text-panel">텍스트</button>
+        <button type="button" class="chzzk-chat-ui-floating-tab" role="tab" aria-selected="false" aria-controls="${FLOATING_SETTINGS_PANEL_ID}-style-panel" ${FLOATING_SETTINGS_TAB_TARGET_ATTR}="${FLOATING_SETTINGS_PANEL_ID}-style-panel">꾸미기</button>
+        <button type="button" class="chzzk-chat-ui-floating-tab" role="tab" aria-selected="false" aria-controls="${FLOATING_SETTINGS_PANEL_ID}-settings-panel" ${FLOATING_SETTINGS_TAB_TARGET_ATTR}="${FLOATING_SETTINGS_PANEL_ID}-settings-panel">설정</button>
+      </nav>
+
+      <section id="${FLOATING_SETTINGS_PANEL_ID}-text-panel" class="chzzk-chat-ui-floating-panel is-active" role="tabpanel" ${FLOATING_SETTINGS_PANEL_ATTR}="true">
+        <div class="chzzk-chat-ui-floating-toggles" aria-label="텍스트 옵션">
+${createFloatingToggleMarkup("showNicknames", "닉네임")}
+${createFloatingToggleMarkup("showBadges", "배지")}
+${createFloatingToggleMarkup("showTimestamps", "타임스탬프")}
+        </div>
+      </section>
+
+      <section id="${FLOATING_SETTINGS_PANEL_ID}-style-panel" class="chzzk-chat-ui-floating-panel" role="tabpanel" ${FLOATING_SETTINGS_PANEL_ATTR}="true" hidden>
+        <div class="chzzk-chat-ui-floating-toggles" aria-label="꾸미기 옵션">
+${createFloatingToggleMarkup("useGuestChatFrame", "비로그인 채팅")}
+${createFloatingToggleMarkup("showChatBoxes", "채팅 박스")}
+${createFloatingToggleMarkup("showLargeText", "큰 글씨")}
+${createFloatingToggleMarkup("showBoldText", "굵게")}
+        </div>
+
+        <section class="chzzk-chat-ui-floating-color-picker" aria-label="채팅 박스 색상">
+          <div>
+            <strong>박스 색상</strong>
+          </div>
+
+          <div class="chzzk-chat-ui-floating-color-controls">
+            <span id="${FLOATING_SETTINGS_PANEL_ID}-color-preview" class="chzzk-chat-ui-floating-color-preview" aria-hidden="true"></span>
+            <input type="text" id="${FLOATING_SETTINGS_PANEL_ID}-chat-box-color-hex" class="chzzk-chat-ui-floating-hex-input" inputmode="text" maxlength="7" spellcheck="false" aria-label="색상 코드">
+            <button type="button" id="${FLOATING_SETTINGS_PANEL_ID}-reset-chat-box-color" class="chzzk-chat-ui-floating-default-button">기본</button>
+          </div>
+
+          <div class="chzzk-chat-ui-floating-color-body">
+            <button type="button" id="${FLOATING_SETTINGS_PANEL_ID}-color-field" class="chzzk-chat-ui-floating-color-field" aria-label="색상 영역">
+              <span class="chzzk-chat-ui-floating-color-handle"></span>
+            </button>
+            <input type="range" id="${FLOATING_SETTINGS_PANEL_ID}-hue-slider" class="chzzk-chat-ui-floating-hue-slider" min="0" max="360" value="0" aria-label="색상 범위">
+          </div>
+        </section>
+      </section>
+
+      <section id="${FLOATING_SETTINGS_PANEL_ID}-settings-panel" class="chzzk-chat-ui-floating-panel" role="tabpanel" ${FLOATING_SETTINGS_PANEL_ATTR}="true" hidden>
+        <div class="chzzk-chat-ui-floating-toggles" aria-label="설정 옵션">
+${createFloatingToggleMarkup("showGuestChatToggleButton", "비로그인 버튼 표시")}
+        </div>
+      </section>`;
+
+    connectFloatingSettingsPanel(panel);
+    document.documentElement.append(panel);
+    return panel;
+  }
+
+  function getFloatingSettingsPanel() {
+    const existingPanel = document.getElementById(FLOATING_SETTINGS_PANEL_ID);
+
+    return existingPanel instanceof HTMLElement ? existingPanel : createFloatingSettingsPanel();
+  }
+
+  function getFloatingSettingsControls(panel) {
+    const controls = {};
+
+    for (const input of panel.querySelectorAll(`[${FLOATING_SETTINGS_OPTION_ATTR}]`)) {
+      if (input instanceof HTMLInputElement) {
+        controls[input.getAttribute(FLOATING_SETTINGS_OPTION_ATTR)] = input;
+      }
+    }
+
+    return controls;
+  }
+
+  function getFloatingSettingsElement(id) {
+    return document.getElementById(`${FLOATING_SETTINGS_PANEL_ID}-${id}`);
+  }
+
+  function setFloatingSettingsStatus(message) {
+    const status = getFloatingSettingsElement("status");
+
+    if (status) {
+      status.textContent = message;
+    }
+  }
+
+  function updateFloatingSettingsColorUi(hexColor, { syncInput = true } = {}) {
+    const panel = document.getElementById(FLOATING_SETTINGS_PANEL_ID);
+    const normalizedColor = normalizeHexColor(hexColor);
+    const hexInput = getFloatingSettingsElement("chat-box-color-hex");
+    const colorPreview = getFloatingSettingsElement("color-preview");
+    const colorField = getFloatingSettingsElement("color-field");
+    const hueSlider = getFloatingSettingsElement("hue-slider");
+
+    floatingSettingsColor = normalizedColor;
+    floatingSettingsHsv = rgbToHsv(hexToRgb(normalizedColor));
+
+    panel?.style.setProperty("--chzzk-chat-ui-floating-current-color", normalizedColor);
+    panel?.style.setProperty("--chzzk-chat-ui-floating-field-hue", hueToHex(floatingSettingsHsv.hue));
+    colorField?.style.setProperty("--chzzk-chat-ui-floating-field-x", String(floatingSettingsHsv.saturation));
+    colorField?.style.setProperty("--chzzk-chat-ui-floating-field-y", String(1 - floatingSettingsHsv.value));
+
+    if (colorPreview instanceof HTMLElement) {
+      colorPreview.style.backgroundColor = normalizedColor;
+    }
+
+    if (hueSlider instanceof HTMLInputElement) {
+      hueSlider.value = String(floatingSettingsHsv.hue);
+    }
+
+    if (syncInput && hexInput instanceof HTMLInputElement) {
+      hexInput.value = normalizedColor;
+      hexInput.classList.remove("is-invalid");
+    }
+  }
+
+  function setFloatingSettingsPanelControls(options, { syncColorInput = true } = {}) {
+    const panel = document.getElementById(FLOATING_SETTINGS_PANEL_ID);
+
+    if (!(panel instanceof HTMLElement)) {
+      return;
+    }
+
+    const normalizedOptions = normalizeOptions(options);
+    const controls = getFloatingSettingsControls(panel);
+
+    for (const [optionKey, input] of Object.entries(controls)) {
+      input.checked = normalizedOptions[optionKey] === true;
+    }
+
+    updateFloatingSettingsColorUi(normalizedOptions.chatBoxColor, { syncInput: syncColorInput });
+  }
+
+  function readFloatingSettingsPanelOptions(panel) {
+    const controls = getFloatingSettingsControls(panel);
+
+    return normalizeOptions({
+      ...currentOptions,
+      showNicknames: controls.showNicknames?.checked,
+      showBadges: controls.showBadges?.checked,
+      showTimestamps: controls.showTimestamps?.checked,
+      showChatBoxes: controls.showChatBoxes?.checked,
+      useGuestChatFrame: controls.useGuestChatFrame?.checked,
+      showGuestChatToggleButton: controls.showGuestChatToggleButton?.checked,
+      showLargeText: controls.showLargeText?.checked,
+      showBoldText: controls.showBoldText?.checked,
+      chatBoxColor: floatingSettingsColor
+    });
+  }
+
+  async function applyFloatingSettingsPanelOptions({ source = "floating-settings", syncColorInput = true } = {}) {
+    const panel = document.getElementById(FLOATING_SETTINGS_PANEL_ID);
+
+    if (!(panel instanceof HTMLElement)) {
+      return;
+    }
+
+    const previousOptions = currentOptions;
+    const nextOptions = readFloatingSettingsPanelOptions(panel);
+
+    setFloatingSettingsStatus("저장 중");
+    const result = await writeOptionsToStorageLocal(nextOptions);
+
+    if (!result.ok) {
+      setFloatingSettingsStatus("저장 실패");
+      setFloatingSettingsPanelControls(previousOptions);
+      return;
+    }
+
+    applyOptions(result.options, { source });
+    scan();
+    setFloatingSettingsPanelControls(result.options, { syncColorInput });
+    setFloatingSettingsStatus("적용됨");
+    positionFloatingSettingsPanel(floatingSettingsPanelAnchor);
+  }
+
+  function setFloatingSettingsColorFromHsv(nextHsv, { commit = true } = {}) {
+    floatingSettingsHsv = {
+      hue: Math.max(0, Math.min(360, nextHsv.hue)),
+      saturation: Math.max(0, Math.min(1, nextHsv.saturation)),
+      value: Math.max(0, Math.min(1, nextHsv.value))
+    };
+    updateFloatingSettingsColorUi(rgbToHex(hsvToRgb(floatingSettingsHsv)));
+
+    if (commit) {
+      scheduleFloatingSettingsColorApply();
+    }
+  }
+
+  function scheduleFloatingSettingsColorApply() {
+    window.clearTimeout(floatingSettingsColorApplyTimer);
+    floatingSettingsColorApplyTimer = window.setTimeout(() => {
+      applyFloatingSettingsPanelOptions({
+        source: "floating-settings-color",
+        syncColorInput: false
+      });
+    }, 100);
+  }
+
+  function updateFloatingSettingsColorFromField(event) {
+    const colorField = getFloatingSettingsElement("color-field");
+
+    if (!(colorField instanceof HTMLElement)) {
+      return;
+    }
+
+    const rect = colorField.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+    const y = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
+
+    setFloatingSettingsColorFromHsv({
+      hue: floatingSettingsHsv.hue,
+      saturation: x,
+      value: 1 - y
+    });
+  }
+
+  function handleFloatingSettingsHexInput(input) {
+    if (!input.value.trim()) {
+      input.classList.remove("is-invalid");
+      return;
+    }
+
+    if (isCompleteHexInput(input.value)) {
+      updateFloatingSettingsColorUi(normalizeHexColor(input.value), { syncInput: false });
+      input.classList.remove("is-invalid");
+      scheduleFloatingSettingsColorApply();
+      return;
+    }
+
+    input.classList.toggle("is-invalid", !isPendingHexInput(input.value));
+  }
+
+  function commitFloatingSettingsHexInput(input) {
+    if (!isValidHexInput(input.value)) {
+      input.classList.add("is-invalid");
+      return;
+    }
+
+    updateFloatingSettingsColorUi(normalizeHexColor(input.value));
+    applyFloatingSettingsPanelOptions({ source: "floating-settings-hex" });
+  }
+
+  function selectFloatingSettingsTab(panel, targetId) {
+    for (const button of panel.querySelectorAll(`[${FLOATING_SETTINGS_TAB_TARGET_ATTR}]`)) {
+      const isSelected = button.getAttribute(FLOATING_SETTINGS_TAB_TARGET_ATTR) === targetId;
+      button.classList.toggle("is-active", isSelected);
+      button.setAttribute("aria-selected", String(isSelected));
+    }
+
+    for (const tabPanel of panel.querySelectorAll(`[${FLOATING_SETTINGS_PANEL_ATTR}]`)) {
+      const isSelected = tabPanel.id === targetId;
+      tabPanel.classList.toggle("is-active", isSelected);
+      tabPanel.hidden = !isSelected;
+    }
+
+    positionFloatingSettingsPanel(floatingSettingsPanelAnchor);
+  }
+
+  function connectFloatingSettingsPanel(panel) {
+    if (panel.dataset.chzzkChatUiToggleSettingsConnected === "true") {
+      return;
+    }
+
+    panel.dataset.chzzkChatUiToggleSettingsConnected = "true";
+
+    panel.addEventListener("click", (event) => {
+      const target = event.target;
+
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      const tabButton = target.closest(`[${FLOATING_SETTINGS_TAB_TARGET_ATTR}]`);
+
+      if (tabButton instanceof HTMLElement) {
+        event.preventDefault();
+        event.stopPropagation();
+        selectFloatingSettingsTab(panel, tabButton.getAttribute(FLOATING_SETTINGS_TAB_TARGET_ATTR));
+        return;
+      }
+
+      if (target.closest(".chzzk-chat-ui-floating-close")) {
+        event.preventDefault();
+        event.stopPropagation();
+        closeFloatingSettingsPanel();
+        return;
+      }
+
+      if (target.closest(`#${FLOATING_SETTINGS_PANEL_ID}-reset-chat-box-color`)) {
+        event.preventDefault();
+        event.stopPropagation();
+        updateFloatingSettingsColorUi(DEFAULT_OPTIONS.chatBoxColor);
+        applyFloatingSettingsPanelOptions({ source: "floating-settings-reset-color" });
+      }
+    });
+
+    panel.addEventListener("change", (event) => {
+      const target = event.target;
+
+      if (target instanceof HTMLInputElement && target.hasAttribute(FLOATING_SETTINGS_OPTION_ATTR)) {
+        applyFloatingSettingsPanelOptions();
+      }
+    });
+
+    panel.addEventListener("input", (event) => {
+      const target = event.target;
+
+      if (!(target instanceof HTMLInputElement)) {
+        return;
+      }
+
+      if (target.id === `${FLOATING_SETTINGS_PANEL_ID}-hue-slider`) {
+        setFloatingSettingsColorFromHsv({
+          hue: Number(target.value),
+          saturation: floatingSettingsHsv.saturation,
+          value: floatingSettingsHsv.value
+        });
+        return;
+      }
+
+      if (target.id === `${FLOATING_SETTINGS_PANEL_ID}-chat-box-color-hex`) {
+        handleFloatingSettingsHexInput(target);
+      }
+    });
+
+    panel.addEventListener("keydown", (event) => {
+      const target = event.target;
+
+      if (event.key === "Enter" && target instanceof HTMLInputElement && target.id === `${FLOATING_SETTINGS_PANEL_ID}-chat-box-color-hex`) {
+        commitFloatingSettingsHexInput(target);
+        target.blur();
+      }
+    });
+
+    panel.addEventListener("focusout", (event) => {
+      const target = event.target;
+
+      if (!(target instanceof HTMLInputElement) || target.id !== `${FLOATING_SETTINGS_PANEL_ID}-chat-box-color-hex`) {
+        return;
+      }
+
+      if (isValidHexInput(target.value)) {
+        commitFloatingSettingsHexInput(target);
+        return;
+      }
+
+      updateFloatingSettingsColorUi(floatingSettingsColor);
+    });
+
+    panel.addEventListener("pointerdown", (event) => {
+      const colorField = getFloatingSettingsElement("color-field");
+
+      if (event.target === colorField && colorField instanceof HTMLElement) {
+        colorField.setPointerCapture(event.pointerId);
+        updateFloatingSettingsColorFromField(event);
+      }
+    });
+
+    panel.addEventListener("pointermove", (event) => {
+      const colorField = getFloatingSettingsElement("color-field");
+
+      if (colorField instanceof HTMLElement && colorField.hasPointerCapture(event.pointerId)) {
+        updateFloatingSettingsColorFromField(event);
+      }
+    });
+  }
+
+  function handleFloatingSettingsDocumentPointerDown(event) {
+    const panel = document.getElementById(FLOATING_SETTINGS_PANEL_ID);
+    const settingsButton = document.getElementById(GUEST_CHAT_SETTINGS_BUTTON_ID);
+    const target = event.target;
+
+    if (!(panel instanceof HTMLElement) || panel.hidden || !(target instanceof Node)) {
+      return;
+    }
+
+    if (panel.contains(target) || settingsButton?.contains(target)) {
+      return;
+    }
+
+    closeFloatingSettingsPanel();
+  }
+
+  function handleFloatingSettingsKeyDown(event) {
+    if (event.key === "Escape") {
+      closeFloatingSettingsPanel();
+    }
+  }
+
+  function handleFloatingSettingsReposition() {
+    positionFloatingSettingsPanel(floatingSettingsPanelAnchor);
+  }
+
+  function connectFloatingSettingsGlobalEvents() {
+    document.addEventListener("pointerdown", handleFloatingSettingsDocumentPointerDown, true);
+    document.addEventListener("keydown", handleFloatingSettingsKeyDown, true);
+    window.addEventListener("resize", handleFloatingSettingsReposition, true);
+    window.addEventListener("scroll", handleFloatingSettingsReposition, true);
+  }
+
+  function disconnectFloatingSettingsGlobalEvents() {
+    document.removeEventListener("pointerdown", handleFloatingSettingsDocumentPointerDown, true);
+    document.removeEventListener("keydown", handleFloatingSettingsKeyDown, true);
+    window.removeEventListener("resize", handleFloatingSettingsReposition, true);
+    window.removeEventListener("scroll", handleFloatingSettingsReposition, true);
+  }
+
+  function positionFloatingSettingsPanel(anchorButton) {
+    const panel = document.getElementById(FLOATING_SETTINGS_PANEL_ID);
+
+    if (!(panel instanceof HTMLElement) || panel.hidden) {
+      return;
+    }
+
+    if (!(anchorButton instanceof HTMLElement) || !anchorButton.isConnected) {
+      closeFloatingSettingsPanel();
+      return;
+    }
+
+    const gap = 8;
+    const safeMargin = 8;
+    const anchorRect = anchorButton.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    const panelWidth = Math.min(panelRect.width || 320, window.innerWidth - safeMargin * 2);
+    const panelHeight = Math.min(panelRect.height || 360, window.innerHeight - safeMargin * 2);
+    const maxLeft = Math.max(safeMargin, window.innerWidth - panelWidth - safeMargin);
+    const maxTop = Math.max(safeMargin, window.innerHeight - panelHeight - safeMargin);
+    let left = Math.min(maxLeft, Math.max(safeMargin, anchorRect.right - panelWidth));
+    let top = anchorRect.bottom + gap;
+
+    if (top + panelHeight > window.innerHeight - safeMargin) {
+      top = anchorRect.top - panelHeight - gap;
+    }
+
+    top = Math.min(maxTop, Math.max(safeMargin, top));
+
+    panel.style.left = `${Math.round(left)}px`;
+    panel.style.top = `${Math.round(top)}px`;
+  }
+
+  function openFloatingSettingsPanel(anchorButton) {
+    const panel = getFloatingSettingsPanel();
+
+    floatingSettingsPanelAnchor = anchorButton;
+    setFloatingSettingsPanelControls(currentOptions);
+    setFloatingSettingsStatus("대기 중");
+    panel.hidden = false;
+    positionFloatingSettingsPanel(anchorButton);
+    connectFloatingSettingsGlobalEvents();
+    setGuestChatSettingsButtonState(anchorButton);
+  }
+
+  function closeFloatingSettingsPanel() {
+    const panel = document.getElementById(FLOATING_SETTINGS_PANEL_ID);
+
+    if (panel instanceof HTMLElement) {
+      panel.hidden = true;
+    }
+
+    window.clearTimeout(floatingSettingsColorApplyTimer);
+    disconnectFloatingSettingsGlobalEvents();
+    floatingSettingsPanelAnchor = null;
+
+    const settingsButton = document.getElementById(GUEST_CHAT_SETTINGS_BUTTON_ID);
+
+    if (settingsButton instanceof HTMLButtonElement) {
+      setGuestChatSettingsButtonState(settingsButton);
+    }
+  }
+
+  function syncFloatingSettingsPanelState({ syncColorInput = true } = {}) {
+    const panel = document.getElementById(FLOATING_SETTINGS_PANEL_ID);
+
+    if (!(panel instanceof HTMLElement)) {
+      return;
+    }
+
+    setFloatingSettingsPanelControls(currentOptions, { syncColorInput });
+
+    if (!panel.hidden) {
+      positionFloatingSettingsPanel(floatingSettingsPanelAnchor);
+    }
+  }
+
+  function setGuestChatSettingsButtonState(button) {
+    const panel = document.getElementById(FLOATING_SETTINGS_PANEL_ID);
+    const isOpen = panel instanceof HTMLElement && !panel.hidden;
+    const label = isOpen ? "채팅 설정 닫기" : "채팅 설정 열기";
+
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    button.setAttribute("aria-expanded", String(isOpen));
+  }
+
+  function createGuestChatSettingsButton() {
+    const button = document.createElement("button");
+    const icon = document.createElement("span");
+
+    button.id = GUEST_CHAT_SETTINGS_BUTTON_ID;
+    button.type = "button";
+    button.className = "chzzk-chat-ui-toggle-guest-chat-settings";
+    icon.className = GUEST_CHAT_SETTINGS_BUTTON_ICON_CLASS;
+    icon.setAttribute("aria-hidden", "true");
+    icon.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.52a2 2 0 0 1-1 1.72l-.15.1a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.52a2 2 0 0 1 1-1.72l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+        <circle cx="12" cy="12" r="3"></circle>
+      </svg>`;
+    button.append(icon);
+    setGuestChatSettingsButtonState(button);
+
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const panel = document.getElementById(FLOATING_SETTINGS_PANEL_ID);
+
+      if (panel instanceof HTMLElement && !panel.hidden) {
+        closeFloatingSettingsPanel();
+        return;
+      }
+
+      openFloatingSettingsPanel(button);
+    });
+
+    return button;
+  }
+
   function createGuestChatToggleButton() {
     const button = document.createElement("button");
     const icon = document.createElement("span");
@@ -1859,25 +2890,13 @@
 
   function ensureGuestChatToggleButton() {
     const existingButton = document.getElementById(GUEST_CHAT_TOGGLE_BUTTON_ID);
+    const existingSettingsButton = document.getElementById(GUEST_CHAT_SETTINGS_BUTTON_ID);
 
     if (!isGuestChatFrameEligibleContext()) {
       existingButton?.remove();
+      existingSettingsButton?.remove();
+      closeFloatingSettingsPanel();
       clearGuestChatControlHosts();
-      return;
-    }
-
-    if (!currentOptions.showGuestChatToggleButton) {
-      existingButton?.remove();
-
-      if (currentOptions.useGuestChatFrame) {
-        const guestHost = findGuestChatHost();
-
-        if (guestHost) {
-          markGuestChatControlHost(guestHost);
-        }
-      } else {
-        clearGuestChatControlHosts();
-      }
       return;
     }
 
@@ -1888,6 +2907,10 @@
         setGuestChatToggleButtonState(existingButton);
       }
 
+      if (existingSettingsButton instanceof HTMLButtonElement) {
+        setGuestChatSettingsButtonState(existingSettingsButton);
+      }
+
       if (currentOptions.useGuestChatFrame) {
         const guestHost = findGuestChatHost();
 
@@ -1900,13 +2923,35 @@
       return;
     }
 
-    const button =
-      existingButton instanceof HTMLButtonElement ? existingButton : createGuestChatToggleButton();
+    const settingsButton =
+      existingSettingsButton instanceof HTMLButtonElement
+        ? existingSettingsButton
+        : createGuestChatSettingsButton();
 
-    setGuestChatToggleButtonState(button);
+    setGuestChatSettingsButtonState(settingsButton);
 
-    if (button.parentElement !== target.container || button.nextSibling !== target.before) {
-      target.container.insertBefore(button, target.before);
+    if (settingsButton.parentElement !== target.container || settingsButton.nextSibling !== target.before) {
+      target.container.insertBefore(settingsButton, target.before);
+    }
+
+    if (currentOptions.showGuestChatToggleButton) {
+      const button =
+        existingButton instanceof HTMLButtonElement ? existingButton : createGuestChatToggleButton();
+
+      setGuestChatToggleButtonState(button);
+
+      if (button.parentElement !== target.container || button.nextSibling !== settingsButton) {
+        target.container.insertBefore(button, settingsButton);
+      }
+    } else {
+      existingButton?.remove();
+    }
+
+    const settingsPanel = document.getElementById(FLOATING_SETTINGS_PANEL_ID);
+
+    if (settingsPanel instanceof HTMLElement && !settingsPanel.hidden) {
+      floatingSettingsPanelAnchor = settingsButton;
+      positionFloatingSettingsPanel(settingsButton);
     }
 
     markGuestChatToggleControlHost(target.header);
