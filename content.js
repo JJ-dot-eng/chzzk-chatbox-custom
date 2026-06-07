@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.1";
+  const SCRIPT_VERSION = "0.2.3";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -51,6 +51,7 @@
     showTimestamps: true,
     showChatBoxes: true,
     useGuestChatFrame: false,
+    showGuestChatToggleButton: true,
     showLargeText: false,
     showBoldText: false,
     chatBoxColor: "#808080"
@@ -62,6 +63,7 @@
     showTimestamps: "chzzkChatUiToggleTimestamps",
     showChatBoxes: "chzzkChatUiToggleChatBoxes",
     useGuestChatFrame: "chzzkChatUiToggleGuestChatFrame",
+    showGuestChatToggleButton: "chzzkChatUiToggleGuestChatToggleButton",
     showLargeText: "chzzkChatUiToggleLargeText",
     showBoldText: "chzzkChatUiToggleBoldText"
   };
@@ -235,6 +237,7 @@
       showTimestamps: options?.showTimestamps !== false,
       showChatBoxes: options?.showChatBoxes !== false,
       useGuestChatFrame: options?.useGuestChatFrame === true,
+      showGuestChatToggleButton: options?.showGuestChatToggleButton !== false,
       showLargeText: options?.showLargeText === true,
       showBoldText: options?.showBoldText === true || legacyBoldText,
       chatBoxColor: normalizeHexColor(options?.chatBoxColor)
@@ -1860,6 +1863,21 @@
     if (!isGuestChatFrameEligibleContext()) {
       existingButton?.remove();
       clearGuestChatControlHosts();
+      return;
+    }
+
+    if (!currentOptions.showGuestChatToggleButton) {
+      existingButton?.remove();
+
+      if (currentOptions.useGuestChatFrame) {
+        const guestHost = findGuestChatHost();
+
+        if (guestHost) {
+          markGuestChatControlHost(guestHost);
+        }
+      } else {
+        clearGuestChatControlHosts();
+      }
       return;
     }
 

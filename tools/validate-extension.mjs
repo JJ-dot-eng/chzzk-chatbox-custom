@@ -202,7 +202,9 @@ for (const token of removedIncognitoChatTokens) {
 
 const requiredGuestChatTokens = [
   "useGuestChatFrame: false",
+  "showGuestChatToggleButton: true",
   'useGuestChatFrame: "chzzkChatUiToggleGuestChatFrame"',
+  'showGuestChatToggleButton: "chzzkChatUiToggleGuestChatToggleButton"',
   'const GUEST_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-guest-chat-frame";',
   'const GUEST_CHAT_TOGGLE_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-toggle";',
   'const GUEST_CHAT_CONTROL_HOST_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-control-host";',
@@ -353,6 +355,25 @@ if (!backgroundSource.includes("useGuestChatFrame: options?.useGuestChatFrame ==
   throw new Error("background script must normalize the guest chat option.");
 }
 
+if (!backgroundSource.includes("showGuestChatToggleButton: options?.showGuestChatToggleButton !== false")) {
+  throw new Error("background script must normalize the guest chat button visibility option.");
+}
+
+const guestChatToggleVisibilityStart = contentSource.indexOf("if (!currentOptions.showGuestChatToggleButton)");
+const guestChatToggleTargetStart = contentSource.indexOf("const target = findGuestChatToggleTarget();");
+const guestChatToggleVisibilitySource =
+  guestChatToggleVisibilityStart >= 0 && guestChatToggleTargetStart > guestChatToggleVisibilityStart
+    ? contentSource.slice(guestChatToggleVisibilityStart, guestChatToggleTargetStart)
+    : "";
+
+if (!guestChatToggleVisibilitySource.includes("existingButton?.remove();")) {
+  throw new Error("content script must remove the guest chat header button when its visibility option is off.");
+}
+
+if (!guestChatToggleVisibilitySource.includes("markGuestChatControlHost(guestHost);")) {
+  throw new Error("content script must preserve the guest chat control host when hiding the header button.");
+}
+
 const requiredGuestChatThemeBackgroundTokens = [
   'const READ_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_GUEST_CHAT_THEME";',
   'const SET_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_GUEST_CHAT_THEME";',
@@ -377,6 +398,18 @@ if (!popupMarkup.includes('id="useGuestChatFrame"')) {
 
 if (!popupSource.includes('"useGuestChatFrame"')) {
   throw new Error("popup script must store and apply the guest chat option.");
+}
+
+if (!popupMarkup.includes('id="settingsTab"') || !popupMarkup.includes('id="settingsPanel"')) {
+  throw new Error("popup must include a settings tab.");
+}
+
+if (!popupMarkup.includes('id="showGuestChatToggleButton"')) {
+  throw new Error("popup must include a guest chat button visibility toggle.");
+}
+
+if (!popupSource.includes('"showGuestChatToggleButton"')) {
+  throw new Error("popup script must store and apply the guest chat button visibility option.");
 }
 
 const unsafeRoleSelectors = [

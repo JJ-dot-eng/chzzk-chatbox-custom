@@ -16,6 +16,7 @@
       <nav class="tabs" role="tablist" aria-label="설정 분류">
         <button type="button" id="textTab" class="tab is-active" role="tab" aria-selected="true" aria-controls="textPanel" data-tab-target="textPanel">텍스트</button>
         <button type="button" id="styleTab" class="tab" role="tab" aria-selected="false" aria-controls="stylePanel" data-tab-target="stylePanel">꾸미기</button>
+        <button type="button" id="settingsTab" class="tab" role="tab" aria-selected="false" aria-controls="settingsPanel" data-tab-target="settingsPanel">설정</button>
       </nav>
 
       <section id="textPanel" class="tab-panel is-active" role="tabpanel" aria-labelledby="textTab">
@@ -78,6 +79,15 @@
             <input type="range" id="hueSlider" class="hue-slider" min="0" max="360" value="0" aria-label="색상 범위">
           </div>
         </section>
+      </section>
+
+      <section id="settingsPanel" class="tab-panel" role="tabpanel" aria-labelledby="settingsTab" hidden>
+        <div class="toggles" aria-label="설정 옵션">
+          <label class="toggle-row">
+            <span><strong>비로그인 버튼 표시</strong></span>
+            <input type="checkbox" id="showGuestChatToggleButton">
+          </label>
+        </div>
       </section>
     </main>
 

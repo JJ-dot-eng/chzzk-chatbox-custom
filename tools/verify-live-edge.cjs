@@ -17,6 +17,7 @@ const onOptions = {
   showBadges: true,
   showTimestamps: true,
   showChatBoxes: true,
+  showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
@@ -27,6 +28,7 @@ const offOptions = {
   showBadges: false,
   showTimestamps: false,
   showChatBoxes: true,
+  showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
@@ -37,6 +39,7 @@ const badgeOffOptions = {
   showBadges: false,
   showTimestamps: true,
   showChatBoxes: true,
+  showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
@@ -47,6 +50,7 @@ const nicknameOffOptions = {
   showBadges: true,
   showTimestamps: true,
   showChatBoxes: true,
+  showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
@@ -57,6 +61,7 @@ const chatBoxOffOptions = {
   showBadges: true,
   showTimestamps: true,
   showChatBoxes: false,
+  showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
@@ -67,6 +72,7 @@ const largeTextColorOptions = {
   showBadges: true,
   showTimestamps: true,
   showChatBoxes: true,
+  showGuestChatToggleButton: true,
   showLargeText: true,
   showBoldText: false,
   chatBoxColor: "#4b8bff"
@@ -77,6 +83,7 @@ const boldTextOptions = {
   showBadges: true,
   showTimestamps: true,
   showChatBoxes: true,
+  showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: true,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
@@ -820,6 +827,9 @@ async function setPopupOptions(popup, options) {
     await hexInput.fill(options.chatBoxColor);
     await hexInput.press("Enter");
   }
+
+  await selectPopupTab(popup, "settingsPanel");
+  await popup.locator("#showGuestChatToggleButton").setChecked(options.showGuestChatToggleButton);
 }
 
 async function main() {
