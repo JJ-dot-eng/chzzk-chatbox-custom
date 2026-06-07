@@ -25,6 +25,7 @@ const DEFAULT_OPTIONS = {
   showChatBoxes: true,
   useGuestChatFrame: false,
   showGuestChatToggleButton: true,
+  showHeaderSettingsButton: true,
   showLargeText: false,
   showBoldText: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
@@ -62,6 +63,7 @@ function normalizeOptions(options) {
     showChatBoxes: options?.showChatBoxes !== false,
     useGuestChatFrame: options?.useGuestChatFrame === true,
     showGuestChatToggleButton: options?.showGuestChatToggleButton !== false,
+    showHeaderSettingsButton: options?.showHeaderSettingsButton !== false,
     showLargeText: options?.showLargeText === true,
     showBoldText: options?.showBoldText === true || legacyBoldText,
     chatBoxColor: normalizeHexColor(options?.chatBoxColor)

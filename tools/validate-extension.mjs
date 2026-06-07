@@ -215,6 +215,8 @@ for (const token of removedFloatingSettingsTokens) {
 const requiredHeaderPopupContentTokens = [
   'const OPEN_POPUP_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_POPUP";',
   'const HEADER_SETTINGS_BUTTON_ID = "chzzk-chat-ui-toggle-header-settings";',
+  "showHeaderSettingsButton: true",
+  'showHeaderSettingsButton: "chzzkChatUiToggleHeaderSettingsButton"',
   "function sendOpenPopupMessage()",
   "function createHeaderSettingsButton()",
   "function openExtensionPopupFromHeader(button)",
@@ -403,6 +405,10 @@ if (!backgroundSource.includes("showGuestChatToggleButton: options?.showGuestCha
   throw new Error("background script must normalize the guest chat button visibility option.");
 }
 
+if (!backgroundSource.includes("showHeaderSettingsButton: options?.showHeaderSettingsButton !== false")) {
+  throw new Error("background script must normalize the header settings button visibility option.");
+}
+
 const guestChatToggleVisibilityStart = contentSource.indexOf("function ensureGuestChatToggleButton()");
 const guestChatToggleTargetStart = contentSource.indexOf("function hasChatLikeText", guestChatToggleVisibilityStart);
 const guestChatToggleVisibilitySource =
@@ -424,6 +430,10 @@ if (!guestChatToggleVisibilitySource.includes("const nextSibling = settingsButto
 
 if (!guestChatToggleVisibilitySource.includes("target.container.insertBefore(settingsButton, target.before);")) {
   throw new Error("content script must keep the settings button available when the guest chat button is hidden.");
+}
+
+if (!guestChatToggleVisibilitySource.includes("currentOptions.showHeaderSettingsButton && canRenderHeaderSettingsButton()")) {
+  throw new Error("content script must gate the header settings button behind its visibility option.");
 }
 
 const requiredGuestChatThemeBackgroundTokens = [
@@ -462,6 +472,14 @@ if (!popupMarkup.includes('id="showGuestChatToggleButton"')) {
 
 if (!popupSource.includes('"showGuestChatToggleButton"')) {
   throw new Error("popup script must store and apply the guest chat button visibility option.");
+}
+
+if (!popupMarkup.includes('id="showHeaderSettingsButton"')) {
+  throw new Error("popup must include a header settings button visibility toggle.");
+}
+
+if (!popupSource.includes('"showHeaderSettingsButton"')) {
+  throw new Error("popup script must store and apply the header settings button visibility option.");
 }
 
 const unsafeRoleSelectors = [

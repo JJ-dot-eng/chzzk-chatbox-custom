@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.8";
+  const SCRIPT_VERSION = "0.2.9";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -55,6 +55,7 @@
     showChatBoxes: true,
     useGuestChatFrame: false,
     showGuestChatToggleButton: true,
+    showHeaderSettingsButton: true,
     showLargeText: false,
     showBoldText: false,
     chatBoxColor: "#808080"
@@ -67,6 +68,7 @@
     showChatBoxes: "chzzkChatUiToggleChatBoxes",
     useGuestChatFrame: "chzzkChatUiToggleGuestChatFrame",
     showGuestChatToggleButton: "chzzkChatUiToggleGuestChatToggleButton",
+    showHeaderSettingsButton: "chzzkChatUiToggleHeaderSettingsButton",
     showLargeText: "chzzkChatUiToggleLargeText",
     showBoldText: "chzzkChatUiToggleBoldText"
   };
@@ -241,6 +243,7 @@
       showChatBoxes: options?.showChatBoxes !== false,
       useGuestChatFrame: options?.useGuestChatFrame === true,
       showGuestChatToggleButton: options?.showGuestChatToggleButton !== false,
+      showHeaderSettingsButton: options?.showHeaderSettingsButton !== false,
       showLargeText: options?.showLargeText === true,
       showBoldText: options?.showBoldText === true || legacyBoldText,
       chatBoxColor: normalizeHexColor(options?.chatBoxColor)
@@ -2046,7 +2049,7 @@
       return;
     }
 
-    const settingsButton = canRenderHeaderSettingsButton()
+    const settingsButton = currentOptions.showHeaderSettingsButton && canRenderHeaderSettingsButton()
       ? existingSettingsButton instanceof HTMLButtonElement
         ? existingSettingsButton
         : createHeaderSettingsButton()

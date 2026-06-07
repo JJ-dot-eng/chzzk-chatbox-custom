@@ -1,5 +1,5 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
-const CONTENT_VERSION = "0.2.8";
+const CONTENT_VERSION = "0.2.9";
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const NAMED_CHAT_BOX_COLORS = {
   gray: "#808080",
@@ -16,6 +16,7 @@ const DEFAULT_OPTIONS = {
   showChatBoxes: true,
   useGuestChatFrame: false,
   showGuestChatToggleButton: true,
+  showHeaderSettingsButton: true,
   showLargeText: false,
   showBoldText: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
@@ -28,6 +29,7 @@ const controlIds = [
   "showChatBoxes",
   "useGuestChatFrame",
   "showGuestChatToggleButton",
+  "showHeaderSettingsButton",
   "showLargeText",
   "showBoldText"
 ];
@@ -171,6 +173,7 @@ function normalizeOptions(options) {
     showChatBoxes: options?.showChatBoxes !== false,
     useGuestChatFrame: options?.useGuestChatFrame === true,
     showGuestChatToggleButton: options?.showGuestChatToggleButton !== false,
+    showHeaderSettingsButton: options?.showHeaderSettingsButton !== false,
     showLargeText: options?.showLargeText === true,
     showBoldText: options?.showBoldText === true || legacyBoldText,
     chatBoxColor: normalizeHexColor(options?.chatBoxColor)
@@ -230,6 +233,7 @@ function readControls() {
     showChatBoxes: controls.showChatBoxes.checked,
     useGuestChatFrame: controls.useGuestChatFrame.checked,
     showGuestChatToggleButton: controls.showGuestChatToggleButton.checked,
+    showHeaderSettingsButton: controls.showHeaderSettingsButton.checked,
     showLargeText: controls.showLargeText.checked,
     showBoldText: controls.showBoldText.checked,
     chatBoxColor: currentColor

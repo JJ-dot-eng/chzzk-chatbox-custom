@@ -1,6 +1,6 @@
 {
   "name": "chzzk-chat-ui-toggle",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "private": true,
   "description": "Chrome/Edge extension for local-only CHZZK chat UI visibility toggles.",
   "scripts": {
