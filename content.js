@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.10";
+  const SCRIPT_VERSION = "0.2.11";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
