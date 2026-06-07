@@ -1043,7 +1043,8 @@
         min-height: 28px !important;
         margin: 0 2px !important;
         padding: 0 !important;
-        top: 10px !important;
+        left: -3px !important;
+        top: 8px !important;
         border: 0 !important;
         border-radius: 6px !important;
         background: transparent !important;
