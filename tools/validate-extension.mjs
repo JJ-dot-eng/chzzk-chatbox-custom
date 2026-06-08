@@ -409,6 +409,26 @@ if (!backgroundSource.includes("showHeaderSettingsButton: options?.showHeaderSet
   throw new Error("background script must normalize the header settings button visibility option.");
 }
 
+if (!backgroundSource.includes("showDonationRanking: options?.showDonationRanking !== false")) {
+  throw new Error("background script must normalize the donation ranking visibility option.");
+}
+
+if (!contentSource.includes("showDonationRanking: true")) {
+  throw new Error("content script must default the donation ranking visibility option on.");
+}
+
+if (!contentSource.includes('showDonationRanking: "chzzkChatUiToggleDonationRanking"')) {
+  throw new Error("content script must expose the donation ranking option as a dataset flag.");
+}
+
+if (!contentSource.includes('html[data-chzzk-chat-ui-toggle-donation-ranking="off"]')) {
+  throw new Error("content script must hide donation ranking when the option is off.");
+}
+
+if (!contentSource.includes('[class*="live_chatting_ranking_container" i]')) {
+  throw new Error("content script must target the CHZZK live chat ranking container.");
+}
+
 const guestChatToggleVisibilityStart = contentSource.indexOf("function ensureGuestChatToggleButton()");
 const guestChatToggleTargetStart = contentSource.indexOf("function hasChatLikeText", guestChatToggleVisibilityStart);
 const guestChatToggleVisibilitySource =
@@ -480,6 +500,14 @@ if (!popupMarkup.includes('id="showHeaderSettingsButton"')) {
 
 if (!popupSource.includes('"showHeaderSettingsButton"')) {
   throw new Error("popup script must store and apply the header settings button visibility option.");
+}
+
+if (!popupMarkup.includes('id="showDonationRanking"')) {
+  throw new Error("popup must include a donation ranking visibility toggle.");
+}
+
+if (!popupSource.includes('"showDonationRanking"')) {
+  throw new Error("popup script must store and apply the donation ranking visibility option.");
 }
 
 const unsafeRoleSelectors = [

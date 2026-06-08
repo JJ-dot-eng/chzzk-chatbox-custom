@@ -1,5 +1,5 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
-const CONTENT_VERSION = "0.2.15";
+const CONTENT_VERSION = "0.2.16";
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const NAMED_CHAT_BOX_COLORS = {
   gray: "#808080",
@@ -13,6 +13,7 @@ const DEFAULT_OPTIONS = {
   showNicknames: true,
   showBadges: true,
   showTimestamps: true,
+  showDonationRanking: true,
   showChatBoxes: true,
   useGuestChatFrame: false,
   showGuestChatToggleButton: true,
@@ -26,6 +27,7 @@ const controlIds = [
   "showNicknames",
   "showBadges",
   "showTimestamps",
+  "showDonationRanking",
   "showChatBoxes",
   "useGuestChatFrame",
   "showGuestChatToggleButton",
@@ -170,6 +172,7 @@ function normalizeOptions(options) {
     showNicknames: options?.showNicknames !== false,
     showBadges: options?.showBadges !== false,
     showTimestamps: options?.showTimestamps !== false,
+    showDonationRanking: options?.showDonationRanking !== false,
     showChatBoxes: options?.showChatBoxes !== false,
     useGuestChatFrame: options?.useGuestChatFrame === true,
     showGuestChatToggleButton: options?.showGuestChatToggleButton !== false,
@@ -230,6 +233,7 @@ function readControls() {
     showNicknames: controls.showNicknames.checked,
     showBadges: controls.showBadges.checked,
     showTimestamps: controls.showTimestamps.checked,
+    showDonationRanking: controls.showDonationRanking.checked,
     showChatBoxes: controls.showChatBoxes.checked,
     useGuestChatFrame: controls.useGuestChatFrame.checked,
     showGuestChatToggleButton: controls.showGuestChatToggleButton.checked,

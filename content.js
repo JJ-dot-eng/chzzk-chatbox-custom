@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.15";
+  const SCRIPT_VERSION = "0.2.16";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -54,6 +54,7 @@
     showNicknames: true,
     showBadges: true,
     showTimestamps: true,
+    showDonationRanking: true,
     showChatBoxes: true,
     useGuestChatFrame: false,
     showGuestChatToggleButton: true,
@@ -67,6 +68,7 @@
     showNicknames: "chzzkChatUiToggleNicknames",
     showBadges: "chzzkChatUiToggleBadges",
     showTimestamps: "chzzkChatUiToggleTimestamps",
+    showDonationRanking: "chzzkChatUiToggleDonationRanking",
     showChatBoxes: "chzzkChatUiToggleChatBoxes",
     useGuestChatFrame: "chzzkChatUiToggleGuestChatFrame",
     showGuestChatToggleButton: "chzzkChatUiToggleGuestChatToggleButton",
@@ -244,6 +246,7 @@
       showNicknames: options?.showNicknames !== false,
       showBadges: options?.showBadges !== false,
       showTimestamps: options?.showTimestamps !== false,
+      showDonationRanking: options?.showDonationRanking !== false,
       showChatBoxes: options?.showChatBoxes !== false,
       useGuestChatFrame: options?.useGuestChatFrame === true,
       showGuestChatToggleButton: options?.showGuestChatToggleButton !== false,
@@ -1327,6 +1330,11 @@
       html[data-chzzk-chat-ui-toggle-timestamps="on"]
         ${CHAT_ROW_SCOPE_SELECTOR}:has([class*="live_chatting_message_nickname" i]):not(:has(.chzzk-chat-ui-toggle-timestamp)) {
         visibility: hidden !important;
+      }
+
+      html[data-chzzk-chat-ui-toggle-donation-ranking="off"]
+        [class*="live_chatting_ranking_container" i] {
+        display: none !important;
       }
 
       html[data-chzzk-chat-ui-toggle-nicknames="off"]
