@@ -26,6 +26,10 @@ pnpm-debug.log*
 .env.*
 !.env.example
 
+# Local project notes and store drafts
+AGENTS.md
+docs/
+
 # Local caches and temporary files
 .cache/
 .tmp/
