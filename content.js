@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.17";
+  const SCRIPT_VERSION = "0.2.18";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -364,6 +364,10 @@
       showBoldText: options?.showBoldText === true || legacyBoldText,
       chatBoxColor: normalizeHexColor(options?.chatBoxColor)
     };
+  }
+
+  function getMiniChatScaleRatio(scale = currentOptions.miniFloatingChatScale) {
+    return normalizeMiniChatScale(scale) / 100;
   }
 
   function readCachedOptions() {
@@ -1205,16 +1209,12 @@
       }
 
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"] body {
-        width: var(--chzzk-chat-ui-toggle-mini-chat-scale-size, 100%) !important;
-        height: var(--chzzk-chat-ui-toggle-mini-chat-scale-size, 100%) !important;
+        width: 100% !important;
+        height: 100% !important;
         min-width: 0 !important;
-        max-width: none !important;
-        max-height: none !important;
         margin: 0 !important;
         background: transparent !important;
         overflow: hidden !important;
-        transform-origin: left top !important;
-        zoom: var(--chzzk-chat-ui-toggle-mini-chat-scale, 1) !important;
         scrollbar-width: none !important;
         -ms-overflow-style: none !important;
       }
@@ -1563,6 +1563,8 @@
         color: #ffffff !important;
         overflow: hidden !important;
         resize: none !important;
+        transform: scale(var(--chzzk-chat-ui-toggle-mini-chat-scale, 1)) !important;
+        transform-origin: left top !important;
         z-index: 2147483647 !important;
       }
 
@@ -1916,10 +1918,6 @@
       "--chzzk-chat-ui-toggle-mini-chat-scale",
       String(currentOptions.miniFloatingChatScale / 100)
     );
-    document.documentElement.style.setProperty(
-      "--chzzk-chat-ui-toggle-mini-chat-scale-size",
-      `${10000 / currentOptions.miniFloatingChatScale}%`
-    );
 
     for (const [optionKey, datasetKey] of Object.entries(DATASET_KEYS)) {
       document.documentElement.dataset[datasetKey] = currentOptions[optionKey] ? "on" : "off";
@@ -2117,23 +2115,26 @@
     };
   }
 
-  function clampMiniChatBoundsToViewport(bounds) {
+  function clampMiniChatBoundsToViewport(bounds, { scale = currentOptions.miniFloatingChatScale } = {}) {
     const normalizedBounds = normalizeMiniChatBounds(bounds);
     const viewport = getViewportBounds();
+    const scaleRatio = getMiniChatScaleRatio(scale);
     const maxWidth = Math.max(
       MINI_CHAT_MIN_WIDTH,
-      Math.min(MINI_CHAT_MAX_WIDTH, viewport.width - MINI_CHAT_VIEWPORT_MARGIN * 2)
+      Math.min(MINI_CHAT_MAX_WIDTH, (viewport.width - MINI_CHAT_VIEWPORT_MARGIN * 2) / scaleRatio)
     );
     const maxHeight = Math.max(
       MINI_CHAT_MIN_HEIGHT,
-      Math.min(MINI_CHAT_MAX_HEIGHT, viewport.height - MINI_CHAT_VIEWPORT_MARGIN * 2)
+      Math.min(MINI_CHAT_MAX_HEIGHT, (viewport.height - MINI_CHAT_VIEWPORT_MARGIN * 2) / scaleRatio)
     );
     const width = clampNumber(normalizedBounds.width, MINI_CHAT_MIN_WIDTH, maxWidth, MINI_CHAT_DEFAULT_WIDTH);
     const height = clampNumber(normalizedBounds.height, MINI_CHAT_MIN_HEIGHT, maxHeight, MINI_CHAT_DEFAULT_HEIGHT);
-    const fallbackLeft = viewport.width - width - 20;
-    const fallbackTop = viewport.height - height - 20;
-    const maxLeft = Math.max(MINI_CHAT_VIEWPORT_MARGIN, viewport.width - width - MINI_CHAT_VIEWPORT_MARGIN);
-    const maxTop = Math.max(MINI_CHAT_VIEWPORT_MARGIN, viewport.height - height - MINI_CHAT_VIEWPORT_MARGIN);
+    const visibleWidth = width * scaleRatio;
+    const visibleHeight = height * scaleRatio;
+    const fallbackLeft = viewport.width - visibleWidth - 20;
+    const fallbackTop = viewport.height - visibleHeight - 20;
+    const maxLeft = Math.max(MINI_CHAT_VIEWPORT_MARGIN, viewport.width - visibleWidth - MINI_CHAT_VIEWPORT_MARGIN);
+    const maxTop = Math.max(MINI_CHAT_VIEWPORT_MARGIN, viewport.height - visibleHeight - MINI_CHAT_VIEWPORT_MARGIN);
     const left = clampNumber(
       normalizedBounds.left,
       MINI_CHAT_VIEWPORT_MARGIN,
@@ -2161,14 +2162,15 @@
 
   function readMiniChatPanelBounds(panel) {
     const rect = panel.getBoundingClientRect();
+    const scaleRatio = getMiniChatScaleRatio();
 
     return normalizeMiniChatBounds({
       left: rect.left,
       top: rect.top,
-      width: rect.width,
+      width: rect.width / scaleRatio,
       height: currentOptions.miniFloatingChatCollapsed
         ? currentOptions.miniFloatingChatBounds.height
-        : rect.height
+        : rect.height / scaleRatio
     });
   }
 
@@ -2196,9 +2198,20 @@
       return;
     }
 
+    const panel = document.getElementById(MINI_CHAT_PANEL_ID);
+    const currentBounds = panel instanceof HTMLElement
+      ? readMiniChatPanelBounds(panel)
+      : currentOptions.miniFloatingChatBounds;
+    const nextBounds = clampMiniChatBoundsToViewport(currentBounds, { scale: nextScale });
+
+    if (panel instanceof HTMLElement) {
+      applyMiniChatPanelBounds(panel, nextBounds);
+    }
+
     updateMiniChatOptions(
       {
-        miniFloatingChatScale: nextScale
+        miniFloatingChatScale: nextScale,
+        miniFloatingChatBounds: nextBounds
       },
       "mini-chat-scale"
     );
@@ -2322,6 +2335,7 @@
     }
 
     const rect = panel.getBoundingClientRect();
+    const scaleRatio = getMiniChatScaleRatio();
     miniChatDragState = {
       pointerId: event.pointerId,
       panel,
@@ -2329,7 +2343,7 @@
       startY: event.clientY,
       left: rect.left,
       top: rect.top,
-      width: rect.width,
+      width: rect.width / scaleRatio,
       height: currentOptions.miniFloatingChatBounds.height
     };
     panel.dataset.dragging = "true";
@@ -2379,15 +2393,17 @@
     }
 
     const rect = panel.getBoundingClientRect();
+    const scaleRatio = getMiniChatScaleRatio();
     miniChatResizeState = {
       pointerId: event.pointerId,
       panel,
+      scaleRatio,
       startX: event.clientX,
       startY: event.clientY,
       left: rect.left,
       top: rect.top,
-      width: rect.width,
-      height: rect.height
+      width: rect.width / scaleRatio,
+      height: rect.height / scaleRatio
     };
     panel.dataset.resizing = "true";
     handle.setPointerCapture(event.pointerId);
@@ -2403,20 +2419,20 @@
     const viewport = getViewportBounds();
     const maxWidth = Math.max(
       MINI_CHAT_MIN_WIDTH,
-      viewport.width - miniChatResizeState.left - MINI_CHAT_VIEWPORT_MARGIN
+      (viewport.width - miniChatResizeState.left - MINI_CHAT_VIEWPORT_MARGIN) / miniChatResizeState.scaleRatio
     );
     const maxHeight = Math.max(
       MINI_CHAT_MIN_HEIGHT,
-      viewport.height - miniChatResizeState.top - MINI_CHAT_VIEWPORT_MARGIN
+      (viewport.height - miniChatResizeState.top - MINI_CHAT_VIEWPORT_MARGIN) / miniChatResizeState.scaleRatio
     );
     const width = clampNumber(
-      miniChatResizeState.width + event.clientX - miniChatResizeState.startX,
+      miniChatResizeState.width + (event.clientX - miniChatResizeState.startX) / miniChatResizeState.scaleRatio,
       MINI_CHAT_MIN_WIDTH,
       maxWidth,
       miniChatResizeState.width
     );
     const height = clampNumber(
-      miniChatResizeState.height + event.clientY - miniChatResizeState.startY,
+      miniChatResizeState.height + (event.clientY - miniChatResizeState.startY) / miniChatResizeState.scaleRatio,
       MINI_CHAT_MIN_HEIGHT,
       maxHeight,
       miniChatResizeState.height
