@@ -10,6 +10,12 @@ const CHZZK_HOST_SUFFIX = ".chzzk.naver.com";
 const INJECTION_DELAYS_MS = [0, 250, 1000, 2500, 5000];
 const LIVE_CHANNEL_ID_PATTERN = /^[0-9a-f]{32}$/i;
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
+const MINI_CHAT_MIN_WIDTH = 280;
+const MINI_CHAT_MIN_HEIGHT = 320;
+const MINI_CHAT_MAX_WIDTH = 720;
+const MINI_CHAT_MAX_HEIGHT = 900;
+const MINI_CHAT_DEFAULT_WIDTH = 360;
+const MINI_CHAT_DEFAULT_HEIGHT = 520;
 const NAMED_CHAT_BOX_COLORS = {
   gray: "#808080",
   green: "#00c471",
@@ -25,8 +31,17 @@ const DEFAULT_OPTIONS = {
   showDonationRanking: true,
   showChatBoxes: true,
   useGuestChatFrame: false,
+  useMiniFloatingChat: false,
   showGuestChatToggleButton: true,
   showHeaderSettingsButton: true,
+  showMiniFloatingChatButton: true,
+  miniFloatingChatCollapsed: false,
+  miniFloatingChatBounds: {
+    left: null,
+    top: null,
+    width: MINI_CHAT_DEFAULT_WIDTH,
+    height: MINI_CHAT_DEFAULT_HEIGHT
+  },
   showLargeText: false,
   showBoldText: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
@@ -64,11 +79,50 @@ function normalizeOptions(options) {
     showDonationRanking: options?.showDonationRanking !== false,
     showChatBoxes: options?.showChatBoxes !== false,
     useGuestChatFrame: options?.useGuestChatFrame === true,
+    useMiniFloatingChat: options?.useMiniFloatingChat === true,
     showGuestChatToggleButton: options?.showGuestChatToggleButton !== false,
     showHeaderSettingsButton: options?.showHeaderSettingsButton !== false,
+    showMiniFloatingChatButton: options?.showMiniFloatingChatButton !== false,
+    miniFloatingChatCollapsed: options?.miniFloatingChatCollapsed === true,
+    miniFloatingChatBounds: normalizeMiniChatBounds(options?.miniFloatingChatBounds),
     showLargeText: options?.showLargeText === true,
     showBoldText: options?.showBoldText === true || legacyBoldText,
     chatBoxColor: normalizeHexColor(options?.chatBoxColor)
+  };
+}
+
+function clampNumber(value, min, max, fallback) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return fallback;
+  }
+
+  return Math.max(min, Math.min(max, number));
+}
+
+function normalizeOptionalCoordinate(value) {
+  const number = Number(value);
+
+  return Number.isFinite(number) ? number : null;
+}
+
+function normalizeMiniChatBounds(bounds) {
+  return {
+    left: normalizeOptionalCoordinate(bounds?.left),
+    top: normalizeOptionalCoordinate(bounds?.top),
+    width: clampNumber(
+      bounds?.width,
+      MINI_CHAT_MIN_WIDTH,
+      MINI_CHAT_MAX_WIDTH,
+      MINI_CHAT_DEFAULT_WIDTH
+    ),
+    height: clampNumber(
+      bounds?.height,
+      MINI_CHAT_MIN_HEIGHT,
+      MINI_CHAT_MAX_HEIGHT,
+      MINI_CHAT_DEFAULT_HEIGHT
+    )
   };
 }
 

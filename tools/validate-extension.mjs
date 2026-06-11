@@ -4,6 +4,8 @@ import path from "node:path";
 const root = process.cwd();
 const manifestPath = path.join(root, "manifest.json");
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
+const packageLock = JSON.parse(await readFile(path.join(root, "package-lock.json"), "utf8"));
 const contentSource = await readFile(path.join(root, "content.js"), "utf8");
 const backgroundSource = await readFile(path.join(root, "background.js"), "utf8");
 const popupMarkup = await readFile(path.join(root, "popup.html"), "utf8");
@@ -36,6 +38,22 @@ if (manifest.name !== "치지직 채팅 커스텀") {
 
 if (manifest.short_name !== "채팅 커스텀") {
   throw new Error("manifest short_name must be 채팅 커스텀.");
+}
+
+if (manifest.version !== packageJson.version) {
+  throw new Error("manifest and package versions must match.");
+}
+
+if (packageLock.version !== manifest.version || packageLock.packages?.[""]?.version !== manifest.version) {
+  throw new Error("package-lock root versions must match manifest version.");
+}
+
+if (!contentSource.includes(`const SCRIPT_VERSION = "${manifest.version}";`)) {
+  throw new Error("content script version must match manifest version.");
+}
+
+if (!popupSource.includes(`const CONTENT_VERSION = "${manifest.version}";`)) {
+  throw new Error("popup content version must match manifest version.");
 }
 
 if (!manifest.permissions?.includes("storage")) {
@@ -413,6 +431,18 @@ if (!backgroundSource.includes("showDonationRanking: options?.showDonationRankin
   throw new Error("background script must normalize the donation ranking visibility option.");
 }
 
+if (!backgroundSource.includes("useMiniFloatingChat: options?.useMiniFloatingChat === true")) {
+  throw new Error("background script must normalize the mini floating chat option.");
+}
+
+if (!backgroundSource.includes("showMiniFloatingChatButton: options?.showMiniFloatingChatButton !== false")) {
+  throw new Error("background script must normalize the mini floating chat button visibility option.");
+}
+
+if (!backgroundSource.includes("miniFloatingChatBounds: normalizeMiniChatBounds(options?.miniFloatingChatBounds)")) {
+  throw new Error("background script must preserve mini floating chat bounds.");
+}
+
 if (!contentSource.includes("showDonationRanking: true")) {
   throw new Error("content script must default the donation ranking visibility option on.");
 }
@@ -427,6 +457,29 @@ if (!contentSource.includes('html[data-chzzk-chat-ui-toggle-donation-ranking="of
 
 if (!contentSource.includes('[class*="live_chatting_ranking_container" i]')) {
   throw new Error("content script must target the CHZZK live chat ranking container.");
+}
+
+const requiredMiniChatContentTokens = [
+  "useMiniFloatingChat: false",
+  "showMiniFloatingChatButton: true",
+  "miniFloatingChatBounds: normalizeMiniChatBounds(options?.miniFloatingChatBounds)",
+  'const MINI_CHAT_PANEL_ID = "chzzk-chat-ui-toggle-mini-chat-panel";',
+  'const MINI_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-mini-chat-frame";',
+  'const MINI_CHAT_BUTTON_ID = "chzzk-chat-ui-toggle-mini-chat-button";',
+  'const MINI_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleMini";',
+  "function getMiniChatFrameUrl()",
+  "function createMiniFloatingChatPanel()",
+  "function syncMiniFloatingChatPanel()",
+  "function createMiniChatToggleButton()",
+  "resize: both !important;",
+  "frameUrl.searchParams.set(MINI_CHAT_FRAME_MARKER_PARAM, \"1\");",
+  "syncMiniFloatingChatPanel();"
+];
+
+for (const token of requiredMiniChatContentTokens) {
+  if (!contentSource.includes(token)) {
+    throw new Error(`content script must implement mini floating chat: ${token}`);
+  }
 }
 
 const guestChatToggleVisibilityStart = contentSource.indexOf("function ensureGuestChatToggleButton()");
@@ -454,6 +507,14 @@ if (!guestChatToggleVisibilitySource.includes("target.container.insertBefore(set
 
 if (!guestChatToggleVisibilitySource.includes("currentOptions.showHeaderSettingsButton && canRenderHeaderSettingsButton()")) {
   throw new Error("content script must gate the header settings button behind its visibility option.");
+}
+
+if (!guestChatToggleVisibilitySource.includes("if (currentOptions.showMiniFloatingChatButton)")) {
+  throw new Error("content script must gate the mini floating chat header button behind its visibility option.");
+}
+
+if (!guestChatToggleVisibilitySource.includes("existingMiniChatButton?.remove();")) {
+  throw new Error("content script must remove the mini floating chat button when its visibility option is off.");
 }
 
 const requiredGuestChatThemeBackgroundTokens = [
@@ -500,6 +561,26 @@ if (!popupMarkup.includes('id="showHeaderSettingsButton"')) {
 
 if (!popupSource.includes('"showHeaderSettingsButton"')) {
   throw new Error("popup script must store and apply the header settings button visibility option.");
+}
+
+if (!popupMarkup.includes('id="useMiniFloatingChat"')) {
+  throw new Error("popup must include a mini floating chat toggle.");
+}
+
+if (!popupSource.includes('"useMiniFloatingChat"')) {
+  throw new Error("popup script must store and apply the mini floating chat option.");
+}
+
+if (!popupMarkup.includes('id="showMiniFloatingChatButton"')) {
+  throw new Error("popup must include a mini floating chat button visibility toggle.");
+}
+
+if (!popupSource.includes('"showMiniFloatingChatButton"')) {
+  throw new Error("popup script must store and apply the mini floating chat button visibility option.");
+}
+
+if (!popupSource.includes("...currentOptions")) {
+  throw new Error("popup script must preserve mini floating chat bounds when toggles change.");
 }
 
 if (!popupMarkup.includes('id="showDonationRanking"')) {

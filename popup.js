@@ -1,6 +1,12 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
-const CONTENT_VERSION = "0.2.16";
+const CONTENT_VERSION = "0.2.17";
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
+const MINI_CHAT_MIN_WIDTH = 280;
+const MINI_CHAT_MIN_HEIGHT = 320;
+const MINI_CHAT_MAX_WIDTH = 720;
+const MINI_CHAT_MAX_HEIGHT = 900;
+const MINI_CHAT_DEFAULT_WIDTH = 360;
+const MINI_CHAT_DEFAULT_HEIGHT = 520;
 const NAMED_CHAT_BOX_COLORS = {
   gray: "#808080",
   green: "#00c471",
@@ -16,8 +22,17 @@ const DEFAULT_OPTIONS = {
   showDonationRanking: true,
   showChatBoxes: true,
   useGuestChatFrame: false,
+  useMiniFloatingChat: false,
   showGuestChatToggleButton: true,
   showHeaderSettingsButton: true,
+  showMiniFloatingChatButton: true,
+  miniFloatingChatCollapsed: false,
+  miniFloatingChatBounds: {
+    left: null,
+    top: null,
+    width: MINI_CHAT_DEFAULT_WIDTH,
+    height: MINI_CHAT_DEFAULT_HEIGHT
+  },
   showLargeText: false,
   showBoldText: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
@@ -30,8 +45,10 @@ const controlIds = [
   "showDonationRanking",
   "showChatBoxes",
   "useGuestChatFrame",
+  "useMiniFloatingChat",
   "showGuestChatToggleButton",
   "showHeaderSettingsButton",
+  "showMiniFloatingChatButton",
   "showLargeText",
   "showBoldText"
 ];
@@ -47,6 +64,7 @@ const hueSlider = document.getElementById("hueSlider");
 const statusElement = document.getElementById("status");
 
 let currentColor = DEFAULT_CHAT_BOX_COLOR;
+let currentOptions = { ...DEFAULT_OPTIONS };
 let hsv = { hue: 0, saturation: 0, value: 0.5 };
 let colorApplyTimer = 0;
 
@@ -165,6 +183,41 @@ function hueToHex(hue) {
   return rgbToHex(hsvToRgb({ hue, saturation: 1, value: 1 }));
 }
 
+function clampNumber(value, min, max, fallback) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return fallback;
+  }
+
+  return Math.max(min, Math.min(max, number));
+}
+
+function normalizeOptionalCoordinate(value) {
+  const number = Number(value);
+
+  return Number.isFinite(number) ? number : null;
+}
+
+function normalizeMiniChatBounds(bounds) {
+  return {
+    left: normalizeOptionalCoordinate(bounds?.left),
+    top: normalizeOptionalCoordinate(bounds?.top),
+    width: clampNumber(
+      bounds?.width,
+      MINI_CHAT_MIN_WIDTH,
+      MINI_CHAT_MAX_WIDTH,
+      MINI_CHAT_DEFAULT_WIDTH
+    ),
+    height: clampNumber(
+      bounds?.height,
+      MINI_CHAT_MIN_HEIGHT,
+      MINI_CHAT_MAX_HEIGHT,
+      MINI_CHAT_DEFAULT_HEIGHT
+    )
+  };
+}
+
 function normalizeOptions(options) {
   const legacyBoldText = options?.showBoldText === undefined && options?.showLargeText === true;
 
@@ -175,8 +228,12 @@ function normalizeOptions(options) {
     showDonationRanking: options?.showDonationRanking !== false,
     showChatBoxes: options?.showChatBoxes !== false,
     useGuestChatFrame: options?.useGuestChatFrame === true,
+    useMiniFloatingChat: options?.useMiniFloatingChat === true,
     showGuestChatToggleButton: options?.showGuestChatToggleButton !== false,
     showHeaderSettingsButton: options?.showHeaderSettingsButton !== false,
+    showMiniFloatingChatButton: options?.showMiniFloatingChatButton !== false,
+    miniFloatingChatCollapsed: options?.miniFloatingChatCollapsed === true,
+    miniFloatingChatBounds: normalizeMiniChatBounds(options?.miniFloatingChatBounds),
     showLargeText: options?.showLargeText === true,
     showBoldText: options?.showBoldText === true || legacyBoldText,
     chatBoxColor: normalizeHexColor(options?.chatBoxColor)
@@ -220,6 +277,7 @@ function updateColorUi(hexColor, { syncInput = true } = {}) {
 
 function setControls(options) {
   const normalized = normalizeOptions(options);
+  currentOptions = normalized;
 
   for (const id of controlIds) {
     controls[id].checked = normalized[id];
@@ -230,14 +288,17 @@ function setControls(options) {
 
 function readControls() {
   return normalizeOptions({
+    ...currentOptions,
     showNicknames: controls.showNicknames.checked,
     showBadges: controls.showBadges.checked,
     showTimestamps: controls.showTimestamps.checked,
     showDonationRanking: controls.showDonationRanking.checked,
     showChatBoxes: controls.showChatBoxes.checked,
     useGuestChatFrame: controls.useGuestChatFrame.checked,
+    useMiniFloatingChat: controls.useMiniFloatingChat.checked,
     showGuestChatToggleButton: controls.showGuestChatToggleButton.checked,
     showHeaderSettingsButton: controls.showHeaderSettingsButton.checked,
+    showMiniFloatingChatButton: controls.showMiniFloatingChatButton.checked,
     showLargeText: controls.showLargeText.checked,
     showBoldText: controls.showBoldText.checked,
     chatBoxColor: currentColor
@@ -254,7 +315,9 @@ function getStoredOptions() {
 
 function setStoredOptions(options) {
   return new Promise((resolve) => {
-    chrome.storage.local.set({ [STORAGE_KEY]: normalizeOptions(options) }, resolve);
+    const normalized = normalizeOptions(options);
+    currentOptions = normalized;
+    chrome.storage.local.set({ [STORAGE_KEY]: normalized }, resolve);
   });
 }
 
