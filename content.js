@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.30";
+  const SCRIPT_VERSION = "0.2.31";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -2612,6 +2612,177 @@
     };
   }
 
+  function getDocumentPictureInPictureApi() {
+    if (
+      window.documentPictureInPicture
+      && typeof window.documentPictureInPicture.requestWindow === "function"
+    ) {
+      return window.documentPictureInPicture;
+    }
+
+    return null;
+  }
+
+  function isMiniChatPictureInPictureAvailable() {
+    return Boolean(getDocumentPictureInPictureApi());
+  }
+
+  function getMiniChatPictureInPictureWindow() {
+    const pip = getDocumentPictureInPictureApi();
+    const pipWindow = pip?.window;
+
+    return pipWindow && !pipWindow.closed ? pipWindow : null;
+  }
+
+  function renderMiniChatPictureInPictureWindow(pipWindow, frameUrl) {
+    const pipDocument = pipWindow?.document;
+
+    if (!pipDocument) {
+      return;
+    }
+
+    const head = pipDocument.head || pipDocument.createElement("head");
+    const body = pipDocument.body || pipDocument.createElement("body");
+
+    if (!pipDocument.head) {
+      pipDocument.documentElement.prepend(head);
+    }
+
+    if (!pipDocument.body) {
+      pipDocument.documentElement.append(body);
+    }
+
+    pipDocument.title = "미니 치지직 채팅";
+
+    const style = pipDocument.createElement("style");
+    style.textContent = `
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: transparent;
+        color: #ffffff;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      .chzzk-mini-chat-pip {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: 100%;
+        background: #111820;
+      }
+
+      .chzzk-mini-chat-pip iframe {
+        flex: 1 1 auto;
+        width: 100%;
+        min-height: 0;
+        border: 0;
+        background: transparent;
+      }
+
+      .chzzk-mini-chat-pip__controls {
+        display: flex;
+        flex: 0 0 18px;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        height: 18px;
+        padding: 0 6px;
+        box-sizing: border-box;
+        background: rgba(17, 24, 32, 0.98);
+        user-select: none;
+      }
+
+      .chzzk-mini-chat-pip__status {
+        overflow: hidden;
+        color: rgba(255, 255, 255, 0.72);
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .chzzk-mini-chat-pip__controls button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 14px;
+        padding: 0;
+        border: 0;
+        border-radius: 4px;
+        background: transparent;
+        color: rgba(255, 255, 255, 0.86);
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 800;
+        line-height: 1;
+      }
+
+      .chzzk-mini-chat-pip__controls button:hover,
+      .chzzk-mini-chat-pip__controls button:focus-visible {
+        background: rgba(255, 255, 255, 0.14);
+        outline: none;
+      }
+    `;
+
+    const root = pipDocument.createElement("section");
+    root.className = "chzzk-mini-chat-pip";
+
+    const iframe = pipDocument.createElement("iframe");
+    iframe.src = frameUrl;
+    iframe.title = "미니 치지직 채팅";
+    iframe.referrerPolicy = "origin";
+
+    const controls = pipDocument.createElement("div");
+    controls.className = "chzzk-mini-chat-pip__controls";
+
+    const status = pipDocument.createElement("span");
+    status.className = "chzzk-mini-chat-pip__status";
+    status.textContent = "외부 미니 채팅";
+
+    const closeButton = pipDocument.createElement("button");
+    closeButton.type = "button";
+    closeButton.title = "닫기";
+    closeButton.textContent = "×";
+    closeButton.addEventListener("click", () => {
+      pipWindow.close();
+    });
+
+    controls.append(status, closeButton);
+    root.append(iframe, controls);
+    head.replaceChildren(style);
+    body.replaceChildren(root);
+  }
+
+  async function openMiniChatPictureInPictureWindow() {
+    const pip = getDocumentPictureInPictureApi();
+    const frameUrl = getMiniChatFrameUrl();
+
+    if (!pip || !frameUrl) {
+      return { ok: false, error: "document-picture-in-picture-unavailable" };
+    }
+
+    const requestedBounds = getDetachedMiniChatRequestedBounds();
+    const existingWindow = getMiniChatPictureInPictureWindow();
+    const pipWindow = existingWindow || await pip.requestWindow({
+      width: Math.max(MINI_CHAT_MIN_WIDTH, requestedBounds.width),
+      height: Math.max(MINI_CHAT_INPUT_ONLY_HEIGHT + 18, requestedBounds.height)
+    });
+
+    renderMiniChatPictureInPictureWindow(pipWindow, frameUrl);
+
+    if (typeof pipWindow.focus === "function") {
+      pipWindow.focus();
+    }
+
+    return { ok: true, mode: "picture-in-picture" };
+  }
+
   async function openDetachedMiniChatWindow(button = null) {
     const channelId = getCurrentChannelId();
 
@@ -2623,11 +2794,18 @@
       button.dataset.state = "loading";
     }
 
-    const response = await sendOpenDetachedMiniChatMessage({
-      channelId,
-      theme: getGuestChatFrameTheme(),
-      bounds: getDetachedMiniChatRequestedBounds()
-    });
+    let response = await openMiniChatPictureInPictureWindow().catch((error) => ({
+      ok: false,
+      error: String(error?.message || error)
+    }));
+
+    if (!response?.ok) {
+      response = await sendOpenDetachedMiniChatMessage({
+        channelId,
+        theme: getGuestChatFrameTheme(),
+        bounds: getDetachedMiniChatRequestedBounds()
+      });
+    }
 
     if (button instanceof HTMLElement) {
       button.dataset.state = response?.ok ? "ready" : "error";
@@ -2681,7 +2859,9 @@
 
     if (detachButton instanceof HTMLButtonElement) {
       detachButton.textContent = "↗";
-      detachButton.title = "분리 채팅창 열기";
+      detachButton.title = isMiniChatPictureInPictureAvailable()
+        ? "외부 미니창 열기"
+        : "분리 채팅창 열기";
       detachButton.setAttribute("aria-label", detachButton.title);
     }
 
