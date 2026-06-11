@@ -38,6 +38,9 @@
   const MINI_CHAT_BUTTON_ID = "chzzk-chat-ui-toggle-mini-chat-button";
   const MINI_CHAT_BUTTON_ICON_CLASS = "chzzk-chat-ui-toggle-mini-chat-button__icon";
   const MINI_CHAT_PANEL_CONTROLS_CLASS = "chzzk-chat-ui-toggle-mini-chat__controls";
+  const MINI_CHAT_PANEL_SCALE_CLASS = "chzzk-chat-ui-toggle-mini-chat__scale";
+  const MINI_CHAT_PANEL_SCALE_BUTTON_CLASS = "chzzk-chat-ui-toggle-mini-chat__scale-button";
+  const MINI_CHAT_PANEL_SCALE_VALUE_CLASS = "chzzk-chat-ui-toggle-mini-chat__scale-value";
   const MINI_CHAT_PANEL_COLLAPSE_CLASS = "chzzk-chat-ui-toggle-mini-chat__collapse";
   const MINI_CHAT_PANEL_CLOSE_CLASS = "chzzk-chat-ui-toggle-mini-chat__close";
   const MINI_CHAT_PANEL_RESIZE_CLASS = "chzzk-chat-ui-toggle-mini-chat__resize";
@@ -59,6 +62,10 @@
   const MINI_CHAT_DEFAULT_WIDTH = 360;
   const MINI_CHAT_DEFAULT_HEIGHT = 520;
   const MINI_CHAT_VIEWPORT_MARGIN = 8;
+  const MINI_CHAT_SCALE_MIN = 50;
+  const MINI_CHAT_SCALE_MAX = 150;
+  const MINI_CHAT_SCALE_STEP = 10;
+  const MINI_CHAT_SCALE_DEFAULT = 100;
   const GUEST_CHAT_NATIVE_THEME_CLASSES = ["light", "dark", "theme_light", "theme_dark"];
   const GUEST_CHAT_CLEANBOT_STORAGE_KEY = "cleanbot";
   const GUEST_CHAT_CLEANBOT_DISABLED_VALUE = "false";
@@ -87,6 +94,7 @@
       width: MINI_CHAT_DEFAULT_WIDTH,
       height: MINI_CHAT_DEFAULT_HEIGHT
     },
+    miniFloatingChatScale: MINI_CHAT_SCALE_DEFAULT,
     showLargeText: false,
     showBoldText: false,
     chatBoxColor: "#808080"
@@ -318,6 +326,23 @@
     };
   }
 
+  function normalizeMiniChatScale(value) {
+    const clampedScale = clampNumber(
+      value,
+      MINI_CHAT_SCALE_MIN,
+      MINI_CHAT_SCALE_MAX,
+      MINI_CHAT_SCALE_DEFAULT
+    );
+    const steppedScale = Math.round(clampedScale / MINI_CHAT_SCALE_STEP) * MINI_CHAT_SCALE_STEP;
+
+    return clampNumber(
+      steppedScale,
+      MINI_CHAT_SCALE_MIN,
+      MINI_CHAT_SCALE_MAX,
+      MINI_CHAT_SCALE_DEFAULT
+    );
+  }
+
   function normalizeOptions(options) {
     const legacyBoldText = options?.showBoldText === undefined && options?.showLargeText === true;
 
@@ -334,6 +359,7 @@
       showMiniFloatingChatButton: options?.showMiniFloatingChatButton !== false,
       miniFloatingChatCollapsed: options?.miniFloatingChatCollapsed === true,
       miniFloatingChatBounds: normalizeMiniChatBounds(options?.miniFloatingChatBounds),
+      miniFloatingChatScale: normalizeMiniChatScale(options?.miniFloatingChatScale),
       showLargeText: options?.showLargeText === true,
       showBoldText: options?.showBoldText === true || legacyBoldText,
       chatBoxColor: normalizeHexColor(options?.chatBoxColor)
@@ -1177,6 +1203,7 @@
         overflow: hidden !important;
         scrollbar-width: none !important;
         -ms-overflow-style: none !important;
+        zoom: var(--chzzk-chat-ui-toggle-mini-chat-scale, 1) !important;
       }
 
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"] *,
@@ -1528,7 +1555,7 @@
         display: flex !important;
         flex: 0 0 16px !important;
         align-items: center !important;
-        justify-content: flex-end !important;
+        justify-content: space-between !important;
         gap: 2px !important;
         height: 16px !important;
         min-height: 16px !important;
@@ -1557,6 +1584,28 @@
         height: 100% !important;
       }
 
+      #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_SCALE_CLASS} {
+        display: flex !important;
+        flex: 0 0 auto !important;
+        align-items: center !important;
+        gap: 2px !important;
+        height: 100% !important;
+      }
+
+      #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_SCALE_VALUE_CLASS} {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 34px !important;
+        min-width: 34px !important;
+        height: 14px !important;
+        color: rgba(255, 255, 255, 0.72) !important;
+        font: 700 10px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+        letter-spacing: 0 !important;
+        pointer-events: none !important;
+      }
+
+      #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_SCALE_BUTTON_CLASS},
       #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_COLLAPSE_CLASS},
       #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_CLOSE_CLASS} {
         display: inline-flex !important;
@@ -1576,16 +1625,27 @@
         cursor: pointer !important;
       }
 
+      #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_SCALE_BUTTON_CLASS}:hover,
       #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_COLLAPSE_CLASS}:hover,
       #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_CLOSE_CLASS}:hover {
         background: rgba(255, 255, 255, 0.12) !important;
         color: #ffffff !important;
       }
 
+      #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_SCALE_BUTTON_CLASS}:focus-visible,
       #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_COLLAPSE_CLASS}:focus-visible,
       #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_CLOSE_CLASS}:focus-visible {
         outline: 2px solid rgba(0, 196, 113, 0.58) !important;
         outline-offset: 2px !important;
+      }
+
+      #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_SCALE_BUTTON_CLASS}:disabled {
+        color: rgba(255, 255, 255, 0.28) !important;
+        cursor: default !important;
+      }
+
+      #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_SCALE_BUTTON_CLASS}:disabled:hover {
+        background: transparent !important;
       }
 
       #${MINI_CHAT_PANEL_ID} [data-mini-chat-body="true"] {
@@ -1820,6 +1880,8 @@
 
     document.documentElement.dataset.chzzkChatUiToggleVersion = SCRIPT_VERSION;
     document.documentElement.dataset.chzzkChatUiToggleChatBoxColor = currentOptions.chatBoxColor;
+    document.documentElement.dataset.chzzkChatUiToggleMiniFloatingChatScale =
+      String(currentOptions.miniFloatingChatScale);
 
     document.documentElement.style.setProperty(
       "--chzzk-chat-ui-toggle-box-bg",
@@ -1828,6 +1890,10 @@
     document.documentElement.style.setProperty(
       "--chzzk-chat-ui-toggle-box-bg-hover",
       hexToRgba(currentOptions.chatBoxColor, 0.26)
+    );
+    document.documentElement.style.setProperty(
+      "--chzzk-chat-ui-toggle-mini-chat-scale",
+      String(currentOptions.miniFloatingChatScale / 100)
     );
 
     for (const [optionKey, datasetKey] of Object.entries(DATASET_KEYS)) {
@@ -2098,6 +2164,21 @@
     return result;
   }
 
+  function updateMiniChatScale(delta) {
+    const nextScale = normalizeMiniChatScale(currentOptions.miniFloatingChatScale + delta);
+
+    if (nextScale === currentOptions.miniFloatingChatScale) {
+      return;
+    }
+
+    updateMiniChatOptions(
+      {
+        miniFloatingChatScale: nextScale
+      },
+      "mini-chat-scale"
+    );
+  }
+
   function saveMiniChatPanelBounds(panel, { immediate = false } = {}) {
     window.clearTimeout(miniChatBoundsSaveTimer);
 
@@ -2163,10 +2244,32 @@
 
   function setMiniFloatingChatPanelState(panel) {
     const isCollapsed = currentOptions.miniFloatingChatCollapsed === true;
+    const scale = currentOptions.miniFloatingChatScale;
     const collapseButton = panel.querySelector(`.${MINI_CHAT_PANEL_COLLAPSE_CLASS}`);
     const closeButton = panel.querySelector(`.${MINI_CHAT_PANEL_CLOSE_CLASS}`);
+    const scaleValue = panel.querySelector(`.${MINI_CHAT_PANEL_SCALE_VALUE_CLASS}`);
+    const scaleDownButton = panel.querySelector(`[data-mini-chat-scale-delta="-${MINI_CHAT_SCALE_STEP}"]`);
+    const scaleUpButton = panel.querySelector(`[data-mini-chat-scale-delta="${MINI_CHAT_SCALE_STEP}"]`);
 
     panel.dataset.collapsed = String(isCollapsed);
+    panel.dataset.scale = String(scale);
+
+    if (scaleValue instanceof HTMLElement) {
+      scaleValue.textContent = `${scale}%`;
+      scaleValue.title = `채팅 배율 ${scale}%`;
+    }
+
+    if (scaleDownButton instanceof HTMLButtonElement) {
+      scaleDownButton.disabled = scale <= MINI_CHAT_SCALE_MIN;
+      scaleDownButton.title = `채팅 배율 줄이기 (${Math.max(MINI_CHAT_SCALE_MIN, scale - MINI_CHAT_SCALE_STEP)}%)`;
+      scaleDownButton.setAttribute("aria-label", scaleDownButton.title);
+    }
+
+    if (scaleUpButton instanceof HTMLButtonElement) {
+      scaleUpButton.disabled = scale >= MINI_CHAT_SCALE_MAX;
+      scaleUpButton.title = `채팅 배율 키우기 (${Math.min(MINI_CHAT_SCALE_MAX, scale + MINI_CHAT_SCALE_STEP)}%)`;
+      scaleUpButton.setAttribute("aria-label", scaleUpButton.title);
+    }
 
     if (collapseButton instanceof HTMLButtonElement) {
       collapseButton.textContent = isCollapsed ? "□" : "−";
@@ -2316,6 +2419,10 @@
   function createMiniFloatingChatPanel() {
     const panel = document.createElement("section");
     const controlsBar = document.createElement("div");
+    const scaleControls = document.createElement("div");
+    const scaleDownButton = document.createElement("button");
+    const scaleValue = document.createElement("span");
+    const scaleUpButton = document.createElement("button");
     const actions = document.createElement("div");
     const collapseButton = document.createElement("button");
     const closeButton = document.createElement("button");
@@ -2334,6 +2441,31 @@
     controlsBar.addEventListener("pointercancel", handleMiniChatDragEnd);
 
     actions.dataset.miniChatActions = "true";
+    scaleControls.className = MINI_CHAT_PANEL_SCALE_CLASS;
+    scaleControls.dataset.miniChatScaleControls = "true";
+
+    scaleDownButton.type = "button";
+    scaleDownButton.className = MINI_CHAT_PANEL_SCALE_BUTTON_CLASS;
+    scaleDownButton.dataset.miniChatScaleDelta = String(-MINI_CHAT_SCALE_STEP);
+    scaleDownButton.textContent = "-";
+    scaleDownButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      updateMiniChatScale(-MINI_CHAT_SCALE_STEP);
+    });
+
+    scaleValue.className = MINI_CHAT_PANEL_SCALE_VALUE_CLASS;
+    scaleValue.setAttribute("aria-live", "polite");
+
+    scaleUpButton.type = "button";
+    scaleUpButton.className = MINI_CHAT_PANEL_SCALE_BUTTON_CLASS;
+    scaleUpButton.dataset.miniChatScaleDelta = String(MINI_CHAT_SCALE_STEP);
+    scaleUpButton.textContent = "+";
+    scaleUpButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      updateMiniChatScale(MINI_CHAT_SCALE_STEP);
+    });
 
     collapseButton.type = "button";
     collapseButton.className = MINI_CHAT_PANEL_COLLAPSE_CLASS;
@@ -2375,8 +2507,9 @@
     resizeHandle.addEventListener("pointerup", handleMiniChatResizeEnd);
     resizeHandle.addEventListener("pointercancel", handleMiniChatResizeEnd);
 
+    scaleControls.append(scaleDownButton, scaleValue, scaleUpButton);
     actions.append(collapseButton, closeButton);
-    controlsBar.append(actions);
+    controlsBar.append(scaleControls, actions);
     panel.append(body, controlsBar, resizeHandle);
     setMiniFloatingChatPanelState(panel);
 

@@ -443,6 +443,14 @@ if (!backgroundSource.includes("miniFloatingChatBounds: normalizeMiniChatBounds(
   throw new Error("background script must preserve mini floating chat bounds.");
 }
 
+if (!backgroundSource.includes("miniFloatingChatScale: normalizeMiniChatScale(options?.miniFloatingChatScale)")) {
+  throw new Error("background script must normalize the mini floating chat scale option.");
+}
+
+if (!popupSource.includes("miniFloatingChatScale: normalizeMiniChatScale(options?.miniFloatingChatScale)")) {
+  throw new Error("popup script must preserve the mini floating chat scale option.");
+}
+
 if (!contentSource.includes("showDonationRanking: true")) {
   throw new Error("content script must default the donation ranking visibility option on.");
 }
@@ -463,23 +471,36 @@ const requiredMiniChatContentTokens = [
   "useMiniFloatingChat: false",
   "showMiniFloatingChatButton: true",
   "miniFloatingChatBounds: normalizeMiniChatBounds(options?.miniFloatingChatBounds)",
+  "miniFloatingChatScale: normalizeMiniChatScale(options?.miniFloatingChatScale)",
   'const MINI_CHAT_PANEL_ID = "chzzk-chat-ui-toggle-mini-chat-panel";',
   'const MINI_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-mini-chat-frame";',
   'const MINI_CHAT_BUTTON_ID = "chzzk-chat-ui-toggle-mini-chat-button";',
   'const MINI_CHAT_PANEL_CONTROLS_CLASS = "chzzk-chat-ui-toggle-mini-chat__controls";',
+  'const MINI_CHAT_PANEL_SCALE_CLASS = "chzzk-chat-ui-toggle-mini-chat__scale";',
   'const MINI_CHAT_PANEL_RESIZE_CLASS = "chzzk-chat-ui-toggle-mini-chat__resize";',
   'const MINI_CHAT_HIDDEN_CONTROL_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-hidden-control";',
   'const MINI_CHAT_COMPACT_INPUT_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-compact-input";',
   'const MINI_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleMini";',
+  "const MINI_CHAT_SCALE_MIN = 50;",
+  "const MINI_CHAT_SCALE_MAX = 150;",
+  "const MINI_CHAT_SCALE_STEP = 10;",
+  "const MINI_CHAT_SCALE_DEFAULT = 100;",
+  "function normalizeMiniChatScale(value)",
   "function getMiniChatFrameUrl()",
   "function createMiniFloatingChatPanel()",
   "function syncMiniFloatingChatPanel()",
   "function createMiniChatToggleButton()",
+  "function updateMiniChatScale(delta)",
   "function annotateMiniChatHiddenControls()",
   "function hasMiniChatInputField(element)",
   "function findMiniChatCompactInputContainer(actionRow)",
   "markMiniChatCompactInputContainer(actionRow);",
   "!hasMiniChatInputField(current)",
+  "zoom: var(--chzzk-chat-ui-toggle-mini-chat-scale, 1) !important;",
+  "\"--chzzk-chat-ui-toggle-mini-chat-scale\",",
+  "scaleControls.dataset.miniChatScaleControls = \"true\";",
+  "scaleDownButton.dataset.miniChatScaleDelta = String(-MINI_CHAT_SCALE_STEP);",
+  "scaleUpButton.dataset.miniChatScaleDelta = String(MINI_CHAT_SCALE_STEP);",
   "*::-webkit-scrollbar",
   "scrollbar-width: none !important;",
   "background: transparent !important;",
@@ -492,6 +513,7 @@ const requiredMiniChatContentTokens = [
   'panel.setAttribute("aria-label", "미니 채팅");',
   "controlsBar.addEventListener(\"pointerdown\", handleMiniChatDragStart);",
   "resizeHandle.addEventListener(\"pointerdown\", handleMiniChatResizeStart);",
+  "controlsBar.append(scaleControls, actions);",
   "panel.append(body, controlsBar, resizeHandle);",
   "isExistingPanel ? readMiniChatPanelBounds(panel) : currentOptions.miniFloatingChatBounds",
   "frameUrl.searchParams.set(MINI_CHAT_FRAME_MARKER_PARAM, \"1\");",

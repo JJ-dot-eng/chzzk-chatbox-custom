@@ -7,6 +7,10 @@ const MINI_CHAT_MAX_WIDTH = 720;
 const MINI_CHAT_MAX_HEIGHT = 900;
 const MINI_CHAT_DEFAULT_WIDTH = 360;
 const MINI_CHAT_DEFAULT_HEIGHT = 520;
+const MINI_CHAT_SCALE_MIN = 50;
+const MINI_CHAT_SCALE_MAX = 150;
+const MINI_CHAT_SCALE_STEP = 10;
+const MINI_CHAT_SCALE_DEFAULT = 100;
 const NAMED_CHAT_BOX_COLORS = {
   gray: "#808080",
   green: "#00c471",
@@ -33,6 +37,7 @@ const DEFAULT_OPTIONS = {
     width: MINI_CHAT_DEFAULT_WIDTH,
     height: MINI_CHAT_DEFAULT_HEIGHT
   },
+  miniFloatingChatScale: MINI_CHAT_SCALE_DEFAULT,
   showLargeText: false,
   showBoldText: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
@@ -218,6 +223,23 @@ function normalizeMiniChatBounds(bounds) {
   };
 }
 
+function normalizeMiniChatScale(value) {
+  const clampedScale = clampNumber(
+    value,
+    MINI_CHAT_SCALE_MIN,
+    MINI_CHAT_SCALE_MAX,
+    MINI_CHAT_SCALE_DEFAULT
+  );
+  const steppedScale = Math.round(clampedScale / MINI_CHAT_SCALE_STEP) * MINI_CHAT_SCALE_STEP;
+
+  return clampNumber(
+    steppedScale,
+    MINI_CHAT_SCALE_MIN,
+    MINI_CHAT_SCALE_MAX,
+    MINI_CHAT_SCALE_DEFAULT
+  );
+}
+
 function normalizeOptions(options) {
   const legacyBoldText = options?.showBoldText === undefined && options?.showLargeText === true;
 
@@ -234,6 +256,7 @@ function normalizeOptions(options) {
     showMiniFloatingChatButton: options?.showMiniFloatingChatButton !== false,
     miniFloatingChatCollapsed: options?.miniFloatingChatCollapsed === true,
     miniFloatingChatBounds: normalizeMiniChatBounds(options?.miniFloatingChatBounds),
+    miniFloatingChatScale: normalizeMiniChatScale(options?.miniFloatingChatScale),
     showLargeText: options?.showLargeText === true,
     showBoldText: options?.showBoldText === true || legacyBoldText,
     chatBoxColor: normalizeHexColor(options?.chatBoxColor)
