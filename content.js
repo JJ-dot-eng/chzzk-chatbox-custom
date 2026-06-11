@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.38";
+  const SCRIPT_VERSION = "0.2.39";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -43,7 +43,6 @@
   const MINI_CHAT_PANEL_SCALE_VALUE_CLASS = "chzzk-chat-ui-toggle-mini-chat__scale-value";
   const MINI_CHAT_PANEL_MODE_CLASS = "chzzk-chat-ui-toggle-mini-chat__mode";
   const MINI_CHAT_PANEL_INPUT_ONLY_CLASS = "chzzk-chat-ui-toggle-mini-chat__input-only";
-  const MINI_CHAT_PANEL_COLLAPSE_CLASS = "chzzk-chat-ui-toggle-mini-chat__collapse";
   const MINI_CHAT_PANEL_CLOSE_CLASS = "chzzk-chat-ui-toggle-mini-chat__close";
   const MINI_CHAT_PANEL_RESIZE_CLASS = "chzzk-chat-ui-toggle-mini-chat__resize";
   const GUEST_CHAT_HOST_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-host";
@@ -126,7 +125,6 @@
     showGuestChatToggleButton: "chzzkChatUiToggleGuestChatToggleButton",
     showHeaderSettingsButton: "chzzkChatUiToggleHeaderSettingsButton",
     showMiniFloatingChatButton: "chzzkChatUiToggleMiniFloatingChatButton",
-    miniFloatingChatCollapsed: "chzzkChatUiToggleMiniFloatingChatCollapsed",
     miniFloatingChatInputOnly: "chzzkChatUiToggleMiniFloatingChatInputOnly",
     showLargeText: "chzzkChatUiToggleLargeText",
     showBoldText: "chzzkChatUiToggleBoldText"
@@ -389,7 +387,7 @@
       showGuestChatToggleButton: options?.showGuestChatToggleButton !== false,
       showHeaderSettingsButton: options?.showHeaderSettingsButton !== false,
       showMiniFloatingChatButton: options?.showMiniFloatingChatButton !== false,
-      miniFloatingChatCollapsed: options?.miniFloatingChatCollapsed === true,
+      miniFloatingChatCollapsed: false,
       miniFloatingChatInputOnly,
       miniFloatingChatBounds: normalizeMiniChatBounds(options?.miniFloatingChatBounds, {
         inputOnly: miniFloatingChatInputOnly
@@ -1708,12 +1706,6 @@
         z-index: 2147483647 !important;
       }
 
-      #${MINI_CHAT_PANEL_ID}[data-collapsed="true"] {
-        min-height: 16px !important;
-        height: 16px !important;
-        resize: none !important;
-      }
-
       #${MINI_CHAT_PANEL_ID}[data-input-only="true"] {
         min-height: ${MINI_CHAT_INPUT_ONLY_HEIGHT}px !important;
         border-color: transparent !important;
@@ -1789,7 +1781,6 @@
 
       #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_SCALE_BUTTON_CLASS},
       #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_INPUT_ONLY_CLASS},
-      #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_COLLAPSE_CLASS},
       #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_CLOSE_CLASS} {
         display: inline-flex !important;
         align-items: center !important;
@@ -1810,7 +1801,6 @@
 
       #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_SCALE_BUTTON_CLASS}:hover,
       #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_INPUT_ONLY_CLASS}:hover,
-      #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_COLLAPSE_CLASS}:hover,
       #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_CLOSE_CLASS}:hover {
         background: rgba(255, 255, 255, 0.12) !important;
         color: #ffffff !important;
@@ -1818,7 +1808,6 @@
 
       #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_SCALE_BUTTON_CLASS}:focus-visible,
       #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_INPUT_ONLY_CLASS}:focus-visible,
-      #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_COLLAPSE_CLASS}:focus-visible,
       #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_CLOSE_CLASS}:focus-visible {
         outline: 2px solid rgba(0, 196, 113, 0.58) !important;
         outline-offset: 2px !important;
@@ -1851,11 +1840,6 @@
         flex: 1 1 auto !important;
         min-height: 0 !important;
         background: transparent !important;
-      }
-
-      #${MINI_CHAT_PANEL_ID}[data-collapsed="true"] [data-mini-chat-body="true"],
-      #${MINI_CHAT_PANEL_ID}[data-collapsed="true"] .${MINI_CHAT_PANEL_RESIZE_CLASS} {
-        display: none !important;
       }
 
       #${MINI_CHAT_FRAME_ID} {
@@ -2350,9 +2334,7 @@
     const scaleRatio = getMiniChatScaleRatio();
     const styledLeft = Number.parseFloat(panel.style.left);
     const styledTop = Number.parseFloat(panel.style.top);
-    const height = currentOptions.miniFloatingChatCollapsed
-      ? currentOptions.miniFloatingChatBounds.height
-      : rect.height / scaleRatio;
+    const height = rect.height / scaleRatio;
 
     return normalizeMiniChatBounds({
       left: Number.isFinite(styledLeft) ? styledLeft : rect.left,
@@ -2512,7 +2494,7 @@
     window.clearTimeout(miniChatBoundsSaveTimer);
 
     const save = () => {
-      if (!panel.isConnected || currentOptions.miniFloatingChatCollapsed) {
+      if (!panel.isConnected) {
         return;
       }
 
@@ -2576,17 +2558,14 @@
   }
 
   function setMiniFloatingChatPanelState(panel) {
-    const isCollapsed = currentOptions.miniFloatingChatCollapsed === true;
     const isInputOnly = currentOptions.miniFloatingChatInputOnly === true;
     const scale = currentOptions.miniFloatingChatScale;
-    const collapseButton = panel.querySelector(`.${MINI_CHAT_PANEL_COLLAPSE_CLASS}`);
     const closeButton = panel.querySelector(`.${MINI_CHAT_PANEL_CLOSE_CLASS}`);
     const inputOnlyButton = panel.querySelector(`.${MINI_CHAT_PANEL_INPUT_ONLY_CLASS}`);
     const scaleValue = panel.querySelector(`.${MINI_CHAT_PANEL_SCALE_VALUE_CLASS}`);
     const scaleDownButton = panel.querySelector(`[data-mini-chat-scale-delta="-${MINI_CHAT_SCALE_STEP}"]`);
     const scaleUpButton = panel.querySelector(`[data-mini-chat-scale-delta="${MINI_CHAT_SCALE_STEP}"]`);
 
-    panel.dataset.collapsed = String(isCollapsed);
     panel.dataset.inputOnly = String(isInputOnly);
     panel.dataset.scale = String(scale);
 
@@ -2612,13 +2591,6 @@
       inputOnlyButton.title = isInputOnly ? "채팅 목록 보기" : "입력창만 보기";
       inputOnlyButton.setAttribute("aria-label", inputOnlyButton.title);
       inputOnlyButton.setAttribute("aria-pressed", String(isInputOnly));
-    }
-
-    if (collapseButton instanceof HTMLButtonElement) {
-      collapseButton.textContent = isCollapsed ? "□" : "−";
-      collapseButton.title = isCollapsed ? "미니 채팅창 펼치기" : "미니 채팅창 접기";
-      collapseButton.setAttribute("aria-label", collapseButton.title);
-      collapseButton.setAttribute("aria-expanded", String(!isCollapsed));
     }
 
     if (closeButton instanceof HTMLButtonElement) {
@@ -2786,7 +2758,6 @@
     const modeControls = document.createElement("div");
     const inputOnlyButton = document.createElement("button");
     const actions = document.createElement("div");
-    const collapseButton = document.createElement("button");
     const closeButton = document.createElement("button");
     const body = document.createElement("div");
     const iframe = document.createElement("iframe");
@@ -2839,19 +2810,6 @@
       toggleMiniChatInputOnly();
     });
 
-    collapseButton.type = "button";
-    collapseButton.className = MINI_CHAT_PANEL_COLLAPSE_CLASS;
-    collapseButton.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      updateMiniChatOptions(
-        {
-          miniFloatingChatCollapsed: !currentOptions.miniFloatingChatCollapsed
-        },
-        "mini-chat-collapse"
-      );
-    });
-
     closeButton.type = "button";
     closeButton.className = MINI_CHAT_PANEL_CLOSE_CLASS;
     closeButton.textContent = "×";
@@ -2881,7 +2839,7 @@
 
     scaleControls.append(scaleDownButton, scaleValue, scaleUpButton);
     modeControls.append(inputOnlyButton);
-    actions.append(collapseButton, closeButton);
+    actions.append(closeButton);
     controlsBar.append(scaleControls, modeControls, actions);
     panel.append(body, controlsBar, resizeHandle);
     setMiniFloatingChatPanelState(panel);

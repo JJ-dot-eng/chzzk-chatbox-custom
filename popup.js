@@ -1,5 +1,5 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
-const CONTENT_VERSION = "0.2.38";
+const CONTENT_VERSION = "0.2.39";
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const MINI_CHAT_MIN_WIDTH = 280;
 const MINI_CHAT_MIN_HEIGHT = 28;
@@ -276,7 +276,7 @@ function normalizeOptions(options) {
     showGuestChatToggleButton: options?.showGuestChatToggleButton !== false,
     showHeaderSettingsButton: options?.showHeaderSettingsButton !== false,
     showMiniFloatingChatButton: options?.showMiniFloatingChatButton !== false,
-    miniFloatingChatCollapsed: options?.miniFloatingChatCollapsed === true,
+    miniFloatingChatCollapsed: false,
     miniFloatingChatInputOnly,
     miniFloatingChatBounds: normalizeMiniChatBounds(options?.miniFloatingChatBounds, {
       inputOnly: miniFloatingChatInputOnly

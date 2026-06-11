@@ -589,7 +589,7 @@ const requiredMiniChatContentTokens = [
   "\"--chzzk-chat-ui-toggle-mini-chat-scale\",",
   "scaleControls.dataset.miniChatScaleControls = \"true\";",
   "modeControls.dataset.miniChatMode = \"true\";",
-  "actions.append(collapseButton, closeButton);",
+  "actions.append(closeButton);",
   ".chzzk-chat-ui-toggle-mini-chat-button[aria-pressed=\"true\"]",
   ".chzzk-chat-ui-toggle-mini-chat-button:hover",
   "background: transparent !important;",
@@ -640,6 +640,18 @@ const requiredMiniChatContentTokens = [
 for (const token of requiredMiniChatContentTokens) {
   if (!contentSource.includes(token)) {
     throw new Error(`content script must implement mini floating chat: ${token}`);
+  }
+}
+
+const forbiddenMiniChatContentTokens = [
+  "MINI_CHAT_PANEL_COLLAPSE_CLASS",
+  "mini-chat-collapse",
+  "collapseButton"
+];
+
+for (const token of forbiddenMiniChatContentTokens) {
+  if (contentSource.includes(token)) {
+    throw new Error(`content script must not include the removed mini chat collapse control: ${token}`);
   }
 }
 

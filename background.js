@@ -94,7 +94,7 @@ function normalizeOptions(options) {
     showGuestChatToggleButton: options?.showGuestChatToggleButton !== false,
     showHeaderSettingsButton: options?.showHeaderSettingsButton !== false,
     showMiniFloatingChatButton: options?.showMiniFloatingChatButton !== false,
-    miniFloatingChatCollapsed: options?.miniFloatingChatCollapsed === true,
+    miniFloatingChatCollapsed: false,
     miniFloatingChatInputOnly,
     miniFloatingChatBounds: normalizeMiniChatBounds(options?.miniFloatingChatBounds, {
       inputOnly: miniFloatingChatInputOnly
