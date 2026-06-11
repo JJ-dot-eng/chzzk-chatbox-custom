@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.36";
+  const SCRIPT_VERSION = "0.2.37";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -1559,43 +1559,31 @@
       }
 
       .${MINI_CHAT_BUTTON_ICON_CLASS} {
-        position: relative !important;
         display: block !important;
-        width: 16px !important;
-        height: 14px !important;
+        width: 18px !important;
+        height: 18px !important;
         color: inherit !important;
-        border: 1.7px solid currentColor !important;
-        border-radius: 5px !important;
-        box-sizing: border-box !important;
         pointer-events: none !important;
+        line-height: 0 !important;
       }
 
-      .${MINI_CHAT_BUTTON_ICON_CLASS}::before {
-        content: "" !important;
-        position: absolute !important;
-        left: 3px !important;
-        top: 4px !important;
-        width: 2.5px !important;
-        height: 2.5px !important;
-        border-radius: 999px !important;
-        background: currentColor !important;
-        box-shadow:
-          4.5px 0 0 currentColor,
-          9px 0 0 currentColor !important;
+      .${MINI_CHAT_BUTTON_ICON_CLASS} svg {
+        display: block !important;
+        width: 18px !important;
+        height: 18px !important;
+        overflow: visible !important;
       }
 
-      .${MINI_CHAT_BUTTON_ICON_CLASS}::after {
-        content: "" !important;
-        position: absolute !important;
-        left: 2px !important;
-        bottom: -5px !important;
-        width: 6px !important;
-        height: 6px !important;
-        border-left: 1.7px solid currentColor !important;
-        border-bottom: 1.7px solid currentColor !important;
-        background: transparent !important;
-        transform: skew(-18deg) rotate(-18deg) !important;
-        box-sizing: border-box !important;
+      .${MINI_CHAT_BUTTON_ICON_CLASS} path {
+        fill: none !important;
+        stroke: currentColor !important;
+        stroke-width: 1.55 !important;
+        stroke-linejoin: round !important;
+        vector-effect: non-scaling-stroke !important;
+      }
+
+      .${MINI_CHAT_BUTTON_ICON_CLASS} circle {
+        fill: currentColor !important;
       }
 
       .${GUEST_CHAT_TOGGLE_BUTTON_ICON_CLASS} {
@@ -3395,6 +3383,13 @@
     button.className = "chzzk-chat-ui-toggle-mini-chat-button";
     icon.className = MINI_CHAT_BUTTON_ICON_CLASS;
     icon.setAttribute("aria-hidden", "true");
+    icon.innerHTML = `
+      <svg viewBox="0 0 18 18" aria-hidden="true" focusable="false">
+        <path d="M5.2 4.2h7.6c1.35 0 2.2.85 2.2 2.05v4.15c0 1.2-.85 2.05-2.2 2.05H8.1L5.2 14.3v-1.85c-1.35 0-2.2-.85-2.2-2.05V6.25c0-1.2.85-2.05 2.2-2.05Z"></path>
+        <circle cx="7.2" cy="8.35" r="0.8"></circle>
+        <circle cx="10.8" cy="8.35" r="0.8"></circle>
+      </svg>
+    `;
     button.append(icon);
     setMiniChatToggleButtonState(button);
 
