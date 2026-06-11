@@ -47,6 +47,7 @@
   const GUEST_CHAT_EMBED_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-embed";
   const MINI_CHAT_EMBED_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-embed";
   const MINI_CHAT_HIDDEN_CONTROL_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-hidden-control";
+  const MINI_CHAT_COMPACT_INPUT_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-compact-input";
   const GUEST_CHAT_CLEANBOT_DEFAULT_ATTR = "data-chzzk-chat-ui-toggle-guest-cleanbot-default";
   const LIVE_CHAT_FRAME_ATTR = "data-chzzk-chat-ui-toggle-live-chat-frame";
   const GUEST_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleGuest";
@@ -147,6 +148,13 @@
     "[class*='live_chatting' i]",
     "[class*='chatting_area' i]",
     "[class*='chat_area' i]"
+  ];
+
+  const MINI_CHAT_INPUT_CONTAINER_SELECTORS = [
+    "[class*='live_chatting_input_container' i]",
+    "[class*='chatting_input_container' i]",
+    "[class*='live_chatting_input' i]",
+    "[class*='chatting_input' i]"
   ];
 
   const PAGE_THEME_BACKGROUND_SELECTORS = [
@@ -1187,6 +1195,17 @@
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"]
         [${MINI_CHAT_HIDDEN_CONTROL_ATTR}="true"] {
         display: none !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"]
+        [${MINI_CHAT_COMPACT_INPUT_ATTR}="true"] {
+        flex: 0 0 auto !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        margin-bottom: 0 !important;
+        padding-bottom: 8px !important;
+        box-sizing: border-box !important;
       }
 
       .chzzk-chat-ui-toggle-guest-chat-toggle {
@@ -2984,6 +3003,7 @@
     element.removeAttribute(ROLE_ATTR);
     element.removeAttribute(MESSAGE_PREFIX_ATTR);
     element.removeAttribute(MINI_CHAT_HIDDEN_CONTROL_ATTR);
+    element.removeAttribute(MINI_CHAT_COMPACT_INPUT_ATTR);
 
     if (element.getAttribute(CHAT_ROW_ATTR) === "true") {
       element.removeAttribute(CHAT_ROW_ATTR);
@@ -3012,6 +3032,51 @@
     }
   }
 
+  function hasMiniChatInputField(element) {
+    if (!(element instanceof HTMLElement)) {
+      return false;
+    }
+
+    try {
+      return Boolean(
+        element.matches("textarea, input, [contenteditable='true'], [role='textbox']") ||
+        element.querySelector("textarea, input, [contenteditable='true'], [role='textbox']")
+      );
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function findMiniChatCompactInputContainer(actionRow) {
+    let fallbackContainer = null;
+
+    for (
+      let current = actionRow.parentElement, depth = 0;
+      current && current !== document.body && depth < 6;
+      current = current.parentElement, depth += 1
+    ) {
+      if (!(current instanceof HTMLElement) || !hasMiniChatInputField(current)) {
+        continue;
+      }
+
+      if (matchesAnySafe(current, MINI_CHAT_INPUT_CONTAINER_SELECTORS)) {
+        return current;
+      }
+
+      fallbackContainer ??= current;
+    }
+
+    return fallbackContainer;
+  }
+
+  function markMiniChatCompactInputContainer(actionRow) {
+    const inputContainer = findMiniChatCompactInputContainer(actionRow);
+
+    if (inputContainer instanceof HTMLElement) {
+      inputContainer.setAttribute(MINI_CHAT_COMPACT_INPUT_ATTR, "true");
+    }
+  }
+
   function findMiniChatActionControlRow(control) {
     for (
       let current = control.parentElement, depth = 0;
@@ -3024,7 +3089,8 @@
       if (
         controls.length >= 3 &&
         text.includes("후원하기") &&
-        !text.includes("채팅을 입력")
+        !text.includes("채팅을 입력") &&
+        !hasMiniChatInputField(current)
       ) {
         return current;
       }
@@ -3042,6 +3108,10 @@
       element.removeAttribute(MINI_CHAT_HIDDEN_CONTROL_ATTR);
     }
 
+    for (const element of document.querySelectorAll(`[${MINI_CHAT_COMPACT_INPUT_ATTR}]`)) {
+      element.removeAttribute(MINI_CHAT_COMPACT_INPUT_ATTR);
+    }
+
     const controls = getMiniChatActionControls();
     const donationControls = controls.filter((control) => getCompactText(control).includes("후원하기"));
 
@@ -3050,6 +3120,7 @@
 
       if (actionRow) {
         markMiniChatHiddenControl(actionRow);
+        markMiniChatCompactInputContainer(actionRow);
 
         for (const rowControl of getMiniChatActionControls(actionRow)) {
           markMiniChatHiddenControl(rowControl);
