@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.26";
+  const SCRIPT_VERSION = "0.2.27";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -64,7 +64,7 @@
   const MINI_CHAT_MIN_HEIGHT = 28;
   const MINI_CHAT_INPUT_ONLY_HEIGHT = 116;
   const MINI_CHAT_INPUT_ONLY_BOX_HEIGHT = 52;
-  const MINI_CHAT_INPUT_ONLY_FIELD_HEIGHT = 24;
+  const MINI_CHAT_INPUT_ONLY_FIELD_MAX_HEIGHT = 36;
   const MINI_CHAT_MAX_WIDTH = 720;
   const MINI_CHAT_MAX_HEIGHT = 900;
   const MINI_CHAT_DEFAULT_WIDTH = 360;
@@ -1330,6 +1330,8 @@
         [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"] {
         flex: 0 0 ${MINI_CHAT_INPUT_ONLY_BOX_HEIGHT}px !important;
         align-self: center !important;
+        display: flex !important;
+        align-items: center !important;
         width: calc(100% - 20px) !important;
         max-width: calc(100% - 20px) !important;
         height: ${MINI_CHAT_INPUT_ONLY_BOX_HEIGHT}px !important;
@@ -1383,10 +1385,10 @@
         [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"] [contenteditable="true"],
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"][data-chzzk-chat-ui-toggle-mini-floating-chat-input-only="on"]
         [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"] [role="textbox"] {
-        height: ${MINI_CHAT_INPUT_ONLY_FIELD_HEIGHT}px !important;
-        min-height: ${MINI_CHAT_INPUT_ONLY_FIELD_HEIGHT}px !important;
-        max-height: ${MINI_CHAT_INPUT_ONLY_FIELD_HEIGHT}px !important;
-        line-height: ${MINI_CHAT_INPUT_ONLY_FIELD_HEIGHT}px !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: ${MINI_CHAT_INPUT_ONLY_FIELD_MAX_HEIGHT}px !important;
+        line-height: normal !important;
         background: transparent !important;
         overflow: hidden !important;
         resize: none !important;
