@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.20";
+  const SCRIPT_VERSION = "0.2.21";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -61,8 +61,8 @@
   const GUEST_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleGuest";
   const MINI_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleMini";
   const MINI_CHAT_MIN_WIDTH = 280;
-  const MINI_CHAT_MIN_HEIGHT = 320;
-  const MINI_CHAT_INPUT_ONLY_HEIGHT = 88;
+  const MINI_CHAT_MIN_HEIGHT = 56;
+  const MINI_CHAT_INPUT_ONLY_HEIGHT = 76;
   const MINI_CHAT_MAX_WIDTH = 720;
   const MINI_CHAT_MAX_HEIGHT = 900;
   const MINI_CHAT_DEFAULT_WIDTH = 360;
@@ -1317,6 +1317,9 @@
         justify-content: flex-end !important;
         min-height: 0 !important;
         max-height: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: transparent !important;
         overflow: hidden !important;
       }
 
@@ -1325,6 +1328,10 @@
         flex: 0 0 auto !important;
         width: 100% !important;
         margin-top: auto !important;
+        margin-bottom: 0 !important;
+        padding: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
       }
 
       .chzzk-chat-ui-toggle-guest-chat-toggle {
@@ -1629,6 +1636,10 @@
         resize: none !important;
       }
 
+      #${MINI_CHAT_PANEL_ID}[data-input-only="true"] {
+        min-height: ${MINI_CHAT_INPUT_ONLY_HEIGHT}px !important;
+      }
+
       #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_CONTROLS_CLASS} {
         position: relative !important;
         display: flex !important;
@@ -1744,6 +1755,10 @@
       #${MINI_CHAT_PANEL_ID}[data-input-only="true"] .${MINI_CHAT_PANEL_INPUT_ONLY_CLASS} {
         background: rgba(0, 196, 113, 0.22) !important;
         color: #ffffff !important;
+      }
+
+      #${MINI_CHAT_PANEL_ID}[data-input-only="true"] [data-mini-chat-body="true"] {
+        background: #111820 !important;
       }
 
       #${MINI_CHAT_PANEL_ID} [data-mini-chat-body="true"] {
@@ -2275,13 +2290,21 @@
     return result;
   }
 
-  function getMiniChatInputOnlyBounds(expandedBounds) {
+  function getMiniChatLayoutTopForVisualTop(visualTop, height, scale = currentOptions.miniFloatingChatScale) {
+    const scaleRatio = getMiniChatScaleRatio(scale);
+
+    return visualTop - height * (1 - scaleRatio);
+  }
+
+  function getMiniChatInputOnlyBounds(expandedBounds, { visualTop = null } = {}) {
     const baseBounds = clampMiniChatBoundsToViewport(expandedBounds, {
       inputOnly: false
     });
     const inputOnlyBounds = {
       ...baseBounds,
-      top: baseBounds.top + baseBounds.height - MINI_CHAT_INPUT_ONLY_HEIGHT,
+      top: Number.isFinite(visualTop)
+        ? getMiniChatLayoutTopForVisualTop(visualTop, MINI_CHAT_INPUT_ONLY_HEIGHT)
+        : baseBounds.top,
       height: MINI_CHAT_INPUT_ONLY_HEIGHT
     };
 
@@ -2290,7 +2313,7 @@
     });
   }
 
-  function getMiniChatExpandedBoundsFromInputOnly(inputOnlyBounds) {
+  function getMiniChatExpandedBoundsFromInputOnly(inputOnlyBounds, { visualTop = null } = {}) {
     const compactBounds = clampMiniChatBoundsToViewport(inputOnlyBounds, {
       inputOnly: true
     });
@@ -2303,7 +2326,9 @@
     const expandedBounds = {
       ...expandedBase,
       left: compactBounds.left,
-      top: compactBounds.top + compactBounds.height - expandedHeight,
+      top: Number.isFinite(visualTop)
+        ? getMiniChatLayoutTopForVisualTop(visualTop, expandedHeight)
+        : compactBounds.top,
       width: compactBounds.width,
       height: expandedHeight
     };
@@ -2315,12 +2340,13 @@
 
   function toggleMiniChatInputOnly() {
     const panel = document.getElementById(MINI_CHAT_PANEL_ID);
+    const visualTop = panel instanceof HTMLElement ? panel.getBoundingClientRect().top : null;
     const activeBounds = panel instanceof HTMLElement
       ? readMiniChatPanelBounds(panel)
       : currentOptions.miniFloatingChatBounds;
 
     if (currentOptions.miniFloatingChatInputOnly) {
-      const expandedBounds = getMiniChatExpandedBoundsFromInputOnly(activeBounds);
+      const expandedBounds = getMiniChatExpandedBoundsFromInputOnly(activeBounds, { visualTop });
 
       if (panel instanceof HTMLElement) {
         panel.dataset.inputOnly = "false";
@@ -2341,7 +2367,7 @@
     const expandedBounds = clampMiniChatBoundsToViewport(activeBounds, {
       inputOnly: false
     });
-    const inputOnlyBounds = getMiniChatInputOnlyBounds(expandedBounds);
+    const inputOnlyBounds = getMiniChatInputOnlyBounds(expandedBounds, { visualTop });
 
     if (panel instanceof HTMLElement) {
       panel.dataset.inputOnly = "true";
