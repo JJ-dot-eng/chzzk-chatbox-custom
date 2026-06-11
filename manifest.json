@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "치지직 채팅 커스텀",
   "short_name": "채팅 커스텀",
-  "version": "0.2.34",
+  "version": "0.2.35",
   "description": "치지직 채팅창의 텍스트 표시와 꾸미기 옵션을 내 브라우저에서만 토글합니다.",
   "icons": {
     "16": "icons/icon-16.png",
