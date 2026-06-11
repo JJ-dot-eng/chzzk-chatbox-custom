@@ -439,12 +439,28 @@ if (!backgroundSource.includes("showMiniFloatingChatButton: options?.showMiniFlo
   throw new Error("background script must normalize the mini floating chat button visibility option.");
 }
 
-if (!backgroundSource.includes("miniFloatingChatBounds: normalizeMiniChatBounds(options?.miniFloatingChatBounds)")) {
+if (!backgroundSource.includes("miniFloatingChatBounds: normalizeMiniChatBounds(options?.miniFloatingChatBounds, {")) {
   throw new Error("background script must preserve mini floating chat bounds.");
+}
+
+if (!backgroundSource.includes("miniFloatingChatInputOnly")) {
+  throw new Error("background script must preserve the mini floating chat input-only option.");
+}
+
+if (!backgroundSource.includes("miniFloatingChatExpandedBounds: normalizeOptionalMiniChatBounds(options?.miniFloatingChatExpandedBounds)")) {
+  throw new Error("background script must preserve mini floating chat expanded bounds.");
 }
 
 if (!backgroundSource.includes("miniFloatingChatScale: normalizeMiniChatScale(options?.miniFloatingChatScale)")) {
   throw new Error("background script must normalize the mini floating chat scale option.");
+}
+
+if (!popupSource.includes("miniFloatingChatInputOnly")) {
+  throw new Error("popup script must preserve the mini floating chat input-only option.");
+}
+
+if (!popupSource.includes("miniFloatingChatExpandedBounds: normalizeOptionalMiniChatBounds(options?.miniFloatingChatExpandedBounds)")) {
+  throw new Error("popup script must preserve mini floating chat expanded bounds.");
 }
 
 if (!popupSource.includes("miniFloatingChatScale: normalizeMiniChatScale(options?.miniFloatingChatScale)")) {
@@ -470,17 +486,25 @@ if (!contentSource.includes('[class*="live_chatting_ranking_container" i]')) {
 const requiredMiniChatContentTokens = [
   "useMiniFloatingChat: false",
   "showMiniFloatingChatButton: true",
-  "miniFloatingChatBounds: normalizeMiniChatBounds(options?.miniFloatingChatBounds)",
+  "miniFloatingChatInputOnly: false",
+  "miniFloatingChatBounds: normalizeMiniChatBounds(options?.miniFloatingChatBounds, {",
+  "miniFloatingChatExpandedBounds: normalizeOptionalMiniChatBounds(options?.miniFloatingChatExpandedBounds)",
   "miniFloatingChatScale: normalizeMiniChatScale(options?.miniFloatingChatScale)",
   'const MINI_CHAT_PANEL_ID = "chzzk-chat-ui-toggle-mini-chat-panel";',
   'const MINI_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-mini-chat-frame";',
   'const MINI_CHAT_BUTTON_ID = "chzzk-chat-ui-toggle-mini-chat-button";',
   'const MINI_CHAT_PANEL_CONTROLS_CLASS = "chzzk-chat-ui-toggle-mini-chat__controls";',
   'const MINI_CHAT_PANEL_SCALE_CLASS = "chzzk-chat-ui-toggle-mini-chat__scale";',
+  'const MINI_CHAT_PANEL_MODE_CLASS = "chzzk-chat-ui-toggle-mini-chat__mode";',
+  'const MINI_CHAT_PANEL_INPUT_ONLY_CLASS = "chzzk-chat-ui-toggle-mini-chat__input-only";',
   'const MINI_CHAT_PANEL_RESIZE_CLASS = "chzzk-chat-ui-toggle-mini-chat__resize";',
   'const MINI_CHAT_HIDDEN_CONTROL_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-hidden-control";',
   'const MINI_CHAT_COMPACT_INPUT_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-compact-input";',
+  'const MINI_CHAT_INPUT_ONLY_PATH_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-path";',
+  'const MINI_CHAT_INPUT_ONLY_KEEP_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-keep";',
+  'const MINI_CHAT_INPUT_ONLY_HIDDEN_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-hidden";',
   'const MINI_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleMini";',
+  "const MINI_CHAT_INPUT_ONLY_HEIGHT = 88;",
   "const MINI_CHAT_SCALE_MIN = 50;",
   "const MINI_CHAT_SCALE_MAX = 150;",
   "const MINI_CHAT_SCALE_STEP = 10;",
@@ -490,8 +514,11 @@ const requiredMiniChatContentTokens = [
   "function createMiniFloatingChatPanel()",
   "function syncMiniFloatingChatPanel()",
   "function createMiniChatToggleButton()",
+  "function toggleMiniChatInputOnly()",
   "function updateMiniChatScale(delta)",
   "function annotateMiniChatHiddenControls()",
+  "function markMiniChatInputOnlyLayout()",
+  "function findMiniChatInputOnlyContainer(root = document)",
   "function hasMiniChatInputField(element)",
   "function findMiniChatCompactInputContainer(actionRow)",
   "markMiniChatCompactInputContainer(actionRow);",
@@ -499,14 +526,20 @@ const requiredMiniChatContentTokens = [
   "transform: scale(var(--chzzk-chat-ui-toggle-mini-chat-scale, 1)) !important;",
   "transform-origin: left bottom !important;",
   "function getMiniChatScaleRatio(scale = currentOptions.miniFloatingChatScale)",
-  "clampMiniChatBoundsToViewport(currentBounds, { scale: nextScale })",
-  "applyMiniChatPanelBounds(panel, nextBounds, { scale: nextScale });",
+  "clampMiniChatBoundsToViewport(currentBounds, {",
+  "scale: nextScale,",
+  "applyMiniChatPanelBounds(panel, nextBounds, {",
   "miniFloatingChatBounds: nextBounds",
+  "patch.miniFloatingChatExpandedBounds = getMiniChatExpandedBoundsFromInputOnly(nextBounds);",
+  "data-chzzk-chat-ui-toggle-mini-floating-chat-input-only=\"on\"",
   "top: Number.isFinite(styledTop) ? styledTop : rect.bottom - height",
   "visualTop: rect.top",
   "visualTop - height * (1 - miniChatResizeState.scaleRatio)",
   "\"--chzzk-chat-ui-toggle-mini-chat-scale\",",
   "scaleControls.dataset.miniChatScaleControls = \"true\";",
+  "modeControls.dataset.miniChatMode = \"true\";",
+  "inputOnlyButton.textContent = \"ㅁ\";",
+  "inputOnlyButton.setAttribute(\"aria-pressed\", String(isInputOnly));",
   "scaleDownButton.dataset.miniChatScaleDelta = String(-MINI_CHAT_SCALE_STEP);",
   "scaleUpButton.dataset.miniChatScaleDelta = String(MINI_CHAT_SCALE_STEP);",
   "*::-webkit-scrollbar",
@@ -521,7 +554,7 @@ const requiredMiniChatContentTokens = [
   'panel.setAttribute("aria-label", "미니 채팅");',
   "controlsBar.addEventListener(\"pointerdown\", handleMiniChatDragStart);",
   "resizeHandle.addEventListener(\"pointerdown\", handleMiniChatResizeStart);",
-  "controlsBar.append(scaleControls, actions);",
+  "controlsBar.append(scaleControls, modeControls, actions);",
   "panel.append(body, controlsBar, resizeHandle);",
   "isExistingPanel ? readMiniChatPanelBounds(panel) : currentOptions.miniFloatingChatBounds",
   "frameUrl.searchParams.set(MINI_CHAT_FRAME_MARKER_PARAM, \"1\");",

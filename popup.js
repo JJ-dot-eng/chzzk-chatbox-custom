@@ -1,8 +1,9 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
-const CONTENT_VERSION = "0.2.19";
+const CONTENT_VERSION = "0.2.20";
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const MINI_CHAT_MIN_WIDTH = 280;
 const MINI_CHAT_MIN_HEIGHT = 320;
+const MINI_CHAT_INPUT_ONLY_HEIGHT = 88;
 const MINI_CHAT_MAX_WIDTH = 720;
 const MINI_CHAT_MAX_HEIGHT = 900;
 const MINI_CHAT_DEFAULT_WIDTH = 360;
@@ -31,12 +32,14 @@ const DEFAULT_OPTIONS = {
   showHeaderSettingsButton: true,
   showMiniFloatingChatButton: true,
   miniFloatingChatCollapsed: false,
+  miniFloatingChatInputOnly: false,
   miniFloatingChatBounds: {
     left: null,
     top: null,
     width: MINI_CHAT_DEFAULT_WIDTH,
     height: MINI_CHAT_DEFAULT_HEIGHT
   },
+  miniFloatingChatExpandedBounds: null,
   miniFloatingChatScale: MINI_CHAT_SCALE_DEFAULT,
   showLargeText: false,
   showBoldText: false,
@@ -204,7 +207,14 @@ function normalizeOptionalCoordinate(value) {
   return Number.isFinite(number) ? number : null;
 }
 
-function normalizeMiniChatBounds(bounds) {
+function getMiniChatMinHeight(inputOnly = false) {
+  return inputOnly ? MINI_CHAT_INPUT_ONLY_HEIGHT : MINI_CHAT_MIN_HEIGHT;
+}
+
+function normalizeMiniChatBounds(bounds, { inputOnly = false } = {}) {
+  const minHeight = getMiniChatMinHeight(inputOnly);
+  const fallbackHeight = inputOnly ? MINI_CHAT_INPUT_ONLY_HEIGHT : MINI_CHAT_DEFAULT_HEIGHT;
+
   return {
     left: normalizeOptionalCoordinate(bounds?.left),
     top: normalizeOptionalCoordinate(bounds?.top),
@@ -216,11 +226,19 @@ function normalizeMiniChatBounds(bounds) {
     ),
     height: clampNumber(
       bounds?.height,
-      MINI_CHAT_MIN_HEIGHT,
+      minHeight,
       MINI_CHAT_MAX_HEIGHT,
-      MINI_CHAT_DEFAULT_HEIGHT
+      fallbackHeight
     )
   };
+}
+
+function normalizeOptionalMiniChatBounds(bounds) {
+  if (!bounds || typeof bounds !== "object") {
+    return null;
+  }
+
+  return normalizeMiniChatBounds(bounds);
 }
 
 function normalizeMiniChatScale(value) {
@@ -242,6 +260,7 @@ function normalizeMiniChatScale(value) {
 
 function normalizeOptions(options) {
   const legacyBoldText = options?.showBoldText === undefined && options?.showLargeText === true;
+  const miniFloatingChatInputOnly = options?.miniFloatingChatInputOnly === true;
 
   return {
     showNicknames: options?.showNicknames !== false,
@@ -255,7 +274,11 @@ function normalizeOptions(options) {
     showHeaderSettingsButton: options?.showHeaderSettingsButton !== false,
     showMiniFloatingChatButton: options?.showMiniFloatingChatButton !== false,
     miniFloatingChatCollapsed: options?.miniFloatingChatCollapsed === true,
-    miniFloatingChatBounds: normalizeMiniChatBounds(options?.miniFloatingChatBounds),
+    miniFloatingChatInputOnly,
+    miniFloatingChatBounds: normalizeMiniChatBounds(options?.miniFloatingChatBounds, {
+      inputOnly: miniFloatingChatInputOnly
+    }),
+    miniFloatingChatExpandedBounds: normalizeOptionalMiniChatBounds(options?.miniFloatingChatExpandedBounds),
     miniFloatingChatScale: normalizeMiniChatScale(options?.miniFloatingChatScale),
     showLargeText: options?.showLargeText === true,
     showBoldText: options?.showBoldText === true || legacyBoldText,
