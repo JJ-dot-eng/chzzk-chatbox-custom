@@ -41,6 +41,7 @@
   const MINI_CHAT_PANEL_HEADER_CLASS = "chzzk-chat-ui-toggle-mini-chat__header";
   const MINI_CHAT_PANEL_COLLAPSE_CLASS = "chzzk-chat-ui-toggle-mini-chat__collapse";
   const MINI_CHAT_PANEL_CLOSE_CLASS = "chzzk-chat-ui-toggle-mini-chat__close";
+  const MINI_CHAT_PANEL_RESIZE_CLASS = "chzzk-chat-ui-toggle-mini-chat__resize";
   const GUEST_CHAT_HOST_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-host";
   const GUEST_CHAT_CONTROL_HOST_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-control-host";
   const GUEST_CHAT_THEME_ATTR = "data-chzzk-chat-ui-toggle-guest-theme";
@@ -224,7 +225,7 @@
   let lastPublishedGuestChatThemeAt = 0;
   let nativeGuestChatThemeRetryTimers = [];
   let miniChatDragState = null;
-  let miniChatResizeObserver = null;
+  let miniChatResizeState = null;
   let miniChatBoundsSaveTimer = 0;
 
   function getRuntime() {
@@ -1473,7 +1474,7 @@
         box-shadow: 0 16px 42px rgba(0, 0, 0, 0.32) !important;
         color: #ffffff !important;
         overflow: hidden !important;
-        resize: both !important;
+        resize: none !important;
         z-index: 2147483647 !important;
       }
 
@@ -1501,6 +1502,10 @@
 
       #${MINI_CHAT_PANEL_ID}[data-dragging="true"] .${MINI_CHAT_PANEL_HEADER_CLASS} {
         cursor: grabbing !important;
+      }
+
+      #${MINI_CHAT_PANEL_ID}[data-resizing="true"] {
+        user-select: none !important;
       }
 
       #${MINI_CHAT_PANEL_TITLE_ID} {
@@ -1560,7 +1565,8 @@
       }
 
       #${MINI_CHAT_PANEL_ID}[data-collapsed="true"] [data-mini-chat-body="true"],
-      #${MINI_CHAT_PANEL_ID}[data-collapsed="true"] [data-mini-chat-status="true"] {
+      #${MINI_CHAT_PANEL_ID}[data-collapsed="true"] [data-mini-chat-status="true"],
+      #${MINI_CHAT_PANEL_ID}[data-collapsed="true"] .${MINI_CHAT_PANEL_RESIZE_CLASS} {
         display: none !important;
       }
 
@@ -1583,6 +1589,39 @@
         color: rgba(255, 255, 255, 0.68) !important;
         font: 500 11px/1.35 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
         letter-spacing: 0 !important;
+      }
+
+      #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_RESIZE_CLASS} {
+        position: absolute !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: 22px !important;
+        height: 22px !important;
+        border: 0 !important;
+        background: transparent !important;
+        cursor: nwse-resize !important;
+        touch-action: none !important;
+        z-index: 2 !important;
+      }
+
+      #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_RESIZE_CLASS}::before,
+      #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_RESIZE_CLASS}::after {
+        content: "" !important;
+        position: absolute !important;
+        right: 6px !important;
+        bottom: 5px !important;
+        width: 10px !important;
+        height: 1.5px !important;
+        border-radius: 999px !important;
+        background: rgba(255, 255, 255, 0.48) !important;
+        transform: rotate(-45deg) !important;
+        transform-origin: right center !important;
+      }
+
+      #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_RESIZE_CLASS}::after {
+        right: 5px !important;
+        bottom: 10px !important;
+        width: 6px !important;
       }
 
       html[data-chzzk-chat-ui-toggle-chat-boxes="on"]
@@ -2063,32 +2102,6 @@
     miniChatBoundsSaveTimer = window.setTimeout(save, 240);
   }
 
-  function disconnectMiniChatResizeObserver() {
-    if (miniChatResizeObserver) {
-      miniChatResizeObserver.disconnect();
-      miniChatResizeObserver = null;
-    }
-  }
-
-  function connectMiniChatResizeObserver(panel) {
-    if (typeof ResizeObserver === "undefined") {
-      return;
-    }
-
-    if (miniChatResizeObserver) {
-      return;
-    }
-
-    miniChatResizeObserver = new ResizeObserver(() => {
-      if (miniChatDragState || currentOptions.miniFloatingChatCollapsed) {
-        return;
-      }
-
-      saveMiniChatPanelBounds(panel);
-    });
-    miniChatResizeObserver.observe(panel);
-  }
-
   function supportsCredentiallessIframe() {
     return typeof HTMLIFrameElement !== "undefined" && "credentialless" in HTMLIFrameElement.prototype;
   }
@@ -2124,7 +2137,7 @@
   function removeMiniFloatingChatPanel() {
     window.clearTimeout(miniChatBoundsSaveTimer);
     miniChatDragState = null;
-    disconnectMiniChatResizeObserver();
+    miniChatResizeState = null;
     document.getElementById(MINI_CHAT_PANEL_ID)?.remove();
   }
 
@@ -2205,6 +2218,81 @@
     event.preventDefault();
   }
 
+  function handleMiniChatResizeStart(event) {
+    if (event.button !== 0) {
+      return;
+    }
+
+    const handle = event.currentTarget;
+    const panel = handle.closest(`#${MINI_CHAT_PANEL_ID}`);
+
+    if (!(panel instanceof HTMLElement)) {
+      return;
+    }
+
+    const rect = panel.getBoundingClientRect();
+    miniChatResizeState = {
+      pointerId: event.pointerId,
+      panel,
+      startX: event.clientX,
+      startY: event.clientY,
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height
+    };
+    panel.dataset.resizing = "true";
+    handle.setPointerCapture(event.pointerId);
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  function handleMiniChatResizeMove(event) {
+    if (!miniChatResizeState || miniChatResizeState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const viewport = getViewportBounds();
+    const maxWidth = Math.max(
+      MINI_CHAT_MIN_WIDTH,
+      viewport.width - miniChatResizeState.left - MINI_CHAT_VIEWPORT_MARGIN
+    );
+    const maxHeight = Math.max(
+      MINI_CHAT_MIN_HEIGHT,
+      viewport.height - miniChatResizeState.top - MINI_CHAT_VIEWPORT_MARGIN
+    );
+    const width = clampNumber(
+      miniChatResizeState.width + event.clientX - miniChatResizeState.startX,
+      MINI_CHAT_MIN_WIDTH,
+      maxWidth,
+      miniChatResizeState.width
+    );
+    const height = clampNumber(
+      miniChatResizeState.height + event.clientY - miniChatResizeState.startY,
+      MINI_CHAT_MIN_HEIGHT,
+      maxHeight,
+      miniChatResizeState.height
+    );
+
+    miniChatResizeState.panel.style.width = `${width}px`;
+    miniChatResizeState.panel.style.height = `${height}px`;
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  function handleMiniChatResizeEnd(event) {
+    if (!miniChatResizeState || miniChatResizeState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const { panel } = miniChatResizeState;
+    miniChatResizeState = null;
+    delete panel.dataset.resizing;
+    saveMiniChatPanelBounds(panel, { immediate: true });
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
   function createMiniFloatingChatPanel() {
     const panel = document.createElement("section");
     const header = document.createElement("div");
@@ -2215,6 +2303,7 @@
     const body = document.createElement("div");
     const iframe = document.createElement("iframe");
     const status = document.createElement("div");
+    const resizeHandle = document.createElement("div");
 
     panel.id = MINI_CHAT_PANEL_ID;
     panel.setAttribute("role", "dialog");
@@ -2267,9 +2356,16 @@
     status.dataset.miniChatStatus = "true";
     status.textContent = "전송은 치지직 원래 채팅창에서 처리됩니다. 로그인이 필요하면 창 안에서 안내됩니다.";
 
+    resizeHandle.className = MINI_CHAT_PANEL_RESIZE_CLASS;
+    resizeHandle.setAttribute("role", "presentation");
+    resizeHandle.addEventListener("pointerdown", handleMiniChatResizeStart);
+    resizeHandle.addEventListener("pointermove", handleMiniChatResizeMove);
+    resizeHandle.addEventListener("pointerup", handleMiniChatResizeEnd);
+    resizeHandle.addEventListener("pointercancel", handleMiniChatResizeEnd);
+
     actions.append(collapseButton, closeButton);
     header.append(title, actions);
-    panel.append(header, body, status);
+    panel.append(header, body, status, resizeHandle);
     setMiniFloatingChatPanelState(panel);
 
     return panel;
@@ -2294,8 +2390,8 @@
       return;
     }
 
-    const panel =
-      existingPanel instanceof HTMLElement ? existingPanel : createMiniFloatingChatPanel();
+    const isExistingPanel = existingPanel instanceof HTMLElement;
+    const panel = isExistingPanel ? existingPanel : createMiniFloatingChatPanel();
     const iframe = panel.querySelector(`#${MINI_CHAT_FRAME_ID}`);
 
     if (iframe instanceof HTMLIFrameElement && iframe.src !== frameUrl) {
@@ -2303,13 +2399,14 @@
     }
 
     setMiniFloatingChatPanelState(panel);
-    applyMiniChatPanelBounds(panel, currentOptions.miniFloatingChatBounds);
+    applyMiniChatPanelBounds(
+      panel,
+      isExistingPanel ? readMiniChatPanelBounds(panel) : currentOptions.miniFloatingChatBounds
+    );
 
     if (panel.parentElement !== document.body) {
       document.body.append(panel);
     }
-
-    connectMiniChatResizeObserver(panel);
   }
 
   function createGuestChatFrameContainer() {

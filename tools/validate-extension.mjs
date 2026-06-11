@@ -466,12 +466,17 @@ const requiredMiniChatContentTokens = [
   'const MINI_CHAT_PANEL_ID = "chzzk-chat-ui-toggle-mini-chat-panel";',
   'const MINI_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-mini-chat-frame";',
   'const MINI_CHAT_BUTTON_ID = "chzzk-chat-ui-toggle-mini-chat-button";',
+  'const MINI_CHAT_PANEL_RESIZE_CLASS = "chzzk-chat-ui-toggle-mini-chat__resize";',
   'const MINI_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleMini";',
   "function getMiniChatFrameUrl()",
   "function createMiniFloatingChatPanel()",
   "function syncMiniFloatingChatPanel()",
   "function createMiniChatToggleButton()",
-  "resize: both !important;",
+  "function handleMiniChatResizeStart(event)",
+  "function handleMiniChatResizeMove(event)",
+  "function handleMiniChatResizeEnd(event)",
+  "resizeHandle.addEventListener(\"pointerdown\", handleMiniChatResizeStart);",
+  "isExistingPanel ? readMiniChatPanelBounds(panel) : currentOptions.miniFloatingChatBounds",
   "frameUrl.searchParams.set(MINI_CHAT_FRAME_MARKER_PARAM, \"1\");",
   "syncMiniFloatingChatPanel();"
 ];
