@@ -203,7 +203,6 @@ const removedIncognitoChatTokens = [
   "ensureIncognitoChatButton",
   "openCurrentIncognitoChat",
   "findHeaderIncognitoChatTarget",
-  "chrome.windows.create(",
   "incognito: true"
 ];
 
@@ -261,6 +260,25 @@ const requiredHeaderPopupBackgroundTokens = [
 for (const token of requiredHeaderPopupBackgroundTokens) {
   if (!backgroundSource.includes(token)) {
     throw new Error(`background script must open the existing extension popup on request: ${token}`);
+  }
+}
+
+const requiredDetachedMiniChatTokens = [
+  'const OPEN_DETACHED_MINI_CHAT_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_DETACHED_MINI_CHAT";',
+  'const DETACHED_MINI_CHAT_BOUNDS_KEY = "chzzkChatUiToggleDetachedMiniChatBounds";',
+  'const MINI_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleMini";',
+  "function openDetachedMiniChat(message, sendResponse)",
+  "function getDetachedMiniChatUrl(channelId, theme)",
+  "function saveDetachedMiniChatWindowBounds(windowInfo)",
+  "chrome.windows.create(",
+  "chrome.windows.onBoundsChanged.addListener",
+  "message?.type === OPEN_DETACHED_MINI_CHAT_MESSAGE",
+  "return openDetachedMiniChat(message, sendResponse);"
+];
+
+for (const token of requiredDetachedMiniChatTokens) {
+  if (!backgroundSource.includes(token) && !contentSource.includes(token)) {
+    throw new Error(`detached mini chat window support is missing: ${token}`);
   }
 }
 
@@ -497,6 +515,7 @@ const requiredMiniChatContentTokens = [
   'const MINI_CHAT_PANEL_SCALE_CLASS = "chzzk-chat-ui-toggle-mini-chat__scale";',
   'const MINI_CHAT_PANEL_MODE_CLASS = "chzzk-chat-ui-toggle-mini-chat__mode";',
   'const MINI_CHAT_PANEL_INPUT_ONLY_CLASS = "chzzk-chat-ui-toggle-mini-chat__input-only";',
+  'const MINI_CHAT_PANEL_DETACH_CLASS = "chzzk-chat-ui-toggle-mini-chat__detach";',
   'const MINI_CHAT_PANEL_RESIZE_CLASS = "chzzk-chat-ui-toggle-mini-chat__resize";',
   'const MINI_CHAT_HIDDEN_CONTROL_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-hidden-control";',
   'const MINI_CHAT_COMPACT_INPUT_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-compact-input";',
@@ -521,6 +540,8 @@ const requiredMiniChatContentTokens = [
   "function getMiniChatLayoutTopForVisualTop(visualTop, height, scale = currentOptions.miniFloatingChatScale)",
   "function toggleMiniChatInputOnly()",
   "function updateMiniChatScale(delta)",
+  "function openDetachedMiniChatWindow(button = null)",
+  "function sendOpenDetachedMiniChatMessage(payload)",
   "function annotateMiniChatHiddenControls()",
   "function markMiniChatInputOnlyLayout()",
   "function findMiniChatInputOnlyContainer(root = document)",
@@ -547,6 +568,8 @@ const requiredMiniChatContentTokens = [
   "\"--chzzk-chat-ui-toggle-mini-chat-scale\",",
   "scaleControls.dataset.miniChatScaleControls = \"true\";",
   "modeControls.dataset.miniChatMode = \"true\";",
+  "detachButton.textContent = \"↗\";",
+  "actions.append(detachButton, collapseButton, closeButton);",
   "inputOnlyButton.textContent = \"ㅁ\";",
   "inputOnlyButton.setAttribute(\"aria-pressed\", String(isInputOnly));",
   "scaleDownButton.dataset.miniChatScaleDelta = String(-MINI_CHAT_SCALE_STEP);",
