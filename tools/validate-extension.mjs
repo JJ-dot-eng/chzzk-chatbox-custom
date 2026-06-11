@@ -573,6 +573,23 @@ for (const token of requiredMiniChatContentTokens) {
   }
 }
 
+const miniChatInputOnlyKeepRuleMatch = contentSource.match(
+  /\[\$\{MINI_CHAT_INPUT_ONLY_KEEP_ATTR\}="true"\]\s*\{([\s\S]*?)\n\s*\}/
+);
+if (!miniChatInputOnlyKeepRuleMatch) {
+  throw new Error("content script must preserve the mini floating chat input-only keep rule.");
+}
+const miniChatInputOnlyKeepRule = miniChatInputOnlyKeepRuleMatch[1];
+for (const forbiddenKeepToken of [
+  "background: transparent !important;",
+  "border-color: transparent !important;",
+  "box-shadow: none !important;"
+]) {
+  if (miniChatInputOnlyKeepRule.includes(forbiddenKeepToken)) {
+    throw new Error("input-only mode must keep the original chat input box styling.");
+  }
+}
+
 if (contentSource.includes("전송은 치지직 원래 채팅창에서 처리됩니다")) {
   throw new Error("mini floating chat must not render the explanatory footer text.");
 }

@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.24";
+  const SCRIPT_VERSION = "0.2.25";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -1329,10 +1329,6 @@
         flex: 0 0 auto !important;
         width: 100% !important;
         margin-top: auto !important;
-        background: transparent !important;
-        border-color: transparent !important;
-        box-shadow: none !important;
-        outline: 0 !important;
       }
 
       .chzzk-chat-ui-toggle-guest-chat-toggle {
