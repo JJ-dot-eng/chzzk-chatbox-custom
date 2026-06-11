@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.25";
+  const SCRIPT_VERSION = "0.2.26";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -63,6 +63,8 @@
   const MINI_CHAT_MIN_WIDTH = 280;
   const MINI_CHAT_MIN_HEIGHT = 28;
   const MINI_CHAT_INPUT_ONLY_HEIGHT = 116;
+  const MINI_CHAT_INPUT_ONLY_BOX_HEIGHT = 52;
+  const MINI_CHAT_INPUT_ONLY_FIELD_HEIGHT = 24;
   const MINI_CHAT_MAX_WIDTH = 720;
   const MINI_CHAT_MAX_HEIGHT = 900;
   const MINI_CHAT_DEFAULT_WIDTH = 360;
@@ -1326,9 +1328,69 @@
 
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"][data-chzzk-chat-ui-toggle-mini-floating-chat-input-only="on"]
         [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"] {
-        flex: 0 0 auto !important;
-        width: 100% !important;
-        margin-top: auto !important;
+        flex: 0 0 ${MINI_CHAT_INPUT_ONLY_BOX_HEIGHT}px !important;
+        align-self: center !important;
+        width: calc(100% - 20px) !important;
+        max-width: calc(100% - 20px) !important;
+        height: ${MINI_CHAT_INPUT_ONLY_BOX_HEIGHT}px !important;
+        min-height: ${MINI_CHAT_INPUT_ONLY_BOX_HEIGHT}px !important;
+        max-height: ${MINI_CHAT_INPUT_ONLY_BOX_HEIGHT}px !important;
+        margin: auto 10px 8px !important;
+        padding: 0 !important;
+        border-radius: 10px !important;
+        background: rgba(226, 227, 232, 0.98) !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"][data-chzzk-chat-ui-toggle-mini-floating-chat-input-only="on"]
+          [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"] {
+          background: rgba(47, 51, 58, 0.98) !important;
+        }
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"][data-chzzk-chat-ui-toggle-mini-floating-chat-input-only="on"]
+        [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"][data-chzzk-chat-ui-toggle-mini-floating-chat-input-only="on"]
+        [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"]:focus-within {
+        background: rgba(47, 51, 58, 0.98) !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"][data-chzzk-chat-ui-toggle-mini-floating-chat-input-only="on"]
+        [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"][data-chzzk-chat-ui-toggle-mini-floating-chat-input-only="on"]
+        [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"]:focus-within {
+        background: rgba(226, 227, 232, 0.98) !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"][data-chzzk-chat-ui-toggle-mini-floating-chat-input-only="on"]
+        [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"] [class*="live_chatting_input" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"][data-chzzk-chat-ui-toggle-mini-floating-chat-input-only="on"]
+        [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"] [class*="chatting_input" i] {
+        min-height: 0 !important;
+        max-height: 100% !important;
+        background: transparent !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"][data-chzzk-chat-ui-toggle-mini-floating-chat-input-only="on"]
+        [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"] textarea,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"][data-chzzk-chat-ui-toggle-mini-floating-chat-input-only="on"]
+        [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"] input:not([type="button"]):not([type="submit"]):not([type="reset"]),
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"][data-chzzk-chat-ui-toggle-mini-floating-chat-input-only="on"]
+        [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"] [contenteditable="true"],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"][data-chzzk-chat-ui-toggle-mini-floating-chat-input-only="on"]
+        [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"] [role="textbox"] {
+        height: ${MINI_CHAT_INPUT_ONLY_FIELD_HEIGHT}px !important;
+        min-height: ${MINI_CHAT_INPUT_ONLY_FIELD_HEIGHT}px !important;
+        max-height: ${MINI_CHAT_INPUT_ONLY_FIELD_HEIGHT}px !important;
+        line-height: ${MINI_CHAT_INPUT_ONLY_FIELD_HEIGHT}px !important;
+        background: transparent !important;
+        overflow: hidden !important;
+        resize: none !important;
+        box-sizing: border-box !important;
       }
 
       .chzzk-chat-ui-toggle-guest-chat-toggle {

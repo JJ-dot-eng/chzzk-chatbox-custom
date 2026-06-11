@@ -506,6 +506,8 @@ const requiredMiniChatContentTokens = [
   'const MINI_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleMini";',
   "const MINI_CHAT_MIN_HEIGHT = 28;",
   "const MINI_CHAT_INPUT_ONLY_HEIGHT = 116;",
+  "const MINI_CHAT_INPUT_ONLY_BOX_HEIGHT = 52;",
+  "const MINI_CHAT_INPUT_ONLY_FIELD_HEIGHT = 24;",
   "const MINI_CHAT_SCALE_MIN = 50;",
   "const MINI_CHAT_SCALE_MAX = 150;",
   "const MINI_CHAT_SCALE_STEP = 10;",
@@ -551,6 +553,10 @@ const requiredMiniChatContentTokens = [
   "*::-webkit-scrollbar",
   "scrollbar-width: none !important;",
   "background: transparent !important;",
+  "[${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}=\"true\"]:focus-within",
+  "[${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}=\"true\"] textarea",
+  "height: ${MINI_CHAT_INPUT_ONLY_FIELD_HEIGHT}px !important;",
+  "resize: none !important;",
   "getCompactText(control).includes(\"후원하기\")",
   "getCompactText(control) === \"채팅\"",
   "annotateMiniChatHiddenControls();",
@@ -580,6 +586,15 @@ if (!miniChatInputOnlyKeepRuleMatch) {
   throw new Error("content script must preserve the mini floating chat input-only keep rule.");
 }
 const miniChatInputOnlyKeepRule = miniChatInputOnlyKeepRuleMatch[1];
+for (const requiredKeepToken of [
+  "height: ${MINI_CHAT_INPUT_ONLY_BOX_HEIGHT}px !important;",
+  "background: rgba(226, 227, 232, 0.98) !important;",
+  "overflow: hidden !important;"
+]) {
+  if (!miniChatInputOnlyKeepRule.includes(requiredKeepToken)) {
+    throw new Error("input-only mode must pin the chat input box size and background.");
+  }
+}
 for (const forbiddenKeepToken of [
   "background: transparent !important;",
   "border-color: transparent !important;",
