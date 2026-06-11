@@ -1194,8 +1194,7 @@
         display: none !important;
       }
 
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"],
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"] body {
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"] {
         width: 100% !important;
         height: 100% !important;
         min-width: 0 !important;
@@ -1203,7 +1202,29 @@
         overflow: hidden !important;
         scrollbar-width: none !important;
         -ms-overflow-style: none !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"] body {
+        width: var(--chzzk-chat-ui-toggle-mini-chat-scale-size, 100%) !important;
+        height: var(--chzzk-chat-ui-toggle-mini-chat-scale-size, 100%) !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        max-height: none !important;
+        margin: 0 !important;
+        background: transparent !important;
+        overflow: hidden !important;
+        transform-origin: left top !important;
         zoom: var(--chzzk-chat-ui-toggle-mini-chat-scale, 1) !important;
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"] body > div {
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow: hidden !important;
       }
 
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"] *,
@@ -1232,7 +1253,7 @@
         [class*="chatting_area" i],
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"]
         [class*="chat_area" i] {
-        max-height: 100vh !important;
+        max-height: none !important;
       }
 
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"]
@@ -1894,6 +1915,10 @@
     document.documentElement.style.setProperty(
       "--chzzk-chat-ui-toggle-mini-chat-scale",
       String(currentOptions.miniFloatingChatScale / 100)
+    );
+    document.documentElement.style.setProperty(
+      "--chzzk-chat-ui-toggle-mini-chat-scale-size",
+      `${10000 / currentOptions.miniFloatingChatScale}%`
     );
 
     for (const [optionKey, datasetKey] of Object.entries(DATASET_KEYS)) {
