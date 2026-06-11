@@ -460,6 +460,10 @@ if (!backgroundSource.includes("useMiniFloatingChat: options?.useMiniFloatingCha
   throw new Error("background script must normalize the mini floating chat option.");
 }
 
+if (!backgroundSource.includes("miniFloatingChatFullscreenOnly: options?.miniFloatingChatFullscreenOnly === true")) {
+  throw new Error("background script must normalize the mini floating chat fullscreen-only option.");
+}
+
 if (!backgroundSource.includes("showMiniFloatingChatButton: options?.showMiniFloatingChatButton !== false")) {
   throw new Error("background script must normalize the mini floating chat button visibility option.");
 }
@@ -492,6 +496,10 @@ if (!popupSource.includes("miniFloatingChatScale: normalizeMiniChatScale(options
   throw new Error("popup script must preserve the mini floating chat scale option.");
 }
 
+if (!popupSource.includes("miniFloatingChatFullscreenOnly: options?.miniFloatingChatFullscreenOnly === true")) {
+  throw new Error("popup script must preserve the mini floating chat fullscreen-only option.");
+}
+
 if (!contentSource.includes("showDonationRanking: true")) {
   throw new Error("content script must default the donation ranking visibility option on.");
 }
@@ -510,6 +518,7 @@ if (!contentSource.includes('[class*="live_chatting_ranking_container" i]')) {
 
 const requiredMiniChatContentTokens = [
   "useMiniFloatingChat: false",
+  "miniFloatingChatFullscreenOnly: false",
   "showMiniFloatingChatButton: true",
   "miniFloatingChatInputOnly: false",
   "miniFloatingChatBounds: normalizeMiniChatBounds(options?.miniFloatingChatBounds, {",
@@ -552,6 +561,8 @@ const requiredMiniChatContentTokens = [
   "function getMiniChatPanelHost()",
   "function moveMiniChatPanelToHost(panel, host)",
   "function handleMiniChatFullscreenChange()",
+  "function shouldRenderMiniFloatingChatPanel()",
+  "currentOptions.miniFloatingChatFullscreenOnly",
   "function annotateMiniChatHiddenControls()",
   "function markMiniChatInputOnlyLayout()",
   "function findMiniChatInputOnlyContainer(root = document)",
@@ -757,6 +768,14 @@ if (!popupMarkup.includes('id="useMiniFloatingChat"')) {
 
 if (!popupSource.includes('"useMiniFloatingChat"')) {
   throw new Error("popup script must store and apply the mini floating chat option.");
+}
+
+if (!popupMarkup.includes('id="miniFloatingChatFullscreenOnly"')) {
+  throw new Error("popup must include a mini floating chat fullscreen-only toggle.");
+}
+
+if (!popupSource.includes('"miniFloatingChatFullscreenOnly"')) {
+  throw new Error("popup script must store and apply the mini floating chat fullscreen-only option.");
 }
 
 if (!popupMarkup.includes('id="showMiniFloatingChatButton"')) {

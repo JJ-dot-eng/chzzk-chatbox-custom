@@ -1,5 +1,5 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
-const CONTENT_VERSION = "0.2.37";
+const CONTENT_VERSION = "0.2.38";
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const MINI_CHAT_MIN_WIDTH = 280;
 const MINI_CHAT_MIN_HEIGHT = 28;
@@ -28,6 +28,7 @@ const DEFAULT_OPTIONS = {
   showChatBoxes: true,
   useGuestChatFrame: false,
   useMiniFloatingChat: false,
+  miniFloatingChatFullscreenOnly: false,
   showGuestChatToggleButton: true,
   showHeaderSettingsButton: true,
   showMiniFloatingChatButton: true,
@@ -54,6 +55,7 @@ const controlIds = [
   "showChatBoxes",
   "useGuestChatFrame",
   "useMiniFloatingChat",
+  "miniFloatingChatFullscreenOnly",
   "showGuestChatToggleButton",
   "showHeaderSettingsButton",
   "showMiniFloatingChatButton",
@@ -270,6 +272,7 @@ function normalizeOptions(options) {
     showChatBoxes: options?.showChatBoxes !== false,
     useGuestChatFrame: options?.useGuestChatFrame === true,
     useMiniFloatingChat: options?.useMiniFloatingChat === true,
+    miniFloatingChatFullscreenOnly: options?.miniFloatingChatFullscreenOnly === true,
     showGuestChatToggleButton: options?.showGuestChatToggleButton !== false,
     showHeaderSettingsButton: options?.showHeaderSettingsButton !== false,
     showMiniFloatingChatButton: options?.showMiniFloatingChatButton !== false,
@@ -329,7 +332,21 @@ function setControls(options) {
     controls[id].checked = normalized[id];
   }
 
+  syncDependentControls(normalized);
   updateColorUi(normalized.chatBoxColor);
+}
+
+function syncDependentControls(options = currentOptions) {
+  const fullscreenOnlyControl = controls.miniFloatingChatFullscreenOnly;
+  const fullscreenOnlyRow = fullscreenOnlyControl?.closest(".toggle-row");
+  const isMiniChatEnabled = options.useMiniFloatingChat === true;
+
+  if (!fullscreenOnlyControl) {
+    return;
+  }
+
+  fullscreenOnlyControl.disabled = !isMiniChatEnabled;
+  fullscreenOnlyRow?.classList.toggle("is-disabled", !isMiniChatEnabled);
 }
 
 function readControls() {
@@ -342,6 +359,7 @@ function readControls() {
     showChatBoxes: controls.showChatBoxes.checked,
     useGuestChatFrame: controls.useGuestChatFrame.checked,
     useMiniFloatingChat: controls.useMiniFloatingChat.checked,
+    miniFloatingChatFullscreenOnly: controls.miniFloatingChatFullscreenOnly.checked,
     showGuestChatToggleButton: controls.showGuestChatToggleButton.checked,
     showHeaderSettingsButton: controls.showHeaderSettingsButton.checked,
     showMiniFloatingChatButton: controls.showMiniFloatingChatButton.checked,
@@ -510,6 +528,7 @@ function scheduleColorApply() {
 }
 
 async function handleControlChange() {
+  syncDependentControls(readControls());
   await applyCurrentOptions();
 }
 

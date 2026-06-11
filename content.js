@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.37";
+  const SCRIPT_VERSION = "0.2.38";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -95,6 +95,7 @@
     showChatBoxes: true,
     useGuestChatFrame: false,
     useMiniFloatingChat: false,
+    miniFloatingChatFullscreenOnly: false,
     showGuestChatToggleButton: true,
     showHeaderSettingsButton: true,
     showMiniFloatingChatButton: true,
@@ -121,6 +122,7 @@
     showChatBoxes: "chzzkChatUiToggleChatBoxes",
     useGuestChatFrame: "chzzkChatUiToggleGuestChatFrame",
     useMiniFloatingChat: "chzzkChatUiToggleMiniFloatingChat",
+    miniFloatingChatFullscreenOnly: "chzzkChatUiToggleMiniFloatingChatFullscreenOnly",
     showGuestChatToggleButton: "chzzkChatUiToggleGuestChatToggleButton",
     showHeaderSettingsButton: "chzzkChatUiToggleHeaderSettingsButton",
     showMiniFloatingChatButton: "chzzkChatUiToggleMiniFloatingChatButton",
@@ -383,6 +385,7 @@
       showChatBoxes: options?.showChatBoxes !== false,
       useGuestChatFrame: options?.useGuestChatFrame === true,
       useMiniFloatingChat: options?.useMiniFloatingChat === true,
+      miniFloatingChatFullscreenOnly: options?.miniFloatingChatFullscreenOnly === true,
       showGuestChatToggleButton: options?.showGuestChatToggleButton !== false,
       showHeaderSettingsButton: options?.showHeaderSettingsButton !== false,
       showMiniFloatingChatButton: options?.showMiniFloatingChatButton !== false,
@@ -2923,10 +2926,22 @@
     scheduleGuestChatUiSync();
   }
 
+  function shouldRenderMiniFloatingChatPanel() {
+    if (!currentOptions.useMiniFloatingChat || !isMiniFloatingChatEligibleContext()) {
+      return false;
+    }
+
+    if (!currentOptions.miniFloatingChatFullscreenOnly) {
+      return true;
+    }
+
+    return canHostMiniChatFullscreenPanel(document.fullscreenElement);
+  }
+
   function syncMiniFloatingChatPanel() {
     const existingPanel = document.getElementById(MINI_CHAT_PANEL_ID);
 
-    if (!currentOptions.useMiniFloatingChat || !isMiniFloatingChatEligibleContext()) {
+    if (!shouldRenderMiniFloatingChatPanel()) {
       removeMiniFloatingChatPanel();
       return;
     }
