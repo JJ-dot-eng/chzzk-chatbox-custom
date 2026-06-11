@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.27";
+  const SCRIPT_VERSION = "0.2.28";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -1337,7 +1337,7 @@
         height: ${MINI_CHAT_INPUT_ONLY_BOX_HEIGHT}px !important;
         min-height: ${MINI_CHAT_INPUT_ONLY_BOX_HEIGHT}px !important;
         max-height: ${MINI_CHAT_INPUT_ONLY_BOX_HEIGHT}px !important;
-        margin: auto 10px 8px !important;
+        margin: auto 10px 0 !important;
         padding: 0 !important;
         border-radius: 10px !important;
         background: rgba(226, 227, 232, 0.98) !important;
@@ -1819,6 +1819,14 @@
       #${MINI_CHAT_PANEL_ID}[data-input-only="true"] .${MINI_CHAT_PANEL_INPUT_ONLY_CLASS} {
         background: rgba(0, 196, 113, 0.22) !important;
         color: #ffffff !important;
+      }
+
+      #${MINI_CHAT_PANEL_ID}[data-input-only="true"] .${MINI_CHAT_PANEL_CONTROLS_CLASS} {
+        align-self: center !important;
+        width: calc(100% - 20px) !important;
+        max-width: calc(100% - 20px) !important;
+        margin: 0 10px !important;
+        border-radius: 0 0 6px 6px !important;
       }
 
       #${MINI_CHAT_PANEL_ID} [data-mini-chat-body="true"] {
