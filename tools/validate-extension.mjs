@@ -467,11 +467,16 @@ const requiredMiniChatContentTokens = [
   'const MINI_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-mini-chat-frame";',
   'const MINI_CHAT_BUTTON_ID = "chzzk-chat-ui-toggle-mini-chat-button";',
   'const MINI_CHAT_PANEL_RESIZE_CLASS = "chzzk-chat-ui-toggle-mini-chat__resize";',
+  'const MINI_CHAT_HIDDEN_CONTROL_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-hidden-control";',
   'const MINI_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleMini";',
   "function getMiniChatFrameUrl()",
   "function createMiniFloatingChatPanel()",
   "function syncMiniFloatingChatPanel()",
   "function createMiniChatToggleButton()",
+  "function annotateMiniChatHiddenControls()",
+  "getCompactText(control).includes(\"후원하기\")",
+  "getCompactText(control) === \"채팅\"",
+  "annotateMiniChatHiddenControls();",
   "function handleMiniChatResizeStart(event)",
   "function handleMiniChatResizeMove(event)",
   "function handleMiniChatResizeEnd(event)",
@@ -485,6 +490,10 @@ for (const token of requiredMiniChatContentTokens) {
   if (!contentSource.includes(token)) {
     throw new Error(`content script must implement mini floating chat: ${token}`);
   }
+}
+
+if (contentSource.includes("전송은 치지직 원래 채팅창에서 처리됩니다")) {
+  throw new Error("mini floating chat must not render the explanatory footer text.");
 }
 
 const guestChatToggleVisibilityStart = contentSource.indexOf("function ensureGuestChatToggleButton()");

@@ -47,6 +47,7 @@
   const GUEST_CHAT_THEME_ATTR = "data-chzzk-chat-ui-toggle-guest-theme";
   const GUEST_CHAT_EMBED_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-embed";
   const MINI_CHAT_EMBED_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-embed";
+  const MINI_CHAT_HIDDEN_CONTROL_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-hidden-control";
   const GUEST_CHAT_CLEANBOT_DEFAULT_ATTR = "data-chzzk-chat-ui-toggle-guest-cleanbot-default";
   const LIVE_CHAT_FRAME_ATTR = "data-chzzk-chat-ui-toggle-live-chat-frame";
   const GUEST_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleGuest";
@@ -1184,6 +1185,11 @@
         max-height: 100vh !important;
       }
 
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"]
+        [${MINI_CHAT_HIDDEN_CONTROL_ATTR}="true"] {
+        display: none !important;
+      }
+
       .chzzk-chat-ui-toggle-guest-chat-toggle {
         position: relative !important;
         display: inline-flex !important;
@@ -1565,7 +1571,6 @@
       }
 
       #${MINI_CHAT_PANEL_ID}[data-collapsed="true"] [data-mini-chat-body="true"],
-      #${MINI_CHAT_PANEL_ID}[data-collapsed="true"] [data-mini-chat-status="true"],
       #${MINI_CHAT_PANEL_ID}[data-collapsed="true"] .${MINI_CHAT_PANEL_RESIZE_CLASS} {
         display: none !important;
       }
@@ -1579,16 +1584,6 @@
         min-height: 0 !important;
         border: 0 !important;
         background: #ffffff !important;
-      }
-
-      #${MINI_CHAT_PANEL_ID} [data-mini-chat-status="true"] {
-        flex: 0 0 auto !important;
-        padding: 6px 10px !important;
-        border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
-        background: rgba(17, 24, 32, 0.96) !important;
-        color: rgba(255, 255, 255, 0.68) !important;
-        font: 500 11px/1.35 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
-        letter-spacing: 0 !important;
       }
 
       #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_RESIZE_CLASS} {
@@ -2302,7 +2297,6 @@
     const closeButton = document.createElement("button");
     const body = document.createElement("div");
     const iframe = document.createElement("iframe");
-    const status = document.createElement("div");
     const resizeHandle = document.createElement("div");
 
     panel.id = MINI_CHAT_PANEL_ID;
@@ -2353,9 +2347,6 @@
     iframe.referrerPolicy = "origin";
     body.append(iframe);
 
-    status.dataset.miniChatStatus = "true";
-    status.textContent = "전송은 치지직 원래 채팅창에서 처리됩니다. 로그인이 필요하면 창 안에서 안내됩니다.";
-
     resizeHandle.className = MINI_CHAT_PANEL_RESIZE_CLASS;
     resizeHandle.setAttribute("role", "presentation");
     resizeHandle.addEventListener("pointerdown", handleMiniChatResizeStart);
@@ -2365,7 +2356,7 @@
 
     actions.append(collapseButton, closeButton);
     header.append(title, actions);
-    panel.append(header, body, status, resizeHandle);
+    panel.append(header, body, resizeHandle);
     setMiniFloatingChatPanelState(panel);
 
     return panel;
@@ -3006,6 +2997,7 @@
   function removeAnnotations(element) {
     element.removeAttribute(ROLE_ATTR);
     element.removeAttribute(MESSAGE_PREFIX_ATTR);
+    element.removeAttribute(MINI_CHAT_HIDDEN_CONTROL_ATTR);
 
     if (element.getAttribute(CHAT_ROW_ATTR) === "true") {
       element.removeAttribute(CHAT_ROW_ATTR);
@@ -3013,6 +3005,78 @@
 
     if (element.hasAttribute(GENERATED_TIMESTAMP_ATTR)) {
       element.remove();
+    }
+  }
+
+  function getCompactText(element) {
+    return (element.textContent || "").replace(/\s+/g, " ").trim();
+  }
+
+  function getMiniChatActionControls(root = document) {
+    return queryAllSafe(root, [
+      "button",
+      "[role='button']",
+      "a[href]"
+    ]).filter((element) => element instanceof HTMLElement);
+  }
+
+  function markMiniChatHiddenControl(element) {
+    if (element instanceof HTMLElement) {
+      element.setAttribute(MINI_CHAT_HIDDEN_CONTROL_ATTR, "true");
+    }
+  }
+
+  function findMiniChatActionControlRow(control) {
+    for (
+      let current = control.parentElement, depth = 0;
+      current && current !== document.body && depth < 6;
+      current = current.parentElement, depth += 1
+    ) {
+      const controls = getMiniChatActionControls(current);
+      const text = getCompactText(current);
+
+      if (
+        controls.length >= 3 &&
+        text.includes("후원하기") &&
+        !text.includes("채팅을 입력")
+      ) {
+        return current;
+      }
+    }
+
+    return null;
+  }
+
+  function annotateMiniChatHiddenControls() {
+    if (!isMiniChatFrameEmbedUrl(window.location.href)) {
+      return;
+    }
+
+    for (const element of document.querySelectorAll(`[${MINI_CHAT_HIDDEN_CONTROL_ATTR}]`)) {
+      element.removeAttribute(MINI_CHAT_HIDDEN_CONTROL_ATTR);
+    }
+
+    const controls = getMiniChatActionControls();
+    const donationControls = controls.filter((control) => getCompactText(control).includes("후원하기"));
+
+    for (const control of donationControls) {
+      const actionRow = findMiniChatActionControlRow(control);
+
+      if (actionRow) {
+        markMiniChatHiddenControl(actionRow);
+
+        for (const rowControl of getMiniChatActionControls(actionRow)) {
+          markMiniChatHiddenControl(rowControl);
+        }
+      } else {
+        markMiniChatHiddenControl(control);
+      }
+    }
+
+    for (const control of controls) {
+      if (getCompactText(control) === "채팅") {
+        markMiniChatHiddenControl(control);
+      }
     }
   }
 
@@ -3366,6 +3430,8 @@
     for (const row of uniqueRows.filter(hasChatLikeText)) {
       annotateChatRow(row);
     }
+
+    annotateMiniChatHiddenControls();
   }
 
   function scan() {
@@ -3383,6 +3449,7 @@
         scanRows(getChatRows(root));
       }
 
+      annotateMiniChatHiddenControls();
       syncGuestChatUi();
     } finally {
       isScanning = false;
