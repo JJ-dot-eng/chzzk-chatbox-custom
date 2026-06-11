@@ -2,15 +2,11 @@ const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
 const SET_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_OPTIONS";
 const OPEN_POPUP_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_POPUP";
-const OPEN_DETACHED_MINI_CHAT_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_DETACHED_MINI_CHAT";
 const READ_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_GUEST_CHAT_THEME";
 const SET_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_GUEST_CHAT_THEME";
 const APPLY_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_APPLY_GUEST_CHAT_THEME";
 const CONTENT_SCRIPT_FILE = "content.js";
-const CHZZK_ORIGIN = "https://chzzk.naver.com";
 const CHZZK_HOST_SUFFIX = ".chzzk.naver.com";
-const DETACHED_MINI_CHAT_BOUNDS_KEY = "chzzkChatUiToggleDetachedMiniChatBounds";
-const MINI_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleMini";
 const INJECTION_DELAYS_MS = [0, 250, 1000, 2500, 5000];
 const LIVE_CHANNEL_ID_PATTERN = /^[0-9a-f]{32}$/i;
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
@@ -21,12 +17,6 @@ const MINI_CHAT_MAX_WIDTH = 720;
 const MINI_CHAT_MAX_HEIGHT = 900;
 const MINI_CHAT_DEFAULT_WIDTH = 360;
 const MINI_CHAT_DEFAULT_HEIGHT = 520;
-const DETACHED_MINI_CHAT_MIN_WIDTH = 280;
-const DETACHED_MINI_CHAT_MIN_HEIGHT = 140;
-const DETACHED_MINI_CHAT_DEFAULT_WIDTH = 380;
-const DETACHED_MINI_CHAT_DEFAULT_HEIGHT = 560;
-const DETACHED_MINI_CHAT_MAX_WIDTH = 900;
-const DETACHED_MINI_CHAT_MAX_HEIGHT = 1000;
 const MINI_CHAT_SCALE_MIN = 50;
 const MINI_CHAT_SCALE_MAX = 150;
 const MINI_CHAT_SCALE_STEP = 10;
@@ -66,7 +56,6 @@ const DEFAULT_OPTIONS = {
 };
 
 const guestChatThemesByTab = new Map();
-let detachedMiniChatWindowId = null;
 
 function normalizeHexColor(value) {
   if (typeof value !== "string") {
@@ -195,166 +184,6 @@ function normalizeChannelId(value) {
   return typeof value === "string" && LIVE_CHANNEL_ID_PATTERN.test(value)
     ? value.toLowerCase()
     : null;
-}
-
-function normalizeDetachedMiniChatBounds(bounds) {
-  return {
-    left: Number.isFinite(Number(bounds?.left)) ? Math.round(Number(bounds.left)) : null,
-    top: Number.isFinite(Number(bounds?.top)) ? Math.round(Number(bounds.top)) : null,
-    width: Math.round(clampNumber(
-      bounds?.width,
-      DETACHED_MINI_CHAT_MIN_WIDTH,
-      DETACHED_MINI_CHAT_MAX_WIDTH,
-      DETACHED_MINI_CHAT_DEFAULT_WIDTH
-    )),
-    height: Math.round(clampNumber(
-      bounds?.height,
-      DETACHED_MINI_CHAT_MIN_HEIGHT,
-      DETACHED_MINI_CHAT_MAX_HEIGHT,
-      DETACHED_MINI_CHAT_DEFAULT_HEIGHT
-    ))
-  };
-}
-
-function getDetachedMiniChatUrl(channelId, theme) {
-  const chatUrl = new URL(`${CHZZK_ORIGIN}/live/${channelId}/chat`);
-  const normalizedTheme = normalizeGuestChatTheme(theme);
-
-  chatUrl.searchParams.set(MINI_CHAT_FRAME_MARKER_PARAM, "1");
-
-  if (normalizedTheme) {
-    chatUrl.searchParams.set("theme", normalizedTheme);
-  }
-
-  return chatUrl.toString();
-}
-
-function getDetachedMiniChatWindowCreateData(url, bounds) {
-  const normalizedBounds = normalizeDetachedMiniChatBounds(bounds);
-  const createData = {
-    url,
-    type: "popup",
-    focused: true,
-    width: normalizedBounds.width,
-    height: normalizedBounds.height
-  };
-
-  if (normalizedBounds.left !== null) {
-    createData.left = normalizedBounds.left;
-  }
-
-  if (normalizedBounds.top !== null) {
-    createData.top = normalizedBounds.top;
-  }
-
-  return createData;
-}
-
-function saveDetachedMiniChatWindowBounds(windowInfo) {
-  if (!windowInfo || windowInfo.id !== detachedMiniChatWindowId) {
-    return;
-  }
-
-  chrome.storage.local.set({
-    [DETACHED_MINI_CHAT_BOUNDS_KEY]: normalizeDetachedMiniChatBounds(windowInfo)
-  });
-}
-
-function openNewDetachedMiniChatWindow(url, bounds, sendResponse) {
-  chrome.windows.create(getDetachedMiniChatWindowCreateData(url, bounds), (createdWindow) => {
-    const error = chrome.runtime.lastError;
-
-    if (error || !createdWindow?.id) {
-      sendResponse({ ok: false, error: error?.message || "detached-window-create-failed" });
-      return;
-    }
-
-    detachedMiniChatWindowId = createdWindow.id;
-    saveDetachedMiniChatWindowBounds(createdWindow);
-    sendResponse({ ok: true, windowId: createdWindow.id });
-  });
-}
-
-function updateDetachedMiniChatWindow(windowInfo, url, bounds, sendResponse) {
-  const normalizedBounds = normalizeDetachedMiniChatBounds(bounds);
-  const updateInfo = {
-    focused: true,
-    width: normalizedBounds.width,
-    height: normalizedBounds.height
-  };
-
-  if (normalizedBounds.left !== null) {
-    updateInfo.left = normalizedBounds.left;
-  }
-
-  if (normalizedBounds.top !== null) {
-    updateInfo.top = normalizedBounds.top;
-  }
-
-  const tabId = windowInfo.tabs?.[0]?.id;
-
-  const focusWindow = () => {
-    chrome.windows.update(windowInfo.id, updateInfo, (updatedWindow) => {
-      const error = chrome.runtime.lastError;
-
-      if (error) {
-        sendResponse({ ok: false, error: error.message || "detached-window-update-failed" });
-        return;
-      }
-
-      detachedMiniChatWindowId = windowInfo.id;
-      saveDetachedMiniChatWindowBounds(updatedWindow || { id: windowInfo.id, ...normalizedBounds });
-      sendResponse({ ok: true, windowId: windowInfo.id });
-    });
-  };
-
-  if (Number.isInteger(tabId)) {
-    chrome.tabs.update(tabId, { url }, () => {
-      void chrome.runtime.lastError;
-      focusWindow();
-    });
-    return;
-  }
-
-  focusWindow();
-}
-
-function openDetachedMiniChat(message, sendResponse) {
-  const channelId = normalizeChannelId(message?.channelId);
-
-  if (!channelId) {
-    sendResponse({ ok: false, error: "invalid-detached-mini-chat-channel" });
-    return false;
-  }
-
-  const url = getDetachedMiniChatUrl(channelId, message?.theme);
-  const requestedBounds = normalizeDetachedMiniChatBounds(message?.bounds);
-
-  chrome.storage.local.get(DETACHED_MINI_CHAT_BOUNDS_KEY, (result) => {
-    const storedBounds = normalizeDetachedMiniChatBounds(result?.[DETACHED_MINI_CHAT_BOUNDS_KEY]);
-    const bounds = normalizeDetachedMiniChatBounds({
-      ...storedBounds,
-      width: requestedBounds.width,
-      height: requestedBounds.height
-    });
-
-    if (!detachedMiniChatWindowId) {
-      openNewDetachedMiniChatWindow(url, bounds, sendResponse);
-      return;
-    }
-
-    chrome.windows.get(detachedMiniChatWindowId, { populate: true }, (windowInfo) => {
-      if (chrome.runtime.lastError || !windowInfo?.id) {
-        detachedMiniChatWindowId = null;
-        openNewDetachedMiniChatWindow(url, bounds, sendResponse);
-        return;
-      }
-
-      updateDetachedMiniChatWindow(windowInfo, url, bounds, sendResponse);
-    });
-  });
-
-  return true;
 }
 
 function getGuestChatTheme(tabId, channelId) {
@@ -545,18 +374,6 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   guestChatThemesByTab.delete(tabId);
 });
 
-if (chrome.windows?.onBoundsChanged) {
-  chrome.windows.onBoundsChanged.addListener((windowInfo) => {
-    saveDetachedMiniChatWindowBounds(windowInfo);
-  });
-}
-
-chrome.windows.onRemoved.addListener((windowId) => {
-  if (windowId === detachedMiniChatWindowId) {
-    detachedMiniChatWindowId = null;
-  }
-});
-
 chrome.webNavigation.onCommitted.addListener((details) => {
   if (details.frameId !== 0 || !isChzzkUrl(details.url)) {
     return;
@@ -589,10 +406,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message?.type === OPEN_POPUP_MESSAGE) {
     return openExtensionPopup(sendResponse);
-  }
-
-  if (message?.type === OPEN_DETACHED_MINI_CHAT_MESSAGE) {
-    return openDetachedMiniChat(message, sendResponse);
   }
 
   if (message?.type === SET_GUEST_CHAT_THEME_MESSAGE) {
