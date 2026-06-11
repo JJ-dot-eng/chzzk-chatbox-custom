@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.28";
+  const SCRIPT_VERSION = "0.2.29";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -65,6 +65,7 @@
   const MINI_CHAT_INPUT_ONLY_HEIGHT = 116;
   const MINI_CHAT_INPUT_ONLY_BOX_HEIGHT = 52;
   const MINI_CHAT_INPUT_ONLY_FIELD_MAX_HEIGHT = 36;
+  const MINI_CHAT_INPUT_ONLY_CONTROL_INSET = 24;
   const MINI_CHAT_MAX_WIDTH = 720;
   const MINI_CHAT_MAX_HEIGHT = 900;
   const MINI_CHAT_DEFAULT_WIDTH = 360;
@@ -1823,9 +1824,9 @@
 
       #${MINI_CHAT_PANEL_ID}[data-input-only="true"] .${MINI_CHAT_PANEL_CONTROLS_CLASS} {
         align-self: center !important;
-        width: calc(100% - 20px) !important;
-        max-width: calc(100% - 20px) !important;
-        margin: 0 10px !important;
+        width: calc(100% - ${MINI_CHAT_INPUT_ONLY_CONTROL_INSET * 2}px) !important;
+        max-width: calc(100% - ${MINI_CHAT_INPUT_ONLY_CONTROL_INSET * 2}px) !important;
+        margin: 0 ${MINI_CHAT_INPUT_ONLY_CONTROL_INSET}px !important;
         border-radius: 0 0 6px 6px !important;
       }
 
@@ -1883,6 +1884,10 @@
         right: 5px !important;
         bottom: 10px !important;
         width: 6px !important;
+      }
+
+      #${MINI_CHAT_PANEL_ID}[data-input-only="true"] .${MINI_CHAT_PANEL_RESIZE_CLASS} {
+        right: ${MINI_CHAT_INPUT_ONLY_CONTROL_INSET}px !important;
       }
 
       html[data-chzzk-chat-ui-toggle-chat-boxes="on"]
