@@ -536,6 +536,8 @@ const requiredMiniChatContentTokens = [
   "patch.miniFloatingChatExpandedBounds = getMiniChatExpandedBoundsFromInputOnly(nextBounds);",
   "#${MINI_CHAT_PANEL_ID}[data-input-only=\"true\"]",
   "data-chzzk-chat-ui-toggle-mini-floating-chat-input-only=\"on\"",
+  "border-color: transparent !important;",
+  "box-shadow: none !important;",
   "top: Number.isFinite(styledTop) ? styledTop : rect.bottom - height",
   "visualTop: rect.top",
   "visualTop - height * (1 - miniChatResizeState.scaleRatio)",
