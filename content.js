@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.33";
+  const SCRIPT_VERSION = "0.2.34";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -56,6 +56,7 @@
   const MINI_CHAT_INPUT_ONLY_PATH_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-path";
   const MINI_CHAT_INPUT_ONLY_KEEP_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-keep";
   const MINI_CHAT_INPUT_ONLY_HIDDEN_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-hidden";
+  const MINI_CHAT_FULLSCREEN_HOST_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-fullscreen-host";
   const GUEST_CHAT_CLEANBOT_DEFAULT_ATTR = "data-chzzk-chat-ui-toggle-guest-cleanbot-default";
   const LIVE_CHAT_FRAME_ATTR = "data-chzzk-chat-ui-toggle-live-chat-frame";
   const GUEST_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleGuest";
@@ -84,6 +85,7 @@
   const HEADER_SETTINGS_BUTTON_ID = "chzzk-chat-ui-toggle-header-settings";
   const HEADER_SETTINGS_BUTTON_ICON_CLASS = "chzzk-chat-ui-toggle-header-settings__icon";
   const LIVE_CHANNEL_ID_PATTERN = /^[0-9a-f]{32}$/i;
+  const FULLSCREEN_UNSUPPORTED_MINI_CHAT_HOST_TAG_NAMES = new Set(["VIDEO", "AUDIO", "CANVAS", "IFRAME", "IMG"]);
 
   const DEFAULT_OPTIONS = {
     showNicknames: true,
@@ -1692,6 +1694,12 @@
         z-index: 2147483647 !important;
       }
 
+      :fullscreen #${MINI_CHAT_PANEL_ID},
+      #${MINI_CHAT_PANEL_ID}[${MINI_CHAT_FULLSCREEN_HOST_ATTR}="true"] {
+        pointer-events: auto !important;
+        z-index: 2147483647 !important;
+      }
+
       #${MINI_CHAT_PANEL_ID}[data-collapsed="true"] {
         min-height: 16px !important;
         height: 16px !important;
@@ -2873,6 +2881,43 @@
     return panel;
   }
 
+  function canHostMiniChatFullscreenPanel(element) {
+    if (!(element instanceof HTMLElement)) {
+      return false;
+    }
+
+    return !FULLSCREEN_UNSUPPORTED_MINI_CHAT_HOST_TAG_NAMES.has(element.tagName);
+  }
+
+  function getMiniChatPanelHost() {
+    if (canHostMiniChatFullscreenPanel(document.fullscreenElement)) {
+      return document.fullscreenElement;
+    }
+
+    return document.body || null;
+  }
+
+  function moveMiniChatPanelToHost(panel, host) {
+    if (!(panel instanceof HTMLElement) || !(host instanceof HTMLElement)) {
+      return;
+    }
+
+    if (panel.parentElement !== host) {
+      host.append(panel);
+    }
+
+    if (host === document.body) {
+      panel.removeAttribute(MINI_CHAT_FULLSCREEN_HOST_ATTR);
+      return;
+    }
+
+    panel.setAttribute(MINI_CHAT_FULLSCREEN_HOST_ATTR, "true");
+  }
+
+  function handleMiniChatFullscreenChange() {
+    scheduleGuestChatUiSync();
+  }
+
   function syncMiniFloatingChatPanel() {
     const existingPanel = document.getElementById(MINI_CHAT_PANEL_ID);
 
@@ -2881,7 +2926,9 @@
       return;
     }
 
-    if (!document.body) {
+    const panelHost = getMiniChatPanelHost();
+
+    if (!panelHost) {
       return;
     }
 
@@ -2895,20 +2942,15 @@
     const isExistingPanel = existingPanel instanceof HTMLElement;
     const panel = isExistingPanel ? existingPanel : createMiniFloatingChatPanel();
     const iframe = panel.querySelector(`#${MINI_CHAT_FRAME_ID}`);
+    const nextBounds = isExistingPanel ? readMiniChatPanelBounds(panel) : currentOptions.miniFloatingChatBounds;
 
     if (iframe instanceof HTMLIFrameElement && iframe.src !== frameUrl) {
       iframe.src = frameUrl;
     }
 
     setMiniFloatingChatPanelState(panel);
-    applyMiniChatPanelBounds(
-      panel,
-      isExistingPanel ? readMiniChatPanelBounds(panel) : currentOptions.miniFloatingChatBounds
-    );
-
-    if (panel.parentElement !== document.body) {
-      document.body.append(panel);
-    }
+    moveMiniChatPanelToHost(panel, panelHost);
+    applyMiniChatPanelBounds(panel, nextBounds);
   }
 
   function createGuestChatFrameContainer() {
@@ -4352,6 +4394,7 @@
 
     connectObserver();
     window.addEventListener("resize", scheduleGuestChatUiSync);
+    document.addEventListener("fullscreenchange", handleMiniChatFullscreenChange);
     syncGuestChatTheme();
     scheduleScan();
     loadStoredOptions(1, { allowFallback: true });
