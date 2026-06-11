@@ -37,8 +37,7 @@
   const MINI_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-mini-chat-frame";
   const MINI_CHAT_BUTTON_ID = "chzzk-chat-ui-toggle-mini-chat-button";
   const MINI_CHAT_BUTTON_ICON_CLASS = "chzzk-chat-ui-toggle-mini-chat-button__icon";
-  const MINI_CHAT_PANEL_TITLE_ID = "chzzk-chat-ui-toggle-mini-chat-title";
-  const MINI_CHAT_PANEL_HEADER_CLASS = "chzzk-chat-ui-toggle-mini-chat__header";
+  const MINI_CHAT_PANEL_CONTROLS_CLASS = "chzzk-chat-ui-toggle-mini-chat__controls";
   const MINI_CHAT_PANEL_COLLAPSE_CLASS = "chzzk-chat-ui-toggle-mini-chat__collapse";
   const MINI_CHAT_PANEL_CLOSE_CLASS = "chzzk-chat-ui-toggle-mini-chat__close";
   const MINI_CHAT_PANEL_RESIZE_CLASS = "chzzk-chat-ui-toggle-mini-chat__resize";
@@ -1485,28 +1484,29 @@
       }
 
       #${MINI_CHAT_PANEL_ID}[data-collapsed="true"] {
-        min-height: 42px !important;
-        height: 42px !important;
+        min-height: 16px !important;
+        height: 16px !important;
         resize: none !important;
       }
 
-      #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_HEADER_CLASS} {
+      #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_CONTROLS_CLASS} {
         display: flex !important;
-        flex: 0 0 auto !important;
+        flex: 0 0 16px !important;
         align-items: center !important;
-        justify-content: space-between !important;
-        gap: 8px !important;
-        height: 42px !important;
-        min-height: 42px !important;
-        padding: 0 8px 0 12px !important;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
-        background: rgba(17, 24, 32, 0.96) !important;
+        justify-content: flex-end !important;
+        gap: 2px !important;
+        height: 16px !important;
+        min-height: 16px !important;
+        padding: 0 24px 0 6px !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+        background: rgba(17, 24, 32, 0.98) !important;
+        box-sizing: border-box !important;
         cursor: grab !important;
         user-select: none !important;
         touch-action: none !important;
       }
 
-      #${MINI_CHAT_PANEL_ID}[data-dragging="true"] .${MINI_CHAT_PANEL_HEADER_CLASS} {
+      #${MINI_CHAT_PANEL_ID}[data-dragging="true"] .${MINI_CHAT_PANEL_CONTROLS_CLASS} {
         cursor: grabbing !important;
       }
 
@@ -1514,22 +1514,12 @@
         user-select: none !important;
       }
 
-      #${MINI_CHAT_PANEL_TITLE_ID} {
-        display: block !important;
-        min-width: 0 !important;
-        overflow: hidden !important;
-        color: #ffffff !important;
-        font: 700 13px/1.25 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
-        letter-spacing: 0 !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
-      }
-
       #${MINI_CHAT_PANEL_ID} [data-mini-chat-actions="true"] {
         display: flex !important;
         flex: 0 0 auto !important;
         align-items: center !important;
-        gap: 4px !important;
+        gap: 2px !important;
+        height: 100% !important;
       }
 
       #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_COLLAPSE_CLASS},
@@ -1537,17 +1527,17 @@
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
-        width: 28px !important;
-        height: 28px !important;
-        min-width: 28px !important;
-        min-height: 28px !important;
+        width: 16px !important;
+        height: 14px !important;
+        min-width: 16px !important;
+        min-height: 14px !important;
         margin: 0 !important;
         padding: 0 !important;
         border: 0 !important;
-        border-radius: 6px !important;
+        border-radius: 4px !important;
         background: transparent !important;
         color: rgba(255, 255, 255, 0.78) !important;
-        font: 700 17px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+        font: 700 12px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
         cursor: pointer !important;
       }
 
@@ -2161,8 +2151,8 @@
       return;
     }
 
-    const header = event.currentTarget;
-    const panel = header.closest(`#${MINI_CHAT_PANEL_ID}`);
+    const dragHandle = event.currentTarget;
+    const panel = dragHandle.closest(`#${MINI_CHAT_PANEL_ID}`);
 
     if (!(panel instanceof HTMLElement)) {
       return;
@@ -2180,7 +2170,7 @@
       height: currentOptions.miniFloatingChatBounds.height
     };
     panel.dataset.dragging = "true";
-    header.setPointerCapture(event.pointerId);
+    dragHandle.setPointerCapture(event.pointerId);
     event.preventDefault();
   }
 
@@ -2290,8 +2280,7 @@
 
   function createMiniFloatingChatPanel() {
     const panel = document.createElement("section");
-    const header = document.createElement("div");
-    const title = document.createElement("strong");
+    const controlsBar = document.createElement("div");
     const actions = document.createElement("div");
     const collapseButton = document.createElement("button");
     const closeButton = document.createElement("button");
@@ -2301,16 +2290,13 @@
 
     panel.id = MINI_CHAT_PANEL_ID;
     panel.setAttribute("role", "dialog");
-    panel.setAttribute("aria-labelledby", MINI_CHAT_PANEL_TITLE_ID);
+    panel.setAttribute("aria-label", "미니 채팅");
 
-    header.className = MINI_CHAT_PANEL_HEADER_CLASS;
-    header.addEventListener("pointerdown", handleMiniChatDragStart);
-    header.addEventListener("pointermove", handleMiniChatDragMove);
-    header.addEventListener("pointerup", handleMiniChatDragEnd);
-    header.addEventListener("pointercancel", handleMiniChatDragEnd);
-
-    title.id = MINI_CHAT_PANEL_TITLE_ID;
-    title.textContent = "미니 채팅";
+    controlsBar.className = MINI_CHAT_PANEL_CONTROLS_CLASS;
+    controlsBar.addEventListener("pointerdown", handleMiniChatDragStart);
+    controlsBar.addEventListener("pointermove", handleMiniChatDragMove);
+    controlsBar.addEventListener("pointerup", handleMiniChatDragEnd);
+    controlsBar.addEventListener("pointercancel", handleMiniChatDragEnd);
 
     actions.dataset.miniChatActions = "true";
 
@@ -2355,8 +2341,8 @@
     resizeHandle.addEventListener("pointercancel", handleMiniChatResizeEnd);
 
     actions.append(collapseButton, closeButton);
-    header.append(title, actions);
-    panel.append(header, body, resizeHandle);
+    controlsBar.append(actions);
+    panel.append(body, controlsBar, resizeHandle);
     setMiniFloatingChatPanelState(panel);
 
     return panel;

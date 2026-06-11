@@ -466,6 +466,7 @@ const requiredMiniChatContentTokens = [
   'const MINI_CHAT_PANEL_ID = "chzzk-chat-ui-toggle-mini-chat-panel";',
   'const MINI_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-mini-chat-frame";',
   'const MINI_CHAT_BUTTON_ID = "chzzk-chat-ui-toggle-mini-chat-button";',
+  'const MINI_CHAT_PANEL_CONTROLS_CLASS = "chzzk-chat-ui-toggle-mini-chat__controls";',
   'const MINI_CHAT_PANEL_RESIZE_CLASS = "chzzk-chat-ui-toggle-mini-chat__resize";',
   'const MINI_CHAT_HIDDEN_CONTROL_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-hidden-control";',
   'const MINI_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleMini";',
@@ -480,7 +481,10 @@ const requiredMiniChatContentTokens = [
   "function handleMiniChatResizeStart(event)",
   "function handleMiniChatResizeMove(event)",
   "function handleMiniChatResizeEnd(event)",
+  'panel.setAttribute("aria-label", "미니 채팅");',
+  "controlsBar.addEventListener(\"pointerdown\", handleMiniChatDragStart);",
   "resizeHandle.addEventListener(\"pointerdown\", handleMiniChatResizeStart);",
+  "panel.append(body, controlsBar, resizeHandle);",
   "isExistingPanel ? readMiniChatPanelBounds(panel) : currentOptions.miniFloatingChatBounds",
   "frameUrl.searchParams.set(MINI_CHAT_FRAME_MARKER_PARAM, \"1\");",
   "syncMiniFloatingChatPanel();"
@@ -494,6 +498,14 @@ for (const token of requiredMiniChatContentTokens) {
 
 if (contentSource.includes("전송은 치지직 원래 채팅창에서 처리됩니다")) {
   throw new Error("mini floating chat must not render the explanatory footer text.");
+}
+
+if (
+  contentSource.includes("MINI_CHAT_PANEL_HEADER_CLASS") ||
+  contentSource.includes("MINI_CHAT_PANEL_TITLE_ID") ||
+  contentSource.includes('title.textContent = "미니 채팅"')
+) {
+  throw new Error("mini floating chat must not render the old top title bar.");
 }
 
 const guestChatToggleVisibilityStart = contentSource.indexOf("function ensureGuestChatToggleButton()");
