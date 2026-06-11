@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.35";
+  const SCRIPT_VERSION = "0.2.36";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -1498,58 +1498,39 @@
         align-self: center !important;
         align-items: center !important;
         justify-content: center !important;
-        width: 30px !important;
-        height: 30px !important;
-        min-width: 30px !important;
-        min-height: 30px !important;
-        margin: 0 3px !important;
+        width: 28px !important;
+        height: 28px !important;
+        min-width: 28px !important;
+        min-height: 28px !important;
+        margin: 0 2px !important;
         padding: 0 !important;
         left: -3px !important;
         top: 8px !important;
-        border: 1px solid rgba(0, 196, 113, 0.36) !important;
-        border-radius: 999px !important;
-        background:
-          linear-gradient(180deg, rgba(19, 27, 35, 0.96), rgba(12, 18, 26, 0.96)) !important;
-        color: rgba(255, 255, 255, 0.9) !important;
-        box-shadow:
-          0 6px 14px rgba(0, 0, 0, 0.22),
-          inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+        border: 0 !important;
+        border-radius: 6px !important;
+        background: transparent !important;
+        color: rgba(32, 36, 40, 0.72) !important;
+        box-shadow: none !important;
         cursor: pointer !important;
         transition:
           background-color 120ms ease,
-          border-color 120ms ease,
-          box-shadow 120ms ease,
-          color 120ms ease,
-          transform 120ms ease !important;
+          color 120ms ease !important;
         z-index: 2147483646 !important;
       }
 
       .chzzk-chat-ui-toggle-mini-chat-button:hover {
-        border-color: rgba(0, 196, 113, 0.62) !important;
-        background:
-          linear-gradient(180deg, rgba(25, 35, 45, 0.98), rgba(14, 22, 31, 0.98)) !important;
-        color: #ffffff !important;
-        box-shadow:
-          0 8px 18px rgba(0, 0, 0, 0.28),
-          0 0 0 3px rgba(0, 196, 113, 0.12),
-          inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
-        transform: translateY(-1px) !important;
+        background: rgba(32, 36, 40, 0.08) !important;
+        color: rgba(32, 36, 40, 0.92) !important;
       }
 
       .chzzk-chat-ui-toggle-mini-chat-button:focus-visible {
-        outline: 2px solid rgba(0, 196, 113, 0.72) !important;
-        outline-offset: 3px !important;
+        outline: 2px solid rgba(0, 196, 113, 0.42) !important;
+        outline-offset: 2px !important;
       }
 
       .chzzk-chat-ui-toggle-mini-chat-button[aria-pressed="true"] {
-        border-color: rgba(0, 196, 113, 0.86) !important;
-        background:
-          linear-gradient(180deg, rgba(0, 196, 113, 0.98), rgba(0, 142, 82, 0.98)) !important;
-        color: #ffffff !important;
-        box-shadow:
-          0 8px 18px rgba(0, 0, 0, 0.28),
-          0 0 0 3px rgba(0, 196, 113, 0.18),
-          inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+        background: rgba(0, 196, 113, 0.14) !important;
+        color: #008f55 !important;
       }
 
       .chzzk-chat-ui-toggle-mini-chat-button[data-state="loading"] {
@@ -1558,9 +1539,8 @@
       }
 
       .chzzk-chat-ui-toggle-mini-chat-button[data-state="error"] {
-        border-color: rgba(224, 49, 49, 0.58) !important;
-        background: rgba(224, 49, 49, 0.16) !important;
-        color: #ff6b6b !important;
+        background: rgba(224, 49, 49, 0.12) !important;
+        color: #c92a2a !important;
       }
 
       .${HEADER_SETTINGS_BUTTON_ICON_CLASS} {
@@ -1582,10 +1562,10 @@
         position: relative !important;
         display: block !important;
         width: 16px !important;
-        height: 13px !important;
+        height: 14px !important;
         color: inherit !important;
-        border: 2px solid currentColor !important;
-        border-radius: 6px !important;
+        border: 1.7px solid currentColor !important;
+        border-radius: 5px !important;
         box-sizing: border-box !important;
         pointer-events: none !important;
       }
@@ -1611,8 +1591,8 @@
         bottom: -5px !important;
         width: 6px !important;
         height: 6px !important;
-        border-left: 2px solid currentColor !important;
-        border-bottom: 2px solid currentColor !important;
+        border-left: 1.7px solid currentColor !important;
+        border-bottom: 1.7px solid currentColor !important;
         background: transparent !important;
         transform: skew(-18deg) rotate(-18deg) !important;
         box-sizing: border-box !important;
