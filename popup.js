@@ -1,5 +1,5 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
-const CONTENT_VERSION = "0.2.18";
+const CONTENT_VERSION = "0.2.19";
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const MINI_CHAT_MIN_WIDTH = 280;
 const MINI_CHAT_MIN_HEIGHT = 320;
