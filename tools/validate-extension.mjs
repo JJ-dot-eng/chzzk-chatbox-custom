@@ -531,7 +531,10 @@ const requiredMiniChatContentTokens = [
   'const MINI_CHAT_PANEL_SCALE_CLASS = "chzzk-chat-ui-toggle-mini-chat__scale";',
   'const MINI_CHAT_PANEL_MODE_CLASS = "chzzk-chat-ui-toggle-mini-chat__mode";',
   'const MINI_CHAT_PANEL_INPUT_ONLY_CLASS = "chzzk-chat-ui-toggle-mini-chat__input-only";',
+  'const MINI_CHAT_PANEL_MINIMIZE_CLASS = "chzzk-chat-ui-toggle-mini-chat__minimize";',
   'const MINI_CHAT_PANEL_RESIZE_CLASS = "chzzk-chat-ui-toggle-mini-chat__resize";',
+  'const MINI_CHAT_BUBBLE_ID = "chzzk-chat-ui-toggle-mini-chat-bubble";',
+  'const MINI_CHAT_BUBBLE_ICON_CLASS = "chzzk-chat-ui-toggle-mini-chat-bubble__icon";',
   'const MINI_CHAT_HIDDEN_CONTROL_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-hidden-control";',
   'const MINI_CHAT_COMPACT_INPUT_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-compact-input";',
   'const MINI_CHAT_INPUT_ONLY_PATH_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-path";',
@@ -545,6 +548,7 @@ const requiredMiniChatContentTokens = [
   "const MINI_CHAT_INPUT_ONLY_BOX_HEIGHT = 52;",
   "const MINI_CHAT_INPUT_ONLY_FIELD_MAX_HEIGHT = 36;",
   "const MINI_CHAT_INPUT_ONLY_CONTROL_INSET = 24;",
+  "const MINI_CHAT_BUBBLE_SIZE = 44;",
   "const MINI_CHAT_SCALE_MIN = 50;",
   "const MINI_CHAT_SCALE_MAX = 150;",
   "const MINI_CHAT_SCALE_STEP = 10;",
@@ -552,8 +556,16 @@ const requiredMiniChatContentTokens = [
   "function normalizeMiniChatScale(value)",
   "function getMiniChatFrameUrl()",
   "function createMiniFloatingChatPanel()",
+  "function createMiniChatBubbleButton()",
   "function syncMiniFloatingChatPanel()",
+  "function syncMiniChatBubbleButton(host)",
   "function createMiniChatToggleButton()",
+  "function minimizeMiniFloatingChatToBubble(panel)",
+  "function restoreMiniFloatingChatFromBubble()",
+  "function handleMiniChatBubbleDragStart(event)",
+  "function handleMiniChatBubbleDragMove(event)",
+  "function handleMiniChatBubbleDragEnd(event)",
+  "function getMiniChatRestoreBoundsFromBubble(bounds, restoreBounds = miniChatRestoreBounds)",
   "function getMiniChatLayoutTopForVisualTop(visualTop, height, scale = currentOptions.miniFloatingChatScale)",
   "function toggleMiniChatInputOnly()",
   "function updateMiniChatScale(delta)",
@@ -589,7 +601,12 @@ const requiredMiniChatContentTokens = [
   "\"--chzzk-chat-ui-toggle-mini-chat-scale\",",
   "scaleControls.dataset.miniChatScaleControls = \"true\";",
   "modeControls.dataset.miniChatMode = \"true\";",
-  "actions.append(closeButton);",
+  "actions.append(minimizeButton, closeButton);",
+  "#${MINI_CHAT_BUBBLE_ID}",
+  "background: rgba(82, 88, 98, 0.66) !important;",
+  "miniChatMinimized = true;",
+  "button.addEventListener(\"pointerdown\", handleMiniChatBubbleDragStart);",
+  "miniChatBubbleIgnoreNextClick",
   ".chzzk-chat-ui-toggle-mini-chat-button[aria-pressed=\"true\"]",
   ".chzzk-chat-ui-toggle-mini-chat-button:hover",
   "background: transparent !important;",
@@ -645,8 +662,7 @@ for (const token of requiredMiniChatContentTokens) {
 
 const forbiddenMiniChatContentTokens = [
   "MINI_CHAT_PANEL_COLLAPSE_CLASS",
-  "mini-chat-collapse",
-  "collapseButton"
+  "mini-chat-collapse"
 ];
 
 for (const token of forbiddenMiniChatContentTokens) {
