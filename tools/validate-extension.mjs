@@ -403,6 +403,10 @@ const syncGuestChatFrameSource =
 const markControlHostIndex = syncGuestChatFrameSource.indexOf("markGuestChatControlHost(host);");
 const setGuestHostIndex = syncGuestChatFrameSource.indexOf(`host.setAttribute(GUEST_CHAT_HOST_ATTR, "true");`);
 
+if (!syncGuestChatFrameSource.includes("!shouldRenderGuestChatFrame()")) {
+  throw new Error("guest chat frame must be temporarily disabled while the page is fullscreen.");
+}
+
 if (markControlHostIndex < 0 || setGuestHostIndex < 0 || markControlHostIndex > setGuestHostIndex) {
   throw new Error("guest chat header control host must be marked before hiding native chat children.");
 }
@@ -573,6 +577,9 @@ const requiredMiniChatContentTokens = [
   "function getMiniChatPanelHost()",
   "function moveMiniChatPanelToHost(panel, host)",
   "function handleMiniChatFullscreenChange()",
+  "function isPageFullscreenActive()",
+  "function shouldRenderGuestChatFrame()",
+  "function isMiniFloatingChatTemporarilyDisabledByGuestChat()",
   "function shouldRenderMiniFloatingChatPanel()",
   "currentOptions.miniFloatingChatFullscreenOnly",
   "function annotateMiniChatHiddenControls()",
@@ -658,6 +665,25 @@ for (const token of requiredMiniChatContentTokens) {
   if (!contentSource.includes(token)) {
     throw new Error(`content script must implement mini floating chat: ${token}`);
   }
+}
+
+const shouldRenderMiniChatStart = contentSource.indexOf("function shouldRenderMiniFloatingChatPanel()");
+const shouldRenderMiniChatEnd = contentSource.indexOf("function syncMiniFloatingChatPanel()", shouldRenderMiniChatStart);
+const shouldRenderMiniChatSource =
+  shouldRenderMiniChatStart >= 0 && shouldRenderMiniChatEnd > shouldRenderMiniChatStart
+    ? contentSource.slice(shouldRenderMiniChatStart, shouldRenderMiniChatEnd)
+    : "";
+const guestTemporaryDisableIndex =
+  shouldRenderMiniChatSource.indexOf("isMiniFloatingChatTemporarilyDisabledByGuestChat()");
+const fullscreenOnlyGateIndex =
+  shouldRenderMiniChatSource.indexOf("currentOptions.miniFloatingChatFullscreenOnly");
+
+if (
+  guestTemporaryDisableIndex < 0 ||
+  fullscreenOnlyGateIndex < 0 ||
+  guestTemporaryDisableIndex > fullscreenOnlyGateIndex
+) {
+  throw new Error("mini floating chat must be temporarily disabled by guest chat before fullscreen-only gating.");
 }
 
 const forbiddenMiniChatContentTokens = [

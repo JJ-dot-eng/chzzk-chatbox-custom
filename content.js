@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.40";
+  const SCRIPT_VERSION = "0.2.41";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -3234,8 +3234,24 @@
     scheduleGuestChatUiSync();
   }
 
+  function isPageFullscreenActive() {
+    return Boolean(document.fullscreenElement);
+  }
+
+  function shouldRenderGuestChatFrame() {
+    return currentOptions.useGuestChatFrame && !isPageFullscreenActive();
+  }
+
+  function isMiniFloatingChatTemporarilyDisabledByGuestChat() {
+    return currentOptions.useGuestChatFrame && !isPageFullscreenActive();
+  }
+
   function shouldRenderMiniFloatingChatPanel() {
     if (!currentOptions.useMiniFloatingChat || !isMiniFloatingChatEligibleContext()) {
+      return false;
+    }
+
+    if (isMiniFloatingChatTemporarilyDisabledByGuestChat()) {
       return false;
     }
 
@@ -3359,7 +3375,7 @@
   }
 
   function syncGuestChatFrame() {
-    if (!currentOptions.useGuestChatFrame || !isGuestChatFrameEligibleContext() || !supportsCredentiallessIframe()) {
+    if (!shouldRenderGuestChatFrame() || !isGuestChatFrameEligibleContext() || !supportsCredentiallessIframe()) {
       removeGuestChatFrame();
       return;
     }
