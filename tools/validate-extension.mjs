@@ -673,10 +673,24 @@ const shouldRenderMiniChatSource =
   shouldRenderMiniChatStart >= 0 && shouldRenderMiniChatEnd > shouldRenderMiniChatStart
     ? contentSource.slice(shouldRenderMiniChatStart, shouldRenderMiniChatEnd)
     : "";
+const miniGuestDisableStart =
+  contentSource.indexOf("function isMiniFloatingChatTemporarilyDisabledByGuestChat()");
+const miniGuestDisableEnd = contentSource.indexOf("function shouldRenderMiniFloatingChatPanel()", miniGuestDisableStart);
+const miniGuestDisableSource =
+  miniGuestDisableStart >= 0 && miniGuestDisableEnd > miniGuestDisableStart
+    ? contentSource.slice(miniGuestDisableStart, miniGuestDisableEnd)
+    : "";
 const guestTemporaryDisableIndex =
   shouldRenderMiniChatSource.indexOf("isMiniFloatingChatTemporarilyDisabledByGuestChat()");
 const fullscreenOnlyGateIndex =
   shouldRenderMiniChatSource.indexOf("currentOptions.miniFloatingChatFullscreenOnly");
+
+if (
+  !miniGuestDisableSource.includes("return currentOptions.useGuestChatFrame;") ||
+  miniGuestDisableSource.includes("!isPageFullscreenActive()")
+) {
+  throw new Error("mini floating chat must stay hidden whenever guest chat is enabled, including fullscreen.");
+}
 
 if (
   guestTemporaryDisableIndex < 0 ||

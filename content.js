@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.41";
+  const SCRIPT_VERSION = "0.2.42";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -3243,7 +3243,7 @@
   }
 
   function isMiniFloatingChatTemporarilyDisabledByGuestChat() {
-    return currentOptions.useGuestChatFrame && !isPageFullscreenActive();
+    return currentOptions.useGuestChatFrame;
   }
 
   function shouldRenderMiniFloatingChatPanel() {
