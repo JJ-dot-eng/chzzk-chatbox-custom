@@ -22,6 +22,11 @@ const GUEST_CHAT_EMBED_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-embed";
 const GUEST_CHAT_CLEANBOT_DEFAULT_ATTR = "data-chzzk-chat-ui-toggle-guest-cleanbot-default";
 const GUEST_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleGuest";
 const LIVE_CHANNEL_ID_PATTERN = /^[0-9a-f]{32}$/i;
+const HEADER_BUTTON_IDS = [
+  GUEST_CHAT_TOGGLE_BUTTON_ID,
+  "chzzk-chat-ui-toggle-header-settings",
+  "chzzk-chat-ui-toggle-mini-chat-button"
+];
 
 const onOptions = {
   showNicknames: true,
@@ -630,6 +635,63 @@ async function collectGuestChatState(page) {
   return { page: pageState, frame: frameState };
 }
 
+async function collectHeaderButtonPlacement(page) {
+  return await page.evaluate(({ buttonIds }) => {
+    const getRectState = (element) => {
+      if (!(element instanceof HTMLElement)) {
+        return null;
+      }
+
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+
+      return {
+        x: Math.round(rect.x),
+        y: Math.round(rect.y),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+        display: style.display,
+        visibility: style.visibility,
+        opacity: style.opacity
+      };
+    };
+    const compactText = (element) => String(element?.textContent || "").replace(/\s+/g, " ").trim().slice(0, 160);
+    const chatHeader = document.querySelector("aside#aside-chatting")?.firstElementChild || null;
+
+    return {
+      header: chatHeader
+        ? {
+            tagName: chatHeader.tagName.toLowerCase(),
+            className: String(chatHeader.getAttribute("class") || "").slice(0, 120),
+            text: compactText(chatHeader),
+            rect: getRectState(chatHeader)
+          }
+        : null,
+      buttons: buttonIds.map((id) => {
+        const button = document.getElementById(id);
+        const rankingAncestor = button?.closest("aside#aside-chatting > :has([class*='ranking' i])") || null;
+
+        return {
+          id,
+          exists: Boolean(button),
+          title: button?.getAttribute("title") || null,
+          rect: getRectState(button),
+          parentClassName: String(button?.parentElement?.getAttribute("class") || "").slice(0, 120),
+          parentText: compactText(button?.parentElement),
+          insideChatHeader: Boolean(button && chatHeader?.contains(button)),
+          rankingAncestor: rankingAncestor
+            ? {
+                className: String(rankingAncestor.getAttribute("class") || "").slice(0, 120),
+                text: compactText(rankingAncestor),
+                rect: getRectState(rankingAncestor)
+              }
+            : null
+        };
+      })
+    };
+  }, { buttonIds: HEADER_BUTTON_IDS });
+}
+
 function isGuestChatOnState(state, liveUrl) {
   if (!state?.page?.frame || !state.frame) {
     return false;
@@ -1116,6 +1178,24 @@ function assertGuestChatOff(label, state) {
   );
 }
 
+function assertHeaderButtonsInChatHeader(label, state) {
+  if (!state?.header || !String(state.header.text || "").includes("채팅")) {
+    throw new Error(`${label}: chat header was not found; state ${JSON.stringify(state).slice(0, 800)}`);
+  }
+
+  for (const button of state.buttons || []) {
+    if (!button.exists || !isVisibleRect(button.rect)) {
+      throw new Error(`${label}: ${button.id} is not visible in the chat header`);
+    }
+
+    if (!button.insideChatHeader || button.rankingAncestor) {
+      throw new Error(
+        `${label}: ${button.id} was inserted outside the chat header; state ${JSON.stringify(button).slice(0, 800)}`
+      );
+    }
+  }
+}
+
 async function assertGuestChatHeaderToggleFlow(page) {
   const toggleButton = page.locator(`#${GUEST_CHAT_TOGGLE_BUTTON_ID}`);
 
@@ -1227,6 +1307,8 @@ async function main() {
   assertOnState(before.summary);
   assertChatBoxesOn("initial on state", before.summary);
   assertChatBoxColor("initial on state", before.summary, DEFAULT_CHAT_BOX_COLOR);
+  const headerButtonsBefore = await collectHeaderButtonPlacement(page);
+  assertHeaderButtonsInChatHeader("initial header button placement", headerButtonsBefore);
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-on-before.png"), fullPage: false });
 
   const guestChatToggle = await assertGuestChatHeaderToggleFlow(page);
@@ -1344,6 +1426,7 @@ async function main() {
         ],
         summaries: {
           before: before.summary,
+          headerButtonsBefore,
           guestChatToggle,
           boldReloadNoPopup: boldReloadNoPopup.summary,
           badgeOff: badgeOff.summary,

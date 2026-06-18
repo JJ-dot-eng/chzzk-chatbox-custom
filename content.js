@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.44";
+  const SCRIPT_VERSION = "0.2.45";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -172,6 +172,7 @@
   ];
 
   const CHAT_ACTION_HOST_SELECTORS = [
+    "aside#aside-chatting",
     "[class*='live_chatting_header_container' i]",
     "[class*='live_chatting' i]",
     "[class*='chatting_area' i]",
@@ -2088,7 +2089,9 @@
       }
 
       html[data-chzzk-chat-ui-toggle-donation-ranking="off"]
-        [class*="live_chatting_ranking_container" i] {
+        [class*="live_chatting_ranking_container" i],
+      html[data-chzzk-chat-ui-toggle-donation-ranking="off"]
+        aside#aside-chatting > :has([class*="ranking" i]) {
         display: none !important;
       }
 
@@ -3406,6 +3409,42 @@
     return container;
   }
 
+  function isDonationRankingPanel(element) {
+    if (!(element instanceof HTMLElement)) {
+      return false;
+    }
+
+    const text = getCompactText(element);
+
+    return (
+      text.includes("랭킹") &&
+      (element.matches("aside#aside-chatting > *") ||
+        element.closest("aside#aside-chatting") ||
+        element.querySelector("[class*='ranking' i]"))
+    );
+  }
+
+  function isChatHeaderCandidate(element, { includeHidden = false } = {}) {
+    if (!(element instanceof HTMLElement)) {
+      return false;
+    }
+
+    if (!includeHidden && !isElementVisible(element)) {
+      return false;
+    }
+
+    if (isDonationRankingPanel(element)) {
+      return false;
+    }
+
+    const className = getClassName(element);
+    const text = getCompactText(element);
+    const hasChatTitleText = text === "채팅" || /^채팅(?:방)?$/u.test(text) || /\bchat\b/i.test(text);
+    const hasLegacyChatHeaderClass = /live_chatting_header_/i.test(className);
+
+    return hasChatTitleText || hasLegacyChatHeaderClass;
+  }
+
   function findGuestChatHostFrom(element) {
     for (let current = element; current && current !== document.body; current = current.parentElement) {
       if (!(current instanceof HTMLElement)) {
@@ -3415,14 +3454,15 @@
       const className = getClassName(current);
       const hasChatShellClass = /live_chatting|chatting_area|chat_area/i.test(className);
       const isHeaderOnly = /live_chatting_header_/i.test(className);
+      const isKnownChatAside = current.tagName === "ASIDE" && current.id === "aside-chatting";
       const hasModernChatShell = current.tagName === "ASIDE" && Boolean(current.querySelector("[role='log']"));
       const hasChatParts = Boolean(
         current.querySelector(
           "[class*='live_chatting_header_container' i], [class*='live_chatting_input_container' i], [class*='live_chatting_list_item' i], [role='log'], [class*='_chatting_message_' i]"
         )
-      );
+      ) || isChatHeaderCandidate(current.firstElementChild, { includeHidden: true });
 
-      if ((hasChatShellClass && !isHeaderOnly && hasChatParts) || hasModernChatShell) {
+      if ((hasChatShellClass && !isHeaderOnly && hasChatParts) || hasModernChatShell || (isKnownChatAside && hasChatParts)) {
         return current;
       }
     }
@@ -3483,31 +3523,55 @@
     }
   }
 
+  function findChatHeaderFromChatAside({ includeHidden = false } = {}) {
+    const hosts = queryAllSafe(document, ["aside#aside-chatting"])
+      .filter((element) => element instanceof HTMLElement);
+
+    for (const host of hosts) {
+      const firstChild = host.firstElementChild;
+
+      if (isChatHeaderCandidate(firstChild, { includeHidden })) {
+        return firstChild;
+      }
+
+      for (const child of [...host.children]) {
+        if (child.getAttribute("role") === "log") {
+          break;
+        }
+
+        if (isChatHeaderCandidate(child, { includeHidden })) {
+          return child;
+        }
+      }
+    }
+
+    return null;
+  }
+
   function findChatHeaderFromLog({ includeHidden = false } = {}) {
     const logs = queryAllSafe(document, ["[role='log']"])
       .filter((element) => element instanceof HTMLElement);
 
     for (const log of logs) {
-      const header = log.previousElementSibling;
       const host = log.closest("aside");
-      const candidate = header instanceof HTMLElement
-        ? header
-        : host?.firstElementChild instanceof HTMLElement
-          ? host.firstElementChild
-          : null;
+      const hostHeader = host?.firstElementChild instanceof HTMLElement ? host.firstElementChild : null;
 
-      if (!(candidate instanceof HTMLElement)) {
-        continue;
+      if (isChatHeaderCandidate(hostHeader, { includeHidden })) {
+        return hostHeader;
       }
 
-      if (!includeHidden && !isElementVisible(candidate)) {
-        continue;
-      }
+      for (
+        let candidate = log.previousElementSibling;
+        candidate instanceof HTMLElement;
+        candidate = candidate.previousElementSibling
+      ) {
+        if (isDonationRankingPanel(candidate)) {
+          continue;
+        }
 
-      const text = getCompactText(candidate);
-
-      if (text.includes("채팅") || candidate.querySelector("h1, h2, [class*='title' i]")) {
-        return candidate;
+        if (isChatHeaderCandidate(candidate, { includeHidden })) {
+          return candidate;
+        }
       }
     }
 
@@ -3515,15 +3579,11 @@
   }
 
   function findChatHeaderTarget({ includeHidden = false } = {}) {
-    let candidates = queryAllSafe(document, CHAT_HEADER_SELECTORS)
+    const candidates = queryAllSafe(document, CHAT_HEADER_SELECTORS)
       .filter((element) => element instanceof HTMLElement)
-      .filter((element) => /live_chatting_header_/i.test(getClassName(element)));
+      .filter((element) => isChatHeaderCandidate(element, { includeHidden }));
 
-    if (!includeHidden) {
-      candidates = candidates.filter(isElementVisible);
-    }
-
-    return candidates[0] || findChatHeaderFromLog({ includeHidden });
+    return candidates[0] || findChatHeaderFromChatAside({ includeHidden }) || findChatHeaderFromLog({ includeHidden });
   }
 
   function findGuestChatHostFromRows() {

@@ -127,7 +127,11 @@ for (const token of [
   '"[role=\'log\'] [class*=\'_item_\' i]:has([class*=\'_chatting_message_\' i])"',
   "function getMessageContainerElement(row)",
   "function getNicknameButtonElement(row)",
+  "function isDonationRankingPanel(element)",
+  "function isChatHeaderCandidate(element",
+  "function findChatHeaderFromChatAside",
   "function findChatHeaderFromLog",
+  "aside#aside-chatting",
   "aside:has([role='log'])",
   'html[data-chzzk-chat-ui-toggle-detected-theme="dark"]'
 ]) {
@@ -385,10 +389,14 @@ const requiredGuestChatLiveVerifyTokens = [
   'const GUEST_CHAT_TOGGLE_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-toggle";',
   'const GUEST_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleGuest";',
   "function collectGuestChatState(page)",
+  "function collectHeaderButtonPlacement(page)",
+  "function assertHeaderButtonsInChatHeader(label, state)",
   "function waitForGuestChatState(page",
   "function assertGuestChatOn(label, state, liveUrl)",
   "function assertGuestChatOff(label, state)",
   "function assertGuestChatHeaderToggleFlow(page)",
+  "const headerButtonsBefore = await collectHeaderButtonPlacement(page);",
+  "assertHeaderButtonsInChatHeader(\"initial header button placement\", headerButtonsBefore);",
   "await popup.locator(\"#useGuestChatFrame\").setChecked(options.useGuestChatFrame);",
   "const guestChatToggle = await assertGuestChatHeaderToggleFlow(page);",
   "chzzk-live-guest-chat-on.png",
@@ -572,6 +580,14 @@ if (!contentSource.includes('html[data-chzzk-chat-ui-toggle-donation-ranking="of
 
 if (!contentSource.includes('[class*="live_chatting_ranking_container" i]')) {
   throw new Error("content script must target the CHZZK live chat ranking container.");
+}
+
+if (!contentSource.includes('aside#aside-chatting > :has([class*="ranking" i])')) {
+  throw new Error("content script must target the current CHZZK chat ranking panel.");
+}
+
+if (!contentSource.includes("isDonationRankingPanel(candidate)")) {
+  throw new Error("content script must not treat ranking panels as chat headers.");
 }
 
 const requiredMiniChatContentTokens = [
