@@ -10,6 +10,7 @@ const contentSource = await readFile(path.join(root, "content.js"), "utf8");
 const backgroundSource = await readFile(path.join(root, "background.js"), "utf8");
 const popupMarkup = await readFile(path.join(root, "popup.html"), "utf8");
 const popupSource = await readFile(path.join(root, "popup.js"), "utf8");
+const liveVerifySource = await readFile(path.join(root, "tools", "verify-live-edge.cjs"), "utf8");
 const normalizedContentSource = contentSource.replace(/\r\n/g, "\n");
 
 const requiredRootFiles = [
@@ -379,6 +380,29 @@ for (const token of requiredGuestChatTokens) {
   }
 }
 
+const requiredGuestChatLiveVerifyTokens = [
+  'const GUEST_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-guest-chat-frame";',
+  'const GUEST_CHAT_TOGGLE_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-toggle";',
+  'const GUEST_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleGuest";',
+  "function collectGuestChatState(page)",
+  "function waitForGuestChatState(page",
+  "function assertGuestChatOn(label, state, liveUrl)",
+  "function assertGuestChatOff(label, state)",
+  "function assertGuestChatHeaderToggleFlow(page)",
+  "await popup.locator(\"#useGuestChatFrame\").setChecked(options.useGuestChatFrame);",
+  "const guestChatToggle = await assertGuestChatHeaderToggleFlow(page);",
+  "chzzk-live-guest-chat-on.png",
+  "state.frame.cleanbotDefault === \"off\"",
+  "state.frame.localStorageCleanbot === \"false\"",
+  "state.page.nativeVisibleRows === 0"
+];
+
+for (const token of requiredGuestChatLiveVerifyTokens) {
+  if (!liveVerifySource.includes(token)) {
+    throw new Error(`live Edge verification must exercise guest chat iframe behavior: ${token}`);
+  }
+}
+
 const cleanBotDefaultStart = contentSource.indexOf("function applyGuestChatCleanBotDefault()");
 const cleanBotDefaultEnd = contentSource.indexOf("function getGuestChatFrameTheme()", cleanBotDefaultStart);
 const cleanBotDefaultSource =
@@ -405,6 +429,23 @@ const injectStyleCallIndex = startFunctionSource.indexOf("injectStyle();");
 
 if (cleanBotDefaultCallIndex < 0 || injectStyleCallIndex < 0 || cleanBotDefaultCallIndex > injectStyleCallIndex) {
   throw new Error("guest cleanbot default must be applied before normal content script initialization.");
+}
+
+const markGuestChatToggleControlHostStart =
+  contentSource.indexOf("function markGuestChatToggleControlHost(header)");
+const markGuestChatToggleControlHostEnd =
+  contentSource.indexOf("function setGuestChatToggleButtonState", markGuestChatToggleControlHostStart);
+const markGuestChatToggleControlHostSource =
+  markGuestChatToggleControlHostStart >= 0 &&
+  markGuestChatToggleControlHostEnd > markGuestChatToggleControlHostStart
+    ? contentSource.slice(markGuestChatToggleControlHostStart, markGuestChatToggleControlHostEnd)
+    : "";
+
+if (
+  !markGuestChatToggleControlHostSource.includes("if (!currentOptions.useGuestChatFrame)") ||
+  !markGuestChatToggleControlHostSource.includes("clearGuestChatControlHosts();")
+) {
+  throw new Error("guest chat control-host marker must be cleared when guest chat is off.");
 }
 
 const syncGuestChatFrameStart = contentSource.indexOf("function syncGuestChatFrame()");

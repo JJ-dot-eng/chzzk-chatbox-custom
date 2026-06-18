@@ -13,12 +13,22 @@ const OUTPUT_DIR = path.join(process.cwd(), "output", "playwright");
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const EXTENSION_NAME = "치지직 채팅 커스텀";
 const EXTENSION_BACKGROUND_FILE = "background.js";
+const GUEST_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-guest-chat-frame";
+const GUEST_CHAT_FRAME_CONTAINER_ID = "chzzk-chat-ui-toggle-guest-chat-frame-container";
+const GUEST_CHAT_TOGGLE_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-toggle";
+const GUEST_CHAT_HOST_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-host";
+const GUEST_CHAT_CONTROL_HOST_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-control-host";
+const GUEST_CHAT_EMBED_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-embed";
+const GUEST_CHAT_CLEANBOT_DEFAULT_ATTR = "data-chzzk-chat-ui-toggle-guest-cleanbot-default";
+const GUEST_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleGuest";
+const LIVE_CHANNEL_ID_PATTERN = /^[0-9a-f]{32}$/i;
 
 const onOptions = {
   showNicknames: true,
   showBadges: true,
   showTimestamps: true,
   showChatBoxes: true,
+  useGuestChatFrame: false,
   showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: false,
@@ -30,6 +40,7 @@ const offOptions = {
   showBadges: false,
   showTimestamps: false,
   showChatBoxes: true,
+  useGuestChatFrame: false,
   showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: false,
@@ -41,6 +52,7 @@ const badgeOffOptions = {
   showBadges: false,
   showTimestamps: true,
   showChatBoxes: true,
+  useGuestChatFrame: false,
   showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: false,
@@ -52,6 +64,7 @@ const nicknameOffOptions = {
   showBadges: true,
   showTimestamps: true,
   showChatBoxes: true,
+  useGuestChatFrame: false,
   showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: false,
@@ -63,6 +76,7 @@ const chatBoxOffOptions = {
   showBadges: true,
   showTimestamps: true,
   showChatBoxes: false,
+  useGuestChatFrame: false,
   showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: false,
@@ -74,6 +88,7 @@ const largeTextColorOptions = {
   showBadges: true,
   showTimestamps: true,
   showChatBoxes: true,
+  useGuestChatFrame: false,
   showGuestChatToggleButton: true,
   showLargeText: true,
   showBoldText: false,
@@ -85,6 +100,7 @@ const boldTextOptions = {
   showBadges: true,
   showTimestamps: true,
   showChatBoxes: true,
+  useGuestChatFrame: false,
   showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: true,
@@ -113,6 +129,29 @@ function hexToExpectedRgba(hexColor) {
   const blue = Number.parseInt(hex.slice(4, 6), 16);
 
   return `rgba(${red}, ${green}, ${blue}, 0.18)`;
+}
+
+function extractLiveChannelId(url) {
+  try {
+    const parsedUrl = new URL(url);
+    const pathParts = parsedUrl.pathname.split("/").filter(Boolean);
+
+    if (pathParts[0] === "live" && LIVE_CHANNEL_ID_PATTERN.test(pathParts[1] || "")) {
+      return pathParts[1].toLowerCase();
+    }
+
+    if (pathParts.length === 1 && LIVE_CHANNEL_ID_PATTERN.test(pathParts[0])) {
+      return pathParts[0].toLowerCase();
+    }
+
+    return null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function isVisibleRect(rect) {
+  return Boolean(rect && rect.width > 0 && rect.height > 0);
 }
 
 function summarizeFrameState(frameStates) {
@@ -435,6 +474,233 @@ async function collectFrameStates(page) {
   }
 
   return states;
+}
+
+async function collectGuestChatState(page) {
+  const pageState = await page.evaluate(
+    ({
+      frameId,
+      frameContainerId,
+      toggleButtonId,
+      guestHostAttr,
+      guestControlHostAttr
+    }) => {
+      const getRectState = (element) => {
+        if (!(element instanceof HTMLElement)) {
+          return null;
+        }
+
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+
+        return {
+          x: Math.round(rect.x),
+          y: Math.round(rect.y),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+          display: style.display,
+          visibility: style.visibility,
+          opacity: style.opacity
+        };
+      };
+      const isVisible = (element) => {
+        if (!(element instanceof HTMLElement)) {
+          return false;
+        }
+
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.display !== "none" &&
+          style.visibility !== "hidden" &&
+          style.opacity !== "0"
+        );
+      };
+      const frame = document.getElementById(frameId);
+      const frameContainer = document.getElementById(frameContainerId);
+      const toggleButton = document.getElementById(toggleButtonId);
+      const guestHost = document.querySelector(`[${guestHostAttr}="true"]`);
+      const guestControlHost = document.querySelector(`[${guestControlHostAttr}="true"]`);
+      const nativeRows = [...document.querySelectorAll('[role="log"] [class*="_item_" i]')];
+
+      return {
+        url: location.href,
+        rootGuestFrame: document.documentElement.getAttribute("data-chzzk-chat-ui-toggle-guest-chat-frame"),
+        toggleButton: toggleButton
+          ? {
+              ariaPressed: toggleButton.getAttribute("aria-pressed"),
+              title: toggleButton.getAttribute("title"),
+              state: toggleButton.dataset.state || null,
+              rect: getRectState(toggleButton)
+            }
+          : null,
+        guestHost: guestHost
+          ? {
+              tagName: guestHost.tagName.toLowerCase(),
+              id: guestHost.id || null,
+              className: String(guestHost.getAttribute("class") || "").slice(0, 120),
+              rect: getRectState(guestHost)
+            }
+          : null,
+        guestControlHost: guestControlHost
+          ? {
+              tagName: guestControlHost.tagName.toLowerCase(),
+              id: guestControlHost.id || null,
+              className: String(guestControlHost.getAttribute("class") || "").slice(0, 120),
+              rect: getRectState(guestControlHost)
+            }
+          : null,
+        frameContainer: frameContainer
+          ? {
+              parentId: frameContainer.parentElement?.id || null,
+              parentTagName: frameContainer.parentElement?.tagName.toLowerCase() || null,
+              rect: getRectState(frameContainer)
+            }
+          : null,
+        frame: frame
+          ? {
+              src: frame instanceof HTMLIFrameElement ? frame.src : "",
+              credentiallessAttr: frame.getAttribute("credentialless"),
+              credentiallessProp: frame instanceof HTMLIFrameElement ? frame.credentialless === true : false,
+              rect: getRectState(frame)
+            }
+          : null,
+        nativeVisibleRows: nativeRows.filter(isVisible).length
+      };
+    },
+    {
+      frameId: GUEST_CHAT_FRAME_ID,
+      frameContainerId: GUEST_CHAT_FRAME_CONTAINER_ID,
+      toggleButtonId: GUEST_CHAT_TOGGLE_BUTTON_ID,
+      guestHostAttr: GUEST_CHAT_HOST_ATTR,
+      guestControlHostAttr: GUEST_CHAT_CONTROL_HOST_ATTR
+    }
+  );
+
+  let frameState = null;
+
+  for (const frame of page.frames()) {
+    let parsedUrl = null;
+
+    try {
+      parsedUrl = new URL(frame.url());
+    } catch (_error) {
+      continue;
+    }
+
+    if (parsedUrl.searchParams.get(GUEST_CHAT_FRAME_MARKER_PARAM) !== "1") {
+      continue;
+    }
+
+    try {
+      frameState = await frame.evaluate(
+        ({ guestEmbedAttr, guestCleanbotDefaultAttr, guestMarkerParam }) => ({
+          url: location.href,
+          readyState: document.readyState,
+          title: document.title,
+          marker: new URL(location.href).searchParams.get(guestMarkerParam),
+          embed: document.documentElement.getAttribute(guestEmbedAttr),
+          cleanbotDefault: document.documentElement.getAttribute(guestCleanbotDefaultAttr),
+          localStorageCleanbot: window.localStorage?.getItem("cleanbot") || null,
+          hasStyle: Boolean(document.getElementById("chzzk-chat-ui-toggle-style")),
+          logCount: document.querySelectorAll('[role="log"]').length,
+          rowCount: document.querySelectorAll('[role="log"] [class*="_item_" i]').length,
+          bodyText: String(document.body?.innerText || "").slice(0, 500)
+        }),
+        {
+          guestEmbedAttr: GUEST_CHAT_EMBED_ATTR,
+          guestCleanbotDefaultAttr: GUEST_CHAT_CLEANBOT_DEFAULT_ATTR,
+          guestMarkerParam: GUEST_CHAT_FRAME_MARKER_PARAM
+        }
+      );
+    } catch (error) {
+      frameState = {
+        url: frame.url(),
+        inaccessible: true,
+        error: String(error.message || error).slice(0, 160)
+      };
+    }
+
+    break;
+  }
+
+  return { page: pageState, frame: frameState };
+}
+
+function isGuestChatOnState(state, liveUrl) {
+  if (!state?.page?.frame || !state.frame) {
+    return false;
+  }
+
+  let frameUrl = null;
+
+  try {
+    frameUrl = new URL(state.page.frame.src);
+  } catch (_error) {
+    return false;
+  }
+
+  const liveChannelId = extractLiveChannelId(liveUrl);
+  const framePathParts = frameUrl.pathname.split("/").filter(Boolean);
+  const frameChannelId = framePathParts[1]?.toLowerCase() || null;
+
+  return Boolean(
+    state.page.rootGuestFrame === "on" &&
+      state.page.toggleButton?.ariaPressed === "true" &&
+      isVisibleRect(state.page.toggleButton?.rect) &&
+      isVisibleRect(state.page.guestHost?.rect) &&
+      isVisibleRect(state.page.frameContainer?.rect) &&
+      isVisibleRect(state.page.frame?.rect) &&
+      framePathParts[0] === "live" &&
+      framePathParts[2] === "chat" &&
+      (!liveChannelId || frameChannelId === liveChannelId) &&
+      frameUrl.searchParams.get(GUEST_CHAT_FRAME_MARKER_PARAM) === "1" &&
+      (!frameUrl.searchParams.has("theme") || ["dark", "light"].includes(frameUrl.searchParams.get("theme"))) &&
+      state.page.frame.credentiallessAttr !== null &&
+      state.page.frame.credentiallessProp === true &&
+      state.page.nativeVisibleRows === 0 &&
+      state.frame.marker === "1" &&
+      state.frame.embed === "true" &&
+      state.frame.cleanbotDefault === "off" &&
+      state.frame.localStorageCleanbot === "false" &&
+      state.frame.hasStyle === true &&
+      (state.frame.logCount > 0 || state.frame.bodyText.includes("채팅"))
+  );
+}
+
+function isGuestChatOffState(state) {
+  return Boolean(
+    state?.page &&
+      state.page.rootGuestFrame === "off" &&
+      state.page.toggleButton?.ariaPressed === "false" &&
+      isVisibleRect(state.page.toggleButton?.rect) &&
+      !state.page.guestHost &&
+      !state.page.guestControlHost &&
+      !state.page.frameContainer &&
+      !state.page.frame &&
+      !state.frame &&
+      state.page.nativeVisibleRows > 0
+  );
+}
+
+async function waitForGuestChatState(page, { enabled, timeoutMs = 20000 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+  let latestState = null;
+
+  while (Date.now() < deadline) {
+    latestState = await collectGuestChatState(page);
+
+    if (enabled ? isGuestChatOnState(latestState, page.url()) : isGuestChatOffState(latestState)) {
+      return latestState;
+    }
+
+    await page.waitForTimeout(1000);
+  }
+
+  return latestState;
 }
 
 async function waitForRoleCoverage(page, timeoutMs = 20000) {
@@ -830,6 +1096,48 @@ function assertBadgeGapCollapsed(label, summary) {
   }
 }
 
+function assertGuestChatOn(label, state, liveUrl) {
+  if (isGuestChatOnState(state, liveUrl)) {
+    return;
+  }
+
+  throw new Error(
+    `${label}: guest chat iframe did not become active; state ${JSON.stringify(state).slice(0, 1200)}`
+  );
+}
+
+function assertGuestChatOff(label, state) {
+  if (isGuestChatOffState(state)) {
+    return;
+  }
+
+  throw new Error(
+    `${label}: guest chat iframe did not cleanly turn off; state ${JSON.stringify(state).slice(0, 1200)}`
+  );
+}
+
+async function assertGuestChatHeaderToggleFlow(page) {
+  const toggleButton = page.locator(`#${GUEST_CHAT_TOGGLE_BUTTON_ID}`);
+
+  await toggleButton.waitFor({ state: "visible", timeout: 30000 });
+
+  if ((await toggleButton.getAttribute("aria-pressed")) === "true") {
+    await toggleButton.click();
+    assertGuestChatOff("guest chat precondition off state", await waitForGuestChatState(page, { enabled: false }));
+  }
+
+  await toggleButton.click();
+  const guestOn = await waitForGuestChatState(page, { enabled: true });
+  assertGuestChatOn("guest chat header-toggle on state", guestOn, page.url());
+  await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-guest-chat-on.png"), fullPage: false });
+
+  await toggleButton.click();
+  const guestOff = await waitForGuestChatState(page, { enabled: false });
+  assertGuestChatOff("guest chat header-toggle off state", guestOff);
+
+  return { on: guestOn, off: guestOff };
+}
+
 async function collectState(page, label) {
   await page.bringToFront();
   await page.waitForTimeout(1500);
@@ -861,6 +1169,9 @@ async function setPopupOptions(popup, options) {
   await popup.locator("#showTimestamps").setChecked(options.showTimestamps);
 
   await selectPopupTab(popup, "stylePanel");
+  if (typeof options.useGuestChatFrame === "boolean") {
+    await popup.locator("#useGuestChatFrame").setChecked(options.useGuestChatFrame);
+  }
   await popup.locator("#showChatBoxes").setChecked(options.showChatBoxes);
   await popup.locator("#showLargeText").setChecked(options.showLargeText);
   await popup.locator("#showBoldText").setChecked(options.showBoldText);
@@ -917,6 +1228,8 @@ async function main() {
   assertChatBoxesOn("initial on state", before.summary);
   assertChatBoxColor("initial on state", before.summary, DEFAULT_CHAT_BOX_COLOR);
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-on-before.png"), fullPage: false });
+
+  const guestChatToggle = await assertGuestChatHeaderToggleFlow(page);
 
   await setExtensionOptions(worker, boldTextOptions);
   await page.reload({ waitUntil: "domcontentloaded", timeout: 45000 });
@@ -1019,6 +1332,7 @@ async function main() {
         extensionId,
         screenshots: [
           "output/playwright/chzzk-live-on-before.png",
+          "output/playwright/chzzk-live-guest-chat-on.png",
           "output/playwright/chzzk-live-bold-reload-no-popup.png",
           "output/playwright/chzzk-live-badge-off.png",
           "output/playwright/chzzk-live-nickname-off.png",
@@ -1030,6 +1344,7 @@ async function main() {
         ],
         summaries: {
           before: before.summary,
+          guestChatToggle,
           boldReloadNoPopup: boldReloadNoPopup.summary,
           badgeOff: badgeOff.summary,
           nicknameOff: nicknameOff.summary,
