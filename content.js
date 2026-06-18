@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.42";
+  const SCRIPT_VERSION = "0.2.43";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -11,8 +11,8 @@
   const STORAGE_KEY = "chzzkChatUiToggleOptions";
   const ROLE_ATTR = "data-chzzk-chat-ui-toggle-role";
   const CHAT_ROW_ATTR = "data-chzzk-chat-ui-toggle-chat-row";
-  const NATIVE_CHAT_ROW_SELECTOR = `[class*="live_chatting_list_item" i]:has([class*="live_chatting_message_container" i])`;
-  const CHAT_ROW_SCOPE_SELECTOR = `[class*="live_chatting_list_item" i][${CHAT_ROW_ATTR}="true"]`;
+  const NATIVE_CHAT_ROW_SELECTOR = `:is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i]):has(:is([class*="live_chatting_message_container" i], [class*="_chatting_message_" i]))`;
+  const CHAT_ROW_SCOPE_SELECTOR = `:is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i])[${CHAT_ROW_ATTR}="true"]`;
   const STYLE_ID = "chzzk-chat-ui-toggle-style";
   const CACHE_KEY = "chzzkChatUiToggleOptionsCache";
   const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
@@ -153,7 +153,9 @@
   ];
 
   const CHAT_ROW_SELECTORS = [
-    "[class*='live_chatting_list_item' i]"
+    "[class*='live_chatting_list_item' i]",
+    "[role='log'] [class*='_item_' i]:has([class*='_chatting_message_' i])",
+    "[class*='_item_' i]:has([class*='_chatting_message_' i])"
   ];
 
   const CHAT_HEADER_SELECTORS = [
@@ -173,7 +175,8 @@
     "[class*='live_chatting_header_container' i]",
     "[class*='live_chatting' i]",
     "[class*='chatting_area' i]",
-    "[class*='chat_area' i]"
+    "[class*='chat_area' i]",
+    "aside:has([role='log'])"
   ];
 
   const MINI_CHAT_INPUT_CONTAINER_SELECTORS = [
@@ -229,6 +232,7 @@
       "[class*='badge' i]",
       "[class*='grade' i]",
       "img[src*='badge' i]",
+      "img[src*='/glive/icon/' i]",
       "svg[aria-label*='배지' i]"
     ],
     timestamp: [
@@ -1218,7 +1222,7 @@
       }
 
       html:not([data-chzzk-chat-ui-toggle-ready="true"])
-        [class*="live_chatting_list_item" i]:has([class*="live_chatting_message_container" i]) {
+        ${NATIVE_CHAT_ROW_SELECTOR} {
         visibility: hidden !important;
       }
 
@@ -1551,6 +1555,45 @@
       .chzzk-chat-ui-toggle-mini-chat-button[data-state="error"] {
         background: rgba(224, 49, 49, 0.12) !important;
         color: #c92a2a !important;
+      }
+
+      html[data-chzzk-chat-ui-toggle-detected-theme="dark"]
+        :is(
+          .chzzk-chat-ui-toggle-guest-chat-toggle,
+          .chzzk-chat-ui-toggle-header-settings,
+          .chzzk-chat-ui-toggle-mini-chat-button
+        ) {
+        background: rgba(255, 255, 255, 0.07) !important;
+        color: rgba(255, 255, 255, 0.86) !important;
+      }
+
+      html[data-chzzk-chat-ui-toggle-detected-theme="dark"]
+        :is(
+          .chzzk-chat-ui-toggle-guest-chat-toggle,
+          .chzzk-chat-ui-toggle-header-settings,
+          .chzzk-chat-ui-toggle-mini-chat-button
+        ):hover {
+        background: rgba(255, 255, 255, 0.16) !important;
+        color: #ffffff !important;
+      }
+
+      html[data-chzzk-chat-ui-toggle-detected-theme="dark"]
+        :is(
+          .chzzk-chat-ui-toggle-guest-chat-toggle,
+          .chzzk-chat-ui-toggle-mini-chat-button
+        )[aria-pressed="true"] {
+        background: rgba(0, 196, 113, 0.24) !important;
+        color: #8fffd2 !important;
+      }
+
+      html[data-chzzk-chat-ui-toggle-detected-theme="dark"]
+        :is(
+          .chzzk-chat-ui-toggle-guest-chat-toggle,
+          .chzzk-chat-ui-toggle-header-settings,
+          .chzzk-chat-ui-toggle-mini-chat-button
+        )[data-state="error"] {
+        background: rgba(255, 107, 107, 0.18) !important;
+        color: #ffc9c9 !important;
       }
 
       .${HEADER_SETTINGS_BUTTON_ICON_CLASS} {
@@ -2002,7 +2045,13 @@
         [class*="live_chatting_message_text" i],
       html[data-chzzk-chat-ui-toggle-large-text="on"]
         ${NATIVE_CHAT_ROW_SELECTOR}
+        [class*="_chatting_message_" i] [class*="_text_" i],
+      html[data-chzzk-chat-ui-toggle-large-text="on"]
+        ${NATIVE_CHAT_ROW_SELECTOR}
         [class*="live_chatting_username_nickname" i],
+      html[data-chzzk-chat-ui-toggle-large-text="on"]
+        ${NATIVE_CHAT_ROW_SELECTOR}
+        button[class*="nickname" i] [class*="nickname" i],
       html[data-chzzk-chat-ui-toggle-large-text="on"]
         ${NATIVE_CHAT_ROW_SELECTOR}
         [class*="name_text" i],
@@ -2018,10 +2067,14 @@
         ${NATIVE_CHAT_ROW_SELECTOR} :where(
           [class*="live_chatting_message_text" i],
           [class*="live_chatting_message_text" i] *,
+          [class*="_chatting_message_" i] [class*="_text_" i],
+          [class*="_chatting_message_" i] [class*="_text_" i] *,
           [class*="message_text" i],
           [class*="message_text" i] *,
           [class*="live_chatting_username_nickname" i],
           [class*="live_chatting_username_nickname" i] *,
+          button[class*="nickname" i] [class*="nickname" i],
+          button[class*="nickname" i] [class*="nickname" i] *,
           [class*="name_text" i],
           [class*="name_text" i] *,
           .chzzk-chat-ui-toggle-timestamp
@@ -2030,7 +2083,7 @@
       }
 
       html[data-chzzk-chat-ui-toggle-timestamps="on"]
-        ${CHAT_ROW_SCOPE_SELECTOR}:has([class*="live_chatting_message_nickname" i]):not(:has(.chzzk-chat-ui-toggle-timestamp)) {
+        ${CHAT_ROW_SCOPE_SELECTOR}:has(:is([class*="live_chatting_message_nickname" i], button[class*="nickname" i])):not(:has(.chzzk-chat-ui-toggle-timestamp)) {
         visibility: hidden !important;
       }
 
@@ -2044,6 +2097,9 @@
         [class*="live_chatting_username_nickname" i],
       html[data-chzzk-chat-ui-toggle-nicknames="off"]
         ${CHAT_ROW_SCOPE_SELECTOR}
+        button[class*="nickname" i] [class*="nickname" i],
+      html[data-chzzk-chat-ui-toggle-nicknames="off"]
+        ${CHAT_ROW_SCOPE_SELECTOR}
         [class*="name_text" i] {
         display: none !important;
       }
@@ -2051,6 +2107,9 @@
       html[data-chzzk-chat-ui-toggle-badges="off"]
         ${CHAT_ROW_SCOPE_SELECTOR}
         button[class*="live_chatting_message_nickname" i],
+      html[data-chzzk-chat-ui-toggle-badges="off"]
+        ${CHAT_ROW_SCOPE_SELECTOR}
+        button[class*="nickname" i],
       html[data-chzzk-chat-ui-toggle-badges="off"]
         ${CHAT_ROW_SCOPE_SELECTOR}
         [class*="live_chatting_username_container" i] {
@@ -2077,6 +2136,22 @@
       html[data-chzzk-chat-ui-toggle-badges="off"]
         ${CHAT_ROW_SCOPE_SELECTOR}
         button[class*="live_chatting_message_nickname" i]
+        svg {
+        display: none !important;
+        width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      html[data-chzzk-chat-ui-toggle-badges="off"]
+        ${CHAT_ROW_SCOPE_SELECTOR}
+        button[class*="nickname" i]
+        img[src*="/glive/" i],
+      html[data-chzzk-chat-ui-toggle-badges="off"]
+        ${CHAT_ROW_SCOPE_SELECTOR}
+        button[class*="nickname" i]
         svg {
         display: none !important;
         width: 0 !important;
@@ -2118,6 +2193,9 @@
       html[data-chzzk-chat-ui-toggle-nicknames="off"][data-chzzk-chat-ui-toggle-badges="off"][data-chzzk-chat-ui-toggle-timestamps="off"]
         ${CHAT_ROW_SCOPE_SELECTOR}
         [class*="live_chatting_message_container" i],
+      html[data-chzzk-chat-ui-toggle-nicknames="off"][data-chzzk-chat-ui-toggle-badges="off"][data-chzzk-chat-ui-toggle-timestamps="off"]
+        ${CHAT_ROW_SCOPE_SELECTOR}
+        [class*="_chatting_message_" i],
       html[data-chzzk-chat-ui-toggle-nicknames="off"][data-chzzk-chat-ui-toggle-badges="off"][data-chzzk-chat-ui-toggle-timestamps="off"]
         ${CHAT_ROW_SCOPE_SELECTOR}
         [class*="live_chatting_message_text" i] {
@@ -3337,13 +3415,14 @@
       const className = getClassName(current);
       const hasChatShellClass = /live_chatting|chatting_area|chat_area/i.test(className);
       const isHeaderOnly = /live_chatting_header_/i.test(className);
+      const hasModernChatShell = current.tagName === "ASIDE" && Boolean(current.querySelector("[role='log']"));
       const hasChatParts = Boolean(
         current.querySelector(
-          "[class*='live_chatting_header_container' i], [class*='live_chatting_input_container' i], [class*='live_chatting_list_item' i]"
+          "[class*='live_chatting_header_container' i], [class*='live_chatting_input_container' i], [class*='live_chatting_list_item' i], [role='log'], [class*='_chatting_message_' i]"
         )
       );
 
-      if (hasChatShellClass && !isHeaderOnly && hasChatParts) {
+      if ((hasChatShellClass && !isHeaderOnly && hasChatParts) || hasModernChatShell) {
         return current;
       }
     }
@@ -3404,6 +3483,37 @@
     }
   }
 
+  function findChatHeaderFromLog({ includeHidden = false } = {}) {
+    const logs = queryAllSafe(document, ["[role='log']"])
+      .filter((element) => element instanceof HTMLElement);
+
+    for (const log of logs) {
+      const header = log.previousElementSibling;
+      const host = log.closest("aside");
+      const candidate = header instanceof HTMLElement
+        ? header
+        : host?.firstElementChild instanceof HTMLElement
+          ? host.firstElementChild
+          : null;
+
+      if (!(candidate instanceof HTMLElement)) {
+        continue;
+      }
+
+      if (!includeHidden && !isElementVisible(candidate)) {
+        continue;
+      }
+
+      const text = getCompactText(candidate);
+
+      if (text.includes("채팅") || candidate.querySelector("h1, h2, [class*='title' i]")) {
+        return candidate;
+      }
+    }
+
+    return null;
+  }
+
   function findChatHeaderTarget({ includeHidden = false } = {}) {
     let candidates = queryAllSafe(document, CHAT_HEADER_SELECTORS)
       .filter((element) => element instanceof HTMLElement)
@@ -3413,7 +3523,7 @@
       candidates = candidates.filter(isElementVisible);
     }
 
-    return candidates[0] || null;
+    return candidates[0] || findChatHeaderFromLog({ includeHidden });
   }
 
   function findGuestChatHostFromRows() {
@@ -3434,16 +3544,23 @@
         const className = getClassName(element);
         const isChatContainer = /live_chatting|chatting_area|chat_area/i.test(className);
         const isChatRow = /live_chatting_list_item/i.test(className);
+        const isModernChatLog = element.getAttribute("role") === "log";
+        const isModernChatHost = element.tagName === "ASIDE" && Boolean(element.querySelector("[role='log']"));
 
         if (isChatContainer && !isChatRow) {
           fallback ??= element;
         }
 
+        if (isModernChatLog || isModernChatHost) {
+          fallback ??= isModernChatHost ? element : element.closest("aside") || element;
+        }
+
         if (
           fallback &&
-          queryAllSafe(element, CHAT_HEADER_SELECTORS).some((candidate) => candidate instanceof HTMLElement)
+          (queryAllSafe(element, CHAT_HEADER_SELECTORS).some((candidate) => candidate instanceof HTMLElement) ||
+            findChatHeaderFromLog({ includeHidden: true }))
         ) {
-          return element;
+          return isModernChatHost ? element : fallback;
         }
       }
 
@@ -3474,7 +3591,9 @@
       ? header
       : queryAllSafe(guestHost, CHAT_HEADER_SELECTORS)
         .filter((element) => element instanceof HTMLElement)
-        .find((element) => /live_chatting_header_/i.test(getClassName(element))) || null;
+        .find((element) => /live_chatting_header_/i.test(getClassName(element))) ||
+        findChatHeaderFromLog({ includeHidden: true }) ||
+        null;
 
     if (!(headerElement instanceof HTMLElement)) {
       return null;
@@ -4154,8 +4273,34 @@
     return String(element.getAttribute("class") ?? "");
   }
 
+  function getMessageContainerElement(row) {
+    return row.querySelector(
+      "[class*='live_chatting_message_container' i], [class*='_chatting_message_' i]"
+    );
+  }
+
+  function getNicknameButtonElement(row) {
+    return row.querySelector(
+      "button[class*='live_chatting_message_nickname' i], button[class*='nickname' i]"
+    );
+  }
+
   function getMessageTextElement(row) {
-    return row.querySelector("[class*='live_chatting_message_text' i]");
+    const messageContainer = getMessageContainerElement(row);
+
+    if (messageContainer instanceof HTMLElement) {
+      const messageText = queryAllSafe(messageContainer, [
+        "[class*='live_chatting_message_text' i]",
+        "[class*='message_text' i]",
+        "[class*='_text_' i]"
+      ]).find((element) => !isInsideLiveChatNicknameShell(element));
+
+      if (messageText instanceof HTMLElement) {
+        return messageText;
+      }
+    }
+
+    return row.querySelector("[class*='live_chatting_message_text' i], [class*='message_text' i]");
   }
 
   function isBeforeMessageText(row, element) {
@@ -4183,7 +4328,11 @@
       return true;
     }
 
-    if (tagName === "img" && /badge|emblem|grade/i.test(source)) {
+    if (tagName === "img" && /badge|emblem|grade|\/glive\/icon\//i.test(source)) {
+      return true;
+    }
+
+    if ((tagName === "img" || tagName === "svg") && isInsideLiveChatNicknameShell(element)) {
       return true;
     }
 
@@ -4193,7 +4342,7 @@
   function isInsideLiveChatNicknameShell(element) {
     return Boolean(
       element.closest(
-        "button[class*='live_chatting_message_nickname' i], [class*='live_chatting_username_container' i]"
+        "button[class*='live_chatting_message_nickname' i], [class*='live_chatting_username_container' i], button[class*='nickname' i]"
       )
     );
   }
@@ -4314,15 +4463,23 @@
       return false;
     }
 
-    const nicknameButton = row.querySelector("button[class*='live_chatting_message_nickname' i]");
-    const messageContainer = row.querySelector("[class*='live_chatting_message_container' i]");
+    const nicknameButton = getNicknameButtonElement(row);
+    const messageContainer = getMessageContainerElement(row);
     const messageText = getMessageTextElement(row);
-    const hasChatMessageShell = Boolean(
+    const hasLegacyChatMessageShell = Boolean(
       /live_chatting_list_item/i.test(className) &&
         nicknameButton &&
         messageContainer &&
         messageText
     );
+    const hasModernChatMessageShell = Boolean(
+      row.closest("[role='log']") &&
+        /(?:^|\s)_item_/i.test(className) &&
+        nicknameButton &&
+        messageContainer &&
+        messageText
+    );
+    const hasChatMessageShell = hasLegacyChatMessageShell || hasModernChatMessageShell;
 
     if (!hasChatMessageShell) {
       return false;

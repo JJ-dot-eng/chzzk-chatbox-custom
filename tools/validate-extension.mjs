@@ -114,12 +114,25 @@ if (!contentSource.includes('const CHAT_ROW_ATTR = "data-chzzk-chat-ui-toggle-ch
   throw new Error("content script must define a chat-row scope attribute.");
 }
 
-if (!contentSource.includes('const CHAT_ROW_SCOPE_SELECTOR = `[class*="live_chatting_list_item" i][${CHAT_ROW_ATTR}="true"]`;')) {
+if (!contentSource.includes('const CHAT_ROW_SCOPE_SELECTOR = `:is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i])[${CHAT_ROW_ATTR}="true"]`;')) {
   throw new Error("content script must scope styling to native live chat row elements.");
 }
 
-if (!contentSource.includes('const NATIVE_CHAT_ROW_SELECTOR = `[class*="live_chatting_list_item" i]:has([class*="live_chatting_message_container" i])`;')) {
+if (!contentSource.includes('const NATIVE_CHAT_ROW_SELECTOR = `:is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i]):has(:is([class*="live_chatting_message_container" i], [class*="_chatting_message_" i]))`;')) {
   throw new Error("content script must define a native chat-row selector for non-hiding styles.");
+}
+
+for (const token of [
+  '"[role=\'log\'] [class*=\'_item_\' i]:has([class*=\'_chatting_message_\' i])"',
+  "function getMessageContainerElement(row)",
+  "function getNicknameButtonElement(row)",
+  "function findChatHeaderFromLog",
+  "aside:has([role='log'])",
+  'html[data-chzzk-chat-ui-toggle-detected-theme="dark"]'
+]) {
+  if (!contentSource.includes(token)) {
+    throw new Error(`content script must support the current CHZZK chat DOM: ${token}`);
+  }
 }
 
 if (!contentSource.includes('const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";')) {

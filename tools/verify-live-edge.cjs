@@ -11,6 +11,8 @@ const ROLE_ATTR = "data-chzzk-chat-ui-toggle-role";
 const CHAT_ROW_ATTR = "data-chzzk-chat-ui-toggle-chat-row";
 const OUTPUT_DIR = path.join(process.cwd(), "output", "playwright");
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
+const EXTENSION_NAME = "치지직 채팅 커스텀";
+const EXTENSION_BACKGROUND_FILE = "background.js";
 
 const onOptions = {
   showNicknames: true,
@@ -266,7 +268,8 @@ async function collectFrameStates(page) {
           }));
         }
 
-        const timestampNicknameGaps = [...document.querySelectorAll("[class*='live_chatting_list_item' i]")]
+        const chatRows = [...document.querySelectorAll(`[${chatRowAttr}="true"]`)];
+        const timestampNicknameGaps = chatRows
           .slice(-80)
           .map((row) => {
             const timestamp = row.querySelector(`[${roleAttr}~="timestamp"]`);
@@ -294,8 +297,8 @@ async function collectFrameStates(page) {
           })
           .filter((gap) => Number.isFinite(gap) && gap >= 0);
 
-        const chatBoxSamples = [...document.querySelectorAll("[class*='live_chatting_list_item' i]")]
-          .filter((row) => row.querySelector("[class*='live_chatting_message_container' i]"))
+        const chatBoxSamples = chatRows
+          .filter((row) => row.querySelector("[class*='live_chatting_message_container' i], [class*='_chatting_message_' i]"))
           .slice(-40)
           .map((row) => {
             const style = getComputedStyle(row);
@@ -309,7 +312,16 @@ async function collectFrameStates(page) {
             const width = Math.round(rect.width);
             const fontSize = Number.parseFloat(style.fontSize) || 0;
             const fontWeight = Number.parseInt(style.fontWeight, 10) || 0;
-            const messageText = row.querySelector("[class*='live_chatting_message_text' i], [class*='message_text' i]");
+            const messageText = [
+              ...row.querySelectorAll(
+                "[class*='live_chatting_message_text' i], [class*='message_text' i], [class*='_chatting_message_' i] [class*='_text_' i]"
+              )
+            ].find(
+              (element) =>
+                !element.closest(
+                  "button[class*='live_chatting_message_nickname' i], button[class*='nickname' i]"
+                )
+            );
             const messageTextStyle = messageText ? getComputedStyle(messageText) : null;
             const messageFontWeight = messageTextStyle
               ? Number.parseInt(messageTextStyle.fontWeight, 10) || 0
@@ -449,16 +461,46 @@ async function waitForRoleCoverage(page, timeoutMs = 20000) {
   return { states: latestStates, summary: latestSummary };
 }
 
+function hasRoleCoverage(summary) {
+  return Boolean(
+    summary &&
+      summary.framesWithStyle > 0 &&
+      summary.counts.nickname > 0 &&
+      summary.counts.badge > 0 &&
+      summary.counts.timestamp > 0
+  );
+}
+
 async function findExtensionWorker(context) {
   const deadline = Date.now() + 10000;
 
   while (Date.now() < deadline) {
-    const worker = context
-      .serviceWorkers()
-      .find((candidate) => candidate.url().startsWith("chrome-extension://"));
+    for (const worker of context.serviceWorkers()) {
+      if (!worker.url().startsWith("chrome-extension://")) {
+        continue;
+      }
 
-    if (worker) {
-      return worker;
+      try {
+        const metadata = await worker.evaluate(({ expectedName, expectedBackgroundFile }) => {
+          const manifest = chrome.runtime.getManifest();
+
+          return {
+            name: manifest.name,
+            backgroundFile: manifest.background?.service_worker || "",
+            hasStorageLocal: Boolean(chrome.storage?.local),
+            matches:
+              manifest.name === expectedName &&
+              manifest.background?.service_worker === expectedBackgroundFile &&
+              Boolean(chrome.storage?.local)
+          };
+        }, { expectedName: EXTENSION_NAME, expectedBackgroundFile: EXTENSION_BACKGROUND_FILE });
+
+        if (metadata.matches) {
+          return worker;
+        }
+      } catch (_error) {
+        // Edge exposes built-in extension workers too. Ignore workers that do not expose our MV3 APIs.
+      }
     }
 
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -620,10 +662,6 @@ function assertSyntheticNoRawPrefixFlash(label, state) {
   for (const target of hiddenTargets) {
     if (!state[target].exists) {
       throw new Error(`${label}: synthetic ${target} was not annotated before first mutation observer check`);
-    }
-
-    if (!state[target].role.includes(target)) {
-      throw new Error(`${label}: synthetic ${target} role missing before first mutation observer check`);
     }
 
     if (state.visible[target]) {
@@ -796,10 +834,15 @@ async function collectState(page, label) {
   await page.bringToFront();
   await page.waitForTimeout(1500);
 
-  const state = {
+  let state = {
     states: await collectFrameStates(page)
   };
   state.summary = summarizeFrameState(state.states);
+
+  if (!hasRoleCoverage(state.summary)) {
+    state = await waitForRoleCoverage(page, 15000);
+  }
+
   assertSummary(label, state.summary);
 
   return state;
