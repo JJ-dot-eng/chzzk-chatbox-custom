@@ -129,6 +129,7 @@ for (const token of [
   "function getNicknameButtonElement(row)",
   "function isDonationRankingPanel(element)",
   "function isChatHeaderCandidate(element",
+  "function findChatHeaderInHost(host",
   "function findChatHeaderFromChatAside",
   "function findChatHeaderFromLog",
   "aside#aside-chatting",
@@ -357,6 +358,7 @@ const requiredGuestChatTokens = [
   'frameUrl.searchParams.set(GUEST_CHAT_FRAME_MARKER_PARAM, "1");',
   'html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_EMBED_ATTR}="true"]',
   '[class*="live_chatting_header" i]',
+  "aside#aside-chatting > :first-child",
   'document.documentElement.dataset.chzzkChatUiToggleDetectedThemeSource = "chat-chrome-foreground";',
   'document.documentElement.dataset.chzzkChatUiToggleDetectedThemeSource = "chat-chrome";',
   "const frameUrl = new URL(`${CHZZK_ORIGIN}/live/${channelId}/chat`);",
@@ -402,6 +404,7 @@ const requiredGuestChatLiveVerifyTokens = [
   "chzzk-live-guest-chat-on.png",
   "state.frame.cleanbotDefault === \"off\"",
   "state.frame.localStorageCleanbot === \"false\"",
+  "state.frame.visibleHeaderCount === 0",
   "state.page.nativeVisibleRows === 0"
 ];
 
@@ -448,12 +451,24 @@ const markGuestChatToggleControlHostSource =
   markGuestChatToggleControlHostEnd > markGuestChatToggleControlHostStart
     ? contentSource.slice(markGuestChatToggleControlHostStart, markGuestChatToggleControlHostEnd)
     : "";
+const findGuestChatControlHostStart =
+  contentSource.indexOf("function findGuestChatControlHost(guestHost, header = null)");
+const findGuestChatControlHostEnd =
+  contentSource.indexOf("function markGuestChatControlHost", findGuestChatControlHostStart);
+const findGuestChatControlHostSource =
+  findGuestChatControlHostStart >= 0 && findGuestChatControlHostEnd > findGuestChatControlHostStart
+    ? contentSource.slice(findGuestChatControlHostStart, findGuestChatControlHostEnd)
+    : "";
 
 if (
   !markGuestChatToggleControlHostSource.includes("if (!currentOptions.useGuestChatFrame)") ||
   !markGuestChatToggleControlHostSource.includes("clearGuestChatControlHosts();")
 ) {
   throw new Error("guest chat control-host marker must be cleared when guest chat is off.");
+}
+
+if (!findGuestChatControlHostSource.includes("findChatHeaderInHost(guestHost")) {
+  throw new Error("guest chat control-host lookup must preserve the native chat header without relying on chat rows.");
 }
 
 const syncGuestChatFrameStart = contentSource.indexOf("function syncGuestChatFrame()");

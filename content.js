@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.2.45";
+  const SCRIPT_VERSION = "0.2.46";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -1242,7 +1242,9 @@
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_EMBED_ATTR}="true"]
         [class*="live_chatting_header" i],
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_EMBED_ATTR}="true"]
-        [class*="chatting_header" i] {
+        [class*="chatting_header" i],
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_EMBED_ATTR}="true"]
+        aside#aside-chatting > :first-child {
         display: none !important;
       }
 
@@ -3445,6 +3447,30 @@
     return hasChatTitleText || hasLegacyChatHeaderClass;
   }
 
+  function findChatHeaderInHost(host, { includeHidden = false } = {}) {
+    if (!(host instanceof HTMLElement)) {
+      return null;
+    }
+
+    const firstChild = host.firstElementChild;
+
+    if (isChatHeaderCandidate(firstChild, { includeHidden })) {
+      return firstChild;
+    }
+
+    for (const child of [...host.children]) {
+      if (child.getAttribute("role") === "log") {
+        break;
+      }
+
+      if (isChatHeaderCandidate(child, { includeHidden })) {
+        return child;
+      }
+    }
+
+    return null;
+  }
+
   function findGuestChatHostFrom(element) {
     for (let current = element; current && current !== document.body; current = current.parentElement) {
       if (!(current instanceof HTMLElement)) {
@@ -3528,20 +3554,10 @@
       .filter((element) => element instanceof HTMLElement);
 
     for (const host of hosts) {
-      const firstChild = host.firstElementChild;
+      const header = findChatHeaderInHost(host, { includeHidden });
 
-      if (isChatHeaderCandidate(firstChild, { includeHidden })) {
-        return firstChild;
-      }
-
-      for (const child of [...host.children]) {
-        if (child.getAttribute("role") === "log") {
-          break;
-        }
-
-        if (isChatHeaderCandidate(child, { includeHidden })) {
-          return child;
-        }
+      if (header) {
+        return header;
       }
     }
 
@@ -3651,7 +3667,9 @@
       ? header
       : queryAllSafe(guestHost, CHAT_HEADER_SELECTORS)
         .filter((element) => element instanceof HTMLElement)
-        .find((element) => /live_chatting_header_/i.test(getClassName(element))) ||
+        .find((element) => isChatHeaderCandidate(element, { includeHidden: true })) ||
+        findChatHeaderInHost(guestHost, { includeHidden: true }) ||
+        findChatHeaderFromChatAside({ includeHidden: true }) ||
         findChatHeaderFromLog({ includeHidden: true }) ||
         null;
 

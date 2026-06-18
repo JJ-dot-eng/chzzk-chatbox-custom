@@ -611,6 +611,24 @@ async function collectGuestChatState(page) {
           cleanbotDefault: document.documentElement.getAttribute(guestCleanbotDefaultAttr),
           localStorageCleanbot: window.localStorage?.getItem("cleanbot") || null,
           hasStyle: Boolean(document.getElementById("chzzk-chat-ui-toggle-style")),
+          visibleHeaderCount: [
+            ...new Set([
+              ...document.querySelectorAll(
+                "aside#aside-chatting > :first-child, [class*='live_chatting_header' i], [class*='chatting_header' i]"
+              )
+            ])
+          ].filter((element) => {
+            const rect = element.getBoundingClientRect();
+            const style = getComputedStyle(element);
+
+            return (
+              rect.width > 0 &&
+              rect.height > 0 &&
+              style.display !== "none" &&
+              style.visibility !== "hidden" &&
+              style.opacity !== "0"
+            );
+          }).length,
           logCount: document.querySelectorAll('[role="log"]').length,
           rowCount: document.querySelectorAll('[role="log"] [class*="_item_" i]').length,
           bodyText: String(document.body?.innerText || "").slice(0, 500)
@@ -729,7 +747,8 @@ function isGuestChatOnState(state, liveUrl) {
       state.frame.cleanbotDefault === "off" &&
       state.frame.localStorageCleanbot === "false" &&
       state.frame.hasStyle === true &&
-      (state.frame.logCount > 0 || state.frame.bodyText.includes("채팅"))
+      state.frame.visibleHeaderCount === 0 &&
+      (state.frame.logCount > 0 || state.frame.bodyText.length > 0)
   );
 }
 
