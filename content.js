@@ -1439,6 +1439,37 @@
       }
 
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"][data-chzzk-chat-ui-toggle-mini-floating-chat-input-only="on"]
+        [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"] button[class*="setting_button" i] {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 32px !important;
+        min-width: 32px !important;
+        max-width: 32px !important;
+        height: 32px !important;
+        min-height: 32px !important;
+        max-height: 32px !important;
+        margin: 0 8px 0 0 !important;
+        padding: 0 !important;
+        position: relative !important;
+        inset: auto !important;
+        transform: none !important;
+        overflow: hidden !important;
+        box-sizing: border-box !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"][data-chzzk-chat-ui-toggle-mini-floating-chat-input-only="on"]
+        [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"] button[class*="setting_button" i] img,
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"][data-chzzk-chat-ui-toggle-mini-floating-chat-input-only="on"]
+        [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"] button[class*="setting_button" i] svg {
+        display: block !important;
+        width: 32px !important;
+        height: 32px !important;
+        margin: 0 !important;
+        flex: 0 0 auto !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"][data-chzzk-chat-ui-toggle-mini-floating-chat-input-only="on"]
         [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"] textarea,
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"][data-chzzk-chat-ui-toggle-mini-floating-chat-input-only="on"]
         [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"] input:not([type="button"]):not([type="submit"]):not([type="reset"]),

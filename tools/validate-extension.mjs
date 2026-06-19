@@ -850,6 +850,8 @@ const requiredMiniChatContentTokens = [
   "right: ${MINI_CHAT_INPUT_ONLY_CONTROL_INSET}px !important;",
   "height: auto !important;",
   "max-height: ${MINI_CHAT_INPUT_ONLY_FIELD_MAX_HEIGHT}px !important;",
+  "button[class*=\"setting_button\" i]",
+  "width: 32px !important;",
   "line-height: normal !important;",
   "resize: none !important;",
   "getCompactText(control).includes(\"후원하기\")",
