@@ -54,6 +54,7 @@
   const GUEST_CHAT_EMBED_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-embed";
   const MINI_CHAT_EMBED_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-embed";
   const MINI_CHAT_HIDDEN_CONTROL_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-hidden-control";
+  const MINI_CHAT_NON_CHAT_PANEL_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-non-chat-panel";
   const MINI_CHAT_COMPACT_INPUT_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-compact-input";
   const MINI_CHAT_INPUT_ONLY_PATH_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-path";
   const MINI_CHAT_INPUT_ONLY_KEEP_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-keep";
@@ -192,6 +193,14 @@
     "[class*='chatting_input_container' i]",
     "[class*='live_chatting_input' i]",
     "[class*='chatting_input' i]"
+  ];
+
+  const MINI_CHAT_NON_CHAT_PANEL_SELECTORS = [
+    "[class*='_fixed_' i]:has(button)",
+    "section:has([aria-controls*='broadcast-information-sports' i])",
+    "[aria-controls*='broadcast-information-sports' i]",
+    "button:has([class*='title_text' i])",
+    "[class*='status_text' i]"
   ];
 
   const PAGE_THEME_BACKGROUND_SELECTORS = [
@@ -1336,6 +1345,11 @@
 
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"]
         [${MINI_CHAT_HIDDEN_CONTROL_ATTR}="true"] {
+        display: none !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"]
+        [${MINI_CHAT_NON_CHAT_PANEL_ATTR}="true"] {
         display: none !important;
       }
 
@@ -4369,6 +4383,7 @@
     element.removeAttribute(ROLE_ATTR);
     element.removeAttribute(MESSAGE_PREFIX_ATTR);
     element.removeAttribute(MINI_CHAT_HIDDEN_CONTROL_ATTR);
+    element.removeAttribute(MINI_CHAT_NON_CHAT_PANEL_ATTR);
     element.removeAttribute(MINI_CHAT_COMPACT_INPUT_ATTR);
     element.removeAttribute(MINI_CHAT_INPUT_ONLY_PATH_ATTR);
     element.removeAttribute(MINI_CHAT_INPUT_ONLY_KEEP_ATTR);
@@ -4403,6 +4418,101 @@
     if (element instanceof HTMLElement) {
       element.setAttribute(MINI_CHAT_HIDDEN_CONTROL_ATTR, "true");
     }
+  }
+
+  function markMiniChatNonChatPanel(element) {
+    if (element instanceof HTMLElement) {
+      element.setAttribute(MINI_CHAT_NON_CHAT_PANEL_ATTR, "true");
+    }
+  }
+
+  function hasMiniChatMessageContent(element) {
+    if (!(element instanceof HTMLElement)) {
+      return false;
+    }
+
+    try {
+      return Boolean(
+        element.getAttribute("role") === "log" ||
+        element.matches(NATIVE_CHAT_ROW_SELECTOR) ||
+        element.querySelector(
+          `[${CHAT_ROW_ATTR}="true"], [class*="live_chatting_message_container" i], [class*="_chatting_message_" i]`
+        )
+      );
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function hasMiniChatNonChatPanelSignal(element) {
+    if (!(element instanceof HTMLElement)) {
+      return false;
+    }
+
+    const text = getCompactText(element);
+    const hasPredictionPanelText = /승부예측|참여\s*마감|파워가\s*걸린/u.test(text);
+    const hasSportsPanelText = /스포츠\s*중계\s*정보|중계\s*정보\s*펼치기|(?:전반|후반)\s*\d+'?/u.test(text);
+
+    if (hasPredictionPanelText) {
+      return true;
+    }
+
+    if (!hasSportsPanelText) {
+      return false;
+    }
+
+    try {
+      return Boolean(
+        element.querySelector("[aria-controls*='broadcast-information-sports' i], img[src*='sports-phinf' i]") ||
+        element.matches("[aria-controls*='broadcast-information-sports' i], section")
+      );
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function isMiniChatNonChatPanelCandidate(element) {
+    return (
+      element instanceof HTMLElement &&
+      !hasMiniChatInputField(element) &&
+      !hasMiniChatMessageContent(element) &&
+      hasMiniChatNonChatPanelSignal(element)
+    );
+  }
+
+  function findMiniChatNonChatPanelRoot(element) {
+    let candidate = element instanceof HTMLElement ? element : null;
+
+    for (
+      let current = candidate, depth = 0;
+      current && current !== document.body && depth < 5;
+      current = current.parentElement, depth += 1
+    ) {
+      if (!(current instanceof HTMLElement)) {
+        break;
+      }
+
+      if (hasMiniChatInputField(current) || hasMiniChatMessageContent(current)) {
+        break;
+      }
+
+      if (hasMiniChatNonChatPanelSignal(current)) {
+        candidate = current;
+      }
+
+      const parent = current.parentElement;
+
+      if (
+        !(parent instanceof HTMLElement) ||
+        parent === document.body ||
+        parent.getAttribute("role") === "log" ||
+        Boolean(parent.querySelector("[role='log']"))
+      ) {
+        break;
+      }
+    }
+
+    return candidate;
   }
 
   function hasMiniChatInputField(element) {
@@ -4667,6 +4777,10 @@
       element.removeAttribute(MINI_CHAT_HIDDEN_CONTROL_ATTR);
     }
 
+    for (const element of document.querySelectorAll(`[${MINI_CHAT_NON_CHAT_PANEL_ATTR}]`)) {
+      element.removeAttribute(MINI_CHAT_NON_CHAT_PANEL_ATTR);
+    }
+
     for (const element of document.querySelectorAll(`[${MINI_CHAT_COMPACT_INPUT_ATTR}]`)) {
       element.removeAttribute(MINI_CHAT_COMPACT_INPUT_ATTR);
     }
@@ -4704,6 +4818,14 @@
     for (const control of controls) {
       if (getCompactText(control) === "채팅") {
         markMiniChatHiddenControl(control);
+      }
+    }
+
+    for (const element of queryAllSafe(document, MINI_CHAT_NON_CHAT_PANEL_SELECTORS)) {
+      const panel = findMiniChatNonChatPanelRoot(element);
+
+      if (isMiniChatNonChatPanelCandidate(panel)) {
+        markMiniChatNonChatPanel(panel);
       }
     }
 
