@@ -1022,6 +1022,11 @@ if (popupMarkup.includes("<strong>큰 글씨</strong>")) {
 }
 
 for (const token of [
+  'id="toggleChatBoxColorPanel"',
+  'aria-controls="chatBoxColorPanel"',
+  'id="chatBoxColorPanel"',
+  'class="color-picker color-picker--sub"',
+  '<label class="toggle-row__label" for="showChatBoxes"><strong>채팅 박스</strong></label>',
   'id="toggleChatFontSizePanel"',
   'aria-controls="chatFontSizePanel"',
   'id="chatFontSizePanel"',
@@ -1039,17 +1044,27 @@ for (const token of [
 }
 
 for (const token of [
+  'const chatBoxColorPanel = document.getElementById("chatBoxColorPanel");',
+  'const toggleChatBoxColorPanelButton = document.getElementById("toggleChatBoxColorPanel");',
   'const chatFontSizeSlider = document.getElementById("chatFontSizePt");',
   'const chatFontSizeValue = document.getElementById("chatFontSizeValue");',
   'const resetChatFontSizeButton = document.getElementById("resetChatFontSize");',
   'const chatFontSizePanel = document.getElementById("chatFontSizePanel");',
   'const toggleChatFontSizePanelButton = document.getElementById("toggleChatFontSizePanel");',
+  "function setChatBoxColorPanelExpanded(",
+  'document.body.classList.toggle("is-chat-box-color-panel-expanded", shouldExpand);',
+  "function syncChatBoxColorPanel(",
   "function setChatFontSizePanelExpanded(",
   'document.body.classList.toggle("is-chat-font-size-panel-expanded", shouldExpand);',
   "function syncChatFontSizePanel(",
+  'event?.target?.id === "showChatBoxes"',
   'event?.target?.id === "showLargeText"',
+  "options.showChatBoxes && isChatBoxColorPanelExpanded",
+  "options.showLargeText && isChatFontSizePanelExpanded",
+  "function handleChatBoxColorPanelToggle()",
   "function handleChatFontSizePanelToggle()",
   "chatFontSizePt: chatFontSizeSlider.value",
+  'toggleChatBoxColorPanelButton.addEventListener("click", handleChatBoxColorPanelToggle);',
   'toggleChatFontSizePanelButton.addEventListener("click", handleChatFontSizePanelToggle);',
   'chatFontSizeSlider.addEventListener("input", handleChatFontSizeInput);',
   'resetChatFontSizeButton.addEventListener("click", handleResetChatFontSize);'
@@ -1061,14 +1076,19 @@ for (const token of [
 
 for (const token of [
   "body.is-chat-font-size-panel-expanded",
+  "body.is-chat-box-color-panel-expanded",
   "scrollbar-width: none;",
   "body::-webkit-scrollbar",
   ".disclosure-button {",
   "border: 0;",
   "background: transparent;",
+  ".color-picker--sub",
   ".disclosure-button:not(:disabled):hover",
+  "body.is-chat-box-color-panel-expanded .color-picker__body",
   "body.is-chat-font-size-panel-expanded .color-picker__body",
+  "body.is-chat-box-color-panel-expanded .color-field",
   "body.is-chat-font-size-panel-expanded .color-field",
+  "body.is-chat-box-color-panel-expanded .hue-slider",
   "body.is-chat-font-size-panel-expanded .hue-slider"
 ]) {
   if (!popupStyles.includes(token)) {

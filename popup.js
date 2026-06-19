@@ -1,5 +1,5 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
-const CONTENT_VERSION = "0.3.7";
+const CONTENT_VERSION = "0.3.8";
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const MINI_CHAT_MIN_WIDTH = 280;
 const MINI_CHAT_MIN_HEIGHT = 28;
@@ -72,6 +72,8 @@ const tabPanels = [...document.querySelectorAll(".tab-panel")];
 const colorPreview = document.getElementById("colorPreview");
 const hexInput = document.getElementById("chatBoxColorHex");
 const resetColorButton = document.getElementById("resetChatBoxColor");
+const chatBoxColorPanel = document.getElementById("chatBoxColorPanel");
+const toggleChatBoxColorPanelButton = document.getElementById("toggleChatBoxColorPanel");
 const colorField = document.getElementById("colorField");
 const colorFieldHandle = document.getElementById("colorFieldHandle");
 const hueSlider = document.getElementById("hueSlider");
@@ -87,6 +89,7 @@ let currentOptions = { ...DEFAULT_OPTIONS };
 let hsv = { hue: 0, saturation: 0, value: 0.5 };
 let colorApplyTimer = 0;
 let fontSizeApplyTimer = 0;
+let isChatBoxColorPanelExpanded = false;
 let isChatFontSizePanelExpanded = false;
 
 function normalizeHexColor(value) {
@@ -358,6 +361,30 @@ function updateChatFontSizeUi(fontSizePt) {
   chatFontSizeValue.textContent = `${normalizedFontSize}pt`;
 }
 
+function setChatBoxColorPanelExpanded(expanded, { enabled = controls.showChatBoxes?.checked === true } = {}) {
+  const shouldExpand = enabled && expanded === true;
+  isChatBoxColorPanelExpanded = shouldExpand;
+  document.body.classList.toggle("is-chat-box-color-panel-expanded", shouldExpand);
+  chatBoxColorPanel.hidden = !shouldExpand;
+  toggleChatBoxColorPanelButton.disabled = !enabled;
+  toggleChatBoxColorPanelButton.setAttribute("aria-expanded", String(shouldExpand));
+  toggleChatBoxColorPanelButton.setAttribute(
+    "aria-label",
+    shouldExpand ? "박스 색상 항목 접기" : "박스 색상 항목 펼치기"
+  );
+}
+
+function syncChatBoxColorPanel(options = currentOptions) {
+  const isChatBoxesEnabled = options.showChatBoxes === true;
+
+  if (!isChatBoxesEnabled) {
+    setChatBoxColorPanelExpanded(false, { enabled: false });
+    return;
+  }
+
+  setChatBoxColorPanelExpanded(isChatBoxColorPanelExpanded, { enabled: true });
+}
+
 function setChatFontSizePanelExpanded(expanded, { enabled = controls.showLargeText?.checked === true } = {}) {
   const shouldExpand = enabled && expanded === true;
   isChatFontSizePanelExpanded = shouldExpand;
@@ -390,7 +417,8 @@ function setControls(options) {
     controls[id].checked = normalized[id];
   }
 
-  isChatFontSizePanelExpanded = normalized.showLargeText;
+  isChatBoxColorPanelExpanded = false;
+  isChatFontSizePanelExpanded = false;
   syncDependentControls(normalized);
   updateChatFontSizeUi(normalized.chatFontSizePt);
   updateColorUi(normalized.chatBoxColor);
@@ -406,6 +434,7 @@ function syncDependentControls(options = currentOptions) {
     fullscreenOnlyRow?.classList.toggle("is-disabled", !isMiniChatEnabled);
   }
 
+  syncChatBoxColorPanel(options);
   syncChatFontSizePanel(options);
 }
 
@@ -597,7 +626,11 @@ async function handleControlChange(event) {
   const options = readControls();
 
   if (event?.target?.id === "showLargeText") {
-    isChatFontSizePanelExpanded = options.showLargeText;
+    isChatFontSizePanelExpanded = options.showLargeText && isChatFontSizePanelExpanded;
+  }
+
+  if (event?.target?.id === "showChatBoxes") {
+    isChatBoxColorPanelExpanded = options.showChatBoxes && isChatBoxColorPanelExpanded;
   }
 
   syncDependentControls(options);
@@ -615,6 +648,14 @@ function handleChatFontSizePanelToggle() {
   }
 
   setChatFontSizePanelExpanded(!isChatFontSizePanelExpanded);
+}
+
+function handleChatBoxColorPanelToggle() {
+  if (controls.showChatBoxes.checked !== true) {
+    return;
+  }
+
+  setChatBoxColorPanelExpanded(!isChatBoxColorPanelExpanded);
 }
 
 function setColorFromHsv(nextHsv, { commit = true } = {}) {
@@ -731,6 +772,7 @@ async function init() {
   colorField.addEventListener("pointerdown", handleColorFieldPointerDown);
   colorField.addEventListener("pointermove", handleColorFieldPointerMove);
   hueSlider.addEventListener("input", handleHueChange);
+  toggleChatBoxColorPanelButton.addEventListener("click", handleChatBoxColorPanelToggle);
   toggleChatFontSizePanelButton.addEventListener("click", handleChatFontSizePanelToggle);
   chatFontSizeSlider.addEventListener("input", handleChatFontSizeInput);
   resetChatFontSizeButton.addEventListener("click", handleResetChatFontSize);

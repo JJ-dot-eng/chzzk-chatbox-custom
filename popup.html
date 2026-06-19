@@ -50,10 +50,26 @@
 
       <section id="stylePanel" class="tab-panel" role="tabpanel" aria-labelledby="styleTab" hidden>
         <div class="toggles" aria-label="꾸미기 옵션">
-          <label class="toggle-row">
-            <span><strong>채팅 박스</strong></span>
+          <div class="toggle-row toggle-row--with-disclosure">
+            <button type="button" id="toggleChatBoxColorPanel" class="disclosure-button" aria-label="박스 색상 항목 펼치기" aria-expanded="false" aria-controls="chatBoxColorPanel" disabled></button>
+            <label class="toggle-row__label" for="showChatBoxes"><strong>채팅 박스</strong></label>
             <input type="checkbox" id="showChatBoxes">
-          </label>
+          </div>
+
+          <section id="chatBoxColorPanel" class="color-picker color-picker--sub" aria-label="채팅 박스 색상" hidden>
+            <div class="color-picker__controls">
+              <span id="colorPreview" class="color-preview" aria-hidden="true"></span>
+              <input type="text" id="chatBoxColorHex" class="hex-input" inputmode="text" maxlength="7" spellcheck="false" aria-label="색상 코드">
+              <button type="button" id="resetChatBoxColor" class="default-button">기본</button>
+            </div>
+
+            <div class="color-picker__body">
+              <button type="button" id="colorField" class="color-field" aria-label="색상 영역">
+                <span id="colorFieldHandle" class="color-field__handle"></span>
+              </button>
+              <input type="range" id="hueSlider" class="hue-slider" min="0" max="360" value="0" aria-label="색상 범위">
+            </div>
+          </section>
 
           <div class="toggle-row toggle-row--with-disclosure">
             <button type="button" id="toggleChatFontSizePanel" class="disclosure-button" aria-label="글씨 크기 항목 펼치기" aria-expanded="false" aria-controls="chatFontSizePanel" disabled></button>
@@ -76,26 +92,8 @@
             <span><strong>굵게</strong></span>
             <input type="checkbox" id="showBoldText">
           </label>
+
         </div>
-
-        <section class="color-picker" aria-label="채팅 박스 색상">
-          <div class="color-picker__header">
-            <strong>박스 색상</strong>
-          </div>
-
-          <div class="color-picker__controls">
-            <span id="colorPreview" class="color-preview" aria-hidden="true"></span>
-            <input type="text" id="chatBoxColorHex" class="hex-input" inputmode="text" maxlength="7" spellcheck="false" aria-label="색상 코드">
-            <button type="button" id="resetChatBoxColor" class="default-button">기본</button>
-          </div>
-
-          <div class="color-picker__body">
-            <button type="button" id="colorField" class="color-field" aria-label="색상 영역">
-              <span id="colorFieldHandle" class="color-field__handle"></span>
-            </button>
-            <input type="range" id="hueSlider" class="hue-slider" min="0" max="360" value="0" aria-label="색상 범위">
-          </div>
-        </section>
       </section>
 
       <section id="settingsPanel" class="tab-panel" role="tabpanel" aria-labelledby="settingsTab" hidden>
