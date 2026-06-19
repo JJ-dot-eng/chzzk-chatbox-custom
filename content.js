@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.3.8";
+  const SCRIPT_VERSION = "0.3.9";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -117,6 +117,8 @@
     miniFloatingChatScale: MINI_CHAT_SCALE_DEFAULT,
     showLargeText: false,
     chatFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT,
+    useNicknameFontSize: false,
+    nicknameFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT,
     showBoldText: false,
     chatBoxColor: "#808080"
   };
@@ -135,6 +137,7 @@
     showMiniFloatingChatButton: "chzzkChatUiToggleMiniFloatingChatButton",
     miniFloatingChatInputOnly: "chzzkChatUiToggleMiniFloatingChatInputOnly",
     showLargeText: "chzzkChatUiToggleLargeText",
+    useNicknameFontSize: "chzzkChatUiToggleNicknameFontSize",
     showBoldText: "chzzkChatUiToggleBoldText"
   };
 
@@ -431,6 +434,8 @@
       miniFloatingChatScale: normalizeMiniChatScale(options?.miniFloatingChatScale),
       showLargeText: options?.showLargeText === true,
       chatFontSizePt: normalizeChatFontSizePt(options?.chatFontSizePt),
+      useNicknameFontSize: options?.useNicknameFontSize === true,
+      nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt),
       showBoldText: options?.showBoldText === true || legacyBoldText,
       chatBoxColor: normalizeHexColor(options?.chatBoxColor)
     };
@@ -2165,6 +2170,29 @@
         white-space: nowrap !important;
       }
 
+      html[data-chzzk-chat-ui-toggle-large-text="on"][data-chzzk-chat-ui-toggle-nickname-font-size="on"]
+        ${NATIVE_CHAT_ROW_SELECTOR}
+        :where(
+          [class*="live_chatting_username_nickname" i],
+          button[class*="nickname" i] [class*="nickname" i],
+          [class*="name_text" i],
+          [${ROLE_ATTR}~="nickname"]
+        ),
+      html[data-chzzk-chat-ui-toggle-large-text="on"][data-chzzk-chat-ui-toggle-nickname-font-size="on"]
+        ${NATIVE_CHAT_ROW_SELECTOR}
+        :where(
+          [class*="live_chatting_username_nickname" i],
+          button[class*="nickname" i] [class*="nickname" i],
+          [class*="name_text" i],
+          [${ROLE_ATTR}~="nickname"]
+        ) * {
+        font-size: var(
+          --chzzk-chat-ui-toggle-nickname-font-size,
+          var(--chzzk-chat-ui-toggle-chat-font-size, 13pt)
+        ) !important;
+        line-height: inherit !important;
+      }
+
       html[data-chzzk-chat-ui-toggle-bold-text="on"]
         ${NATIVE_CHAT_ROW_SELECTOR},
       html[data-chzzk-chat-ui-toggle-bold-text="on"]
@@ -2336,6 +2364,8 @@
     document.documentElement.dataset.chzzkChatUiToggleChatBoxColor = currentOptions.chatBoxColor;
     document.documentElement.dataset.chzzkChatUiToggleChatFontSizePt =
       String(currentOptions.chatFontSizePt);
+    document.documentElement.dataset.chzzkChatUiToggleNicknameFontSizePt =
+      String(currentOptions.nicknameFontSizePt);
     document.documentElement.dataset.chzzkChatUiToggleMiniFloatingChatScale =
       String(currentOptions.miniFloatingChatScale);
 
@@ -2355,7 +2385,15 @@
       "--chzzk-chat-ui-toggle-chat-font-size",
       `${currentOptions.chatFontSizePt}pt`
     );
-    const chatFontSizePx = currentOptions.chatFontSizePt * 96 / 72;
+    document.documentElement.style.setProperty(
+      "--chzzk-chat-ui-toggle-nickname-font-size",
+      `${currentOptions.nicknameFontSizePt}pt`
+    );
+    const effectiveNicknameFontSizePt = currentOptions.useNicknameFontSize
+      ? currentOptions.nicknameFontSizePt
+      : currentOptions.chatFontSizePt;
+    const maxChatLineFontSizePt = Math.max(currentOptions.chatFontSizePt, effectiveNicknameFontSizePt);
+    const chatFontSizePx = maxChatLineFontSizePt * 96 / 72;
     const chatLineHeightPx = chatFontSizePx * 1.45;
     document.documentElement.style.setProperty(
       "--chzzk-chat-ui-toggle-chat-line-height",
@@ -4837,7 +4875,11 @@
         continue;
       }
 
-      const minimumHeight = currentOptions.chatFontSizePt * 96 / 72 * 1.45 + 8;
+      const effectiveNicknameFontSizePt = currentOptions.useNicknameFontSize
+        ? currentOptions.nicknameFontSizePt
+        : currentOptions.chatFontSizePt;
+      const maxChatLineFontSizePt = Math.max(currentOptions.chatFontSizePt, effectiveNicknameFontSizePt);
+      const minimumHeight = maxChatLineFontSizePt * 96 / 72 * 1.45 + 8;
       let contentBottom = rowRect.top + minimumHeight - 8;
 
       for (const element of getLargeTextLayoutElements(row)) {

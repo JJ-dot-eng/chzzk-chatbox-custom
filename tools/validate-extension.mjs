@@ -11,6 +11,7 @@ const backgroundSource = await readFile(path.join(root, "background.js"), "utf8"
 const popupMarkup = await readFile(path.join(root, "popup.html"), "utf8");
 const popupStyles = await readFile(path.join(root, "popup.css"), "utf8");
 const popupSource = await readFile(path.join(root, "popup.js"), "utf8");
+const readmeSource = await readFile(path.join(root, "README.md"), "utf8");
 const liveVerifySource = await readFile(path.join(root, "tools", "verify-live-edge.cjs"), "utf8");
 const normalizedContentSource = contentSource.replace(/\r\n/g, "\n");
 
@@ -570,6 +571,17 @@ if (!backgroundSource.includes("chatFontSizePt: normalizeChatFontSizePt(options?
   throw new Error("background script must normalize the chat font size pt option.");
 }
 
+for (const token of [
+  "useNicknameFontSize: false",
+  "nicknameFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT",
+  "useNicknameFontSize: options?.useNicknameFontSize === true",
+  "nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt)"
+]) {
+  if (!backgroundSource.includes(token)) {
+    throw new Error(`background script must normalize the nickname font size option: ${token}`);
+  }
+}
+
 if (!popupSource.includes("miniFloatingChatInputOnly")) {
   throw new Error("popup script must preserve the mini floating chat input-only option.");
 }
@@ -588,6 +600,17 @@ if (!popupSource.includes("miniFloatingChatFullscreenOnly: options?.miniFloating
 
 if (!popupSource.includes("chatFontSizePt: normalizeChatFontSizePt(options?.chatFontSizePt)")) {
   throw new Error("popup script must preserve the chat font size pt option.");
+}
+
+for (const token of [
+  "useNicknameFontSize: false",
+  "nicknameFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT",
+  "useNicknameFontSize: options?.useNicknameFontSize === true",
+  "nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt)"
+]) {
+  if (!popupSource.includes(token)) {
+    throw new Error(`popup script must preserve the nickname font size option: ${token}`);
+  }
 }
 
 if (!contentSource.includes("showDonationRanking: true")) {
@@ -612,6 +635,23 @@ if (!contentSource.includes('"--chzzk-chat-ui-toggle-chat-font-size"')) {
 
 if (!contentSource.includes("font-size: var(--chzzk-chat-ui-toggle-chat-font-size, 13pt) !important;")) {
   throw new Error("content script must use the configured chat font size pt value.");
+}
+
+for (const token of [
+  "useNicknameFontSize: false",
+  "nicknameFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT",
+  "useNicknameFontSize: options?.useNicknameFontSize === true",
+  "nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt)",
+  'useNicknameFontSize: "chzzkChatUiToggleNicknameFontSize"',
+  "document.documentElement.dataset.chzzkChatUiToggleNicknameFontSizePt",
+  '"--chzzk-chat-ui-toggle-nickname-font-size"',
+  'html[data-chzzk-chat-ui-toggle-large-text="on"][data-chzzk-chat-ui-toggle-nickname-font-size="on"]',
+  "currentOptions.useNicknameFontSize",
+  "Math.max(currentOptions.chatFontSizePt, effectiveNicknameFontSizePt)"
+]) {
+  if (!contentSource.includes(token)) {
+    throw new Error(`content script must apply the nickname font size option: ${token}`);
+  }
 }
 
 for (const token of [
@@ -1036,7 +1076,14 @@ for (const token of [
   'step="1"',
   'value="13"',
   'id="chatFontSizeValue"',
-  'id="resetChatFontSize"'
+  'id="resetChatFontSize"',
+  'id="useNicknameFontSize"',
+  'id="nicknameFontSizeControl"',
+  'id="nicknameFontSizePt"',
+  'id="nicknameFontSizeValue"',
+  'id="resetNicknameFontSize"',
+  '<strong>닉네임 크기 따로 조정</strong>',
+  '<strong>닉네임 크기</strong>'
 ]) {
   if (!popupMarkup.includes(token)) {
     throw new Error(`popup must include the chat font size pt slider control: ${token}`);
@@ -1051,6 +1098,11 @@ for (const token of [
   'const resetChatFontSizeButton = document.getElementById("resetChatFontSize");',
   'const chatFontSizePanel = document.getElementById("chatFontSizePanel");',
   'const toggleChatFontSizePanelButton = document.getElementById("toggleChatFontSizePanel");',
+  'const nicknameFontSizeControl = document.getElementById("nicknameFontSizeControl");',
+  'const nicknameFontSizeSlider = document.getElementById("nicknameFontSizePt");',
+  'const nicknameFontSizeValue = document.getElementById("nicknameFontSizeValue");',
+  'const resetNicknameFontSizeButton = document.getElementById("resetNicknameFontSize");',
+  "function updateNicknameFontSizeUi(",
   "function setChatBoxColorPanelExpanded(",
   'document.body.classList.toggle("is-chat-box-color-panel-expanded", shouldExpand);',
   "function syncChatBoxColorPanel(",
@@ -1064,10 +1116,17 @@ for (const token of [
   "function handleChatBoxColorPanelToggle()",
   "function handleChatFontSizePanelToggle()",
   "chatFontSizePt: chatFontSizeSlider.value",
+  "useNicknameFontSize: controls.useNicknameFontSize.checked",
+  "nicknameFontSizePt: nicknameFontSizeSlider.value",
+  "function handleNicknameFontSizeInput()",
+  "function handleResetNicknameFontSize()",
+  "nicknameFontSizeSlider.disabled = !isNicknameFontSizeEnabled;",
   'toggleChatBoxColorPanelButton.addEventListener("click", handleChatBoxColorPanelToggle);',
   'toggleChatFontSizePanelButton.addEventListener("click", handleChatFontSizePanelToggle);',
   'chatFontSizeSlider.addEventListener("input", handleChatFontSizeInput);',
-  'resetChatFontSizeButton.addEventListener("click", handleResetChatFontSize);'
+  'resetChatFontSizeButton.addEventListener("click", handleResetChatFontSize);',
+  'nicknameFontSizeSlider.addEventListener("input", handleNicknameFontSizeInput);',
+  'resetNicknameFontSizeButton.addEventListener("click", handleResetNicknameFontSize);'
 ]) {
   if (!popupSource.includes(token)) {
     throw new Error(`popup script must wire the chat font size pt slider: ${token}`);
@@ -1089,11 +1148,18 @@ for (const token of [
   "body.is-chat-box-color-panel-expanded .color-field",
   "body.is-chat-font-size-panel-expanded .color-field",
   "body.is-chat-box-color-panel-expanded .hue-slider",
-  "body.is-chat-font-size-panel-expanded .hue-slider"
+  "body.is-chat-font-size-panel-expanded .hue-slider",
+  ".font-size-control__toggle",
+  ".font-size-control__nested",
+  ".font-size-control__nested.is-disabled"
 ]) {
   if (!popupStyles.includes(token)) {
     throw new Error(`popup styles must keep the adaptive font-size panel layout: ${token}`);
   }
+}
+
+if (!readmeSource.includes("글씨 크기/닉네임 크기 조정")) {
+  throw new Error("README-facing feature wording must include nickname font size adjustment.");
 }
 
 const unsafeRoleSelectors = [

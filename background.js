@@ -56,6 +56,8 @@ const DEFAULT_OPTIONS = {
   miniFloatingChatScale: MINI_CHAT_SCALE_DEFAULT,
   showLargeText: false,
   chatFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT,
+  useNicknameFontSize: false,
+  nicknameFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT,
   showBoldText: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
@@ -107,6 +109,8 @@ function normalizeOptions(options) {
     miniFloatingChatScale: normalizeMiniChatScale(options?.miniFloatingChatScale),
     showLargeText: options?.showLargeText === true,
     chatFontSizePt: normalizeChatFontSizePt(options?.chatFontSizePt),
+    useNicknameFontSize: options?.useNicknameFontSize === true,
+    nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt),
     showBoldText: options?.showBoldText === true || legacyBoldText,
     chatBoxColor: normalizeHexColor(options?.chatBoxColor)
   };

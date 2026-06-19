@@ -1,5 +1,5 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
-const CONTENT_VERSION = "0.3.8";
+const CONTENT_VERSION = "0.3.9";
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const MINI_CHAT_MIN_WIDTH = 280;
 const MINI_CHAT_MIN_HEIGHT = 28;
@@ -47,6 +47,8 @@ const DEFAULT_OPTIONS = {
   miniFloatingChatScale: MINI_CHAT_SCALE_DEFAULT,
   showLargeText: false,
   chatFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT,
+  useNicknameFontSize: false,
+  nicknameFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT,
   showBoldText: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
@@ -64,6 +66,7 @@ const controlIds = [
   "showHeaderSettingsButton",
   "showMiniFloatingChatButton",
   "showLargeText",
+  "useNicknameFontSize",
   "showBoldText"
 ];
 const controls = Object.fromEntries(controlIds.map((id) => [id, document.getElementById(id)]));
@@ -82,6 +85,10 @@ const chatFontSizeValue = document.getElementById("chatFontSizeValue");
 const resetChatFontSizeButton = document.getElementById("resetChatFontSize");
 const chatFontSizePanel = document.getElementById("chatFontSizePanel");
 const toggleChatFontSizePanelButton = document.getElementById("toggleChatFontSizePanel");
+const nicknameFontSizeControl = document.getElementById("nicknameFontSizeControl");
+const nicknameFontSizeSlider = document.getElementById("nicknameFontSizePt");
+const nicknameFontSizeValue = document.getElementById("nicknameFontSizeValue");
+const resetNicknameFontSizeButton = document.getElementById("resetNicknameFontSize");
 const statusElement = document.getElementById("status");
 
 let currentColor = DEFAULT_CHAT_BOX_COLOR;
@@ -315,6 +322,8 @@ function normalizeOptions(options) {
     miniFloatingChatScale: normalizeMiniChatScale(options?.miniFloatingChatScale),
     showLargeText: options?.showLargeText === true,
     chatFontSizePt: normalizeChatFontSizePt(options?.chatFontSizePt),
+    useNicknameFontSize: options?.useNicknameFontSize === true,
+    nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt),
     showBoldText: options?.showBoldText === true || legacyBoldText,
     chatBoxColor: normalizeHexColor(options?.chatBoxColor)
   };
@@ -359,6 +368,12 @@ function updateChatFontSizeUi(fontSizePt) {
   const normalizedFontSize = normalizeChatFontSizePt(fontSizePt);
   chatFontSizeSlider.value = String(normalizedFontSize);
   chatFontSizeValue.textContent = `${normalizedFontSize}pt`;
+}
+
+function updateNicknameFontSizeUi(fontSizePt) {
+  const normalizedFontSize = normalizeChatFontSizePt(fontSizePt);
+  nicknameFontSizeSlider.value = String(normalizedFontSize);
+  nicknameFontSizeValue.textContent = `${normalizedFontSize}pt`;
 }
 
 function setChatBoxColorPanelExpanded(expanded, { enabled = controls.showChatBoxes?.checked === true } = {}) {
@@ -421,6 +436,7 @@ function setControls(options) {
   isChatFontSizePanelExpanded = false;
   syncDependentControls(normalized);
   updateChatFontSizeUi(normalized.chatFontSizePt);
+  updateNicknameFontSizeUi(normalized.nicknameFontSizePt);
   updateColorUi(normalized.chatBoxColor);
 }
 
@@ -436,6 +452,10 @@ function syncDependentControls(options = currentOptions) {
 
   syncChatBoxColorPanel(options);
   syncChatFontSizePanel(options);
+  const isNicknameFontSizeEnabled = options.showLargeText === true && options.useNicknameFontSize === true;
+  nicknameFontSizeSlider.disabled = !isNicknameFontSizeEnabled;
+  resetNicknameFontSizeButton.disabled = !isNicknameFontSizeEnabled;
+  nicknameFontSizeControl.classList.toggle("is-disabled", !isNicknameFontSizeEnabled);
 }
 
 function readControls() {
@@ -454,6 +474,8 @@ function readControls() {
     showMiniFloatingChatButton: controls.showMiniFloatingChatButton.checked,
     showLargeText: controls.showLargeText.checked,
     chatFontSizePt: chatFontSizeSlider.value,
+    useNicknameFontSize: controls.useNicknameFontSize.checked,
+    nicknameFontSizePt: nicknameFontSizeSlider.value,
     showBoldText: controls.showBoldText.checked,
     chatBoxColor: currentColor
   });
@@ -642,6 +664,11 @@ function handleChatFontSizeInput() {
   scheduleFontSizeApply();
 }
 
+function handleNicknameFontSizeInput() {
+  updateNicknameFontSizeUi(nicknameFontSizeSlider.value);
+  scheduleFontSizeApply();
+}
+
 function handleChatFontSizePanelToggle() {
   if (controls.showLargeText.checked !== true) {
     return;
@@ -754,6 +781,11 @@ async function handleResetChatFontSize() {
   await applyCurrentOptions();
 }
 
+async function handleResetNicknameFontSize() {
+  updateNicknameFontSizeUi(CHAT_FONT_SIZE_PT_DEFAULT);
+  await applyCurrentOptions();
+}
+
 async function init() {
   const options = await getStoredOptions();
   setControls(options);
@@ -776,6 +808,8 @@ async function init() {
   toggleChatFontSizePanelButton.addEventListener("click", handleChatFontSizePanelToggle);
   chatFontSizeSlider.addEventListener("input", handleChatFontSizeInput);
   resetChatFontSizeButton.addEventListener("click", handleResetChatFontSize);
+  nicknameFontSizeSlider.addEventListener("input", handleNicknameFontSizeInput);
+  resetNicknameFontSizeButton.addEventListener("click", handleResetNicknameFontSize);
   hexInput.addEventListener("input", handleHexInput);
   hexInput.addEventListener("keydown", handleHexKeyDown);
   hexInput.addEventListener("blur", handleHexBlur);
