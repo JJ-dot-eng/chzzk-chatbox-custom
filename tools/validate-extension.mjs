@@ -780,6 +780,12 @@ const requiredMiniChatContentTokens = [
   "function annotateMiniChatHiddenControls()",
   "function markMiniChatInputOnlyLayout()",
   "function findMiniChatInputOnlyContainer(root = document)",
+  "function scheduleMiniChatInputOnlyScrollReset()",
+  "function isMiniChatTextEntryField(element)",
+  "function isReasonableMiniChatInputContainer(element)",
+  "rect.height <= 160",
+  "style.visibility !== \"hidden\"",
+  "document.addEventListener(\"focusin\", scheduleMiniChatInputOnlyScrollReset, true);",
   "function hasMiniChatInputField(element)",
   "function findMiniChatCompactInputContainer(actionRow)",
   "markMiniChatCompactInputContainer(actionRow);",
@@ -794,6 +800,9 @@ const requiredMiniChatContentTokens = [
   "getMiniChatInputOnlyBounds(expandedBounds, { visualTop });",
   "patch.miniFloatingChatExpandedBounds = getMiniChatExpandedBoundsFromInputOnly(nextBounds);",
   "#${MINI_CHAT_PANEL_ID}[data-input-only=\"true\"]",
+  "#${MINI_CHAT_PANEL_ID}[data-input-only=\"true\"] #${MINI_CHAT_FRAME_ID}",
+  "position: static !important;",
+  "height: 100% !important;",
   "data-chzzk-chat-ui-toggle-mini-floating-chat-input-only=\"on\"",
   "border-color: transparent !important;",
   "box-shadow: none !important;",
@@ -830,6 +839,9 @@ const requiredMiniChatContentTokens = [
   "background: transparent !important;",
   "[${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}=\"true\"]:focus-within",
   "[${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}=\"true\"] textarea",
+  "max-height: ${MINI_CHAT_INPUT_ONLY_FIELD_MAX_HEIGHT}px !important;",
+  "pointer-events: auto !important;",
+  "scheduleMiniChatInputOnlyScrollReset();",
   "#${MINI_CHAT_PANEL_ID}[data-input-only=\"true\"] .${MINI_CHAT_PANEL_CONTROLS_CLASS}",
   "width: calc(100% - ${MINI_CHAT_INPUT_ONLY_CONTROL_INSET * 2}px) !important;",
   "margin: 0 ${MINI_CHAT_INPUT_ONLY_CONTROL_INSET}px !important;",
@@ -916,7 +928,8 @@ const miniChatInputOnlyKeepRule = miniChatInputOnlyKeepRuleMatch[1];
 for (const requiredKeepToken of [
   "height: ${MINI_CHAT_INPUT_ONLY_BOX_HEIGHT}px !important;",
   "background: rgba(226, 227, 232, 0.98) !important;",
-  "overflow: hidden !important;"
+  "overflow: hidden !important;",
+  "pointer-events: auto !important;"
 ]) {
   if (!miniChatInputOnlyKeepRule.includes(requiredKeepToken)) {
     throw new Error("input-only mode must pin the chat input box size and background.");

@@ -279,6 +279,7 @@
   let miniChatBubbleBounds = null;
   let miniChatRestoreBounds = null;
   let miniChatBoundsSaveTimer = 0;
+  let miniChatInputOnlyScrollFrame = 0;
 
   function getRuntime() {
     if (typeof chrome === "undefined") {
@@ -1364,8 +1365,9 @@
         flex: 1 1 auto !important;
         flex-direction: column !important;
         justify-content: flex-end !important;
+        height: 100% !important;
         min-height: 0 !important;
-        max-height: none !important;
+        max-height: 100% !important;
         background: transparent !important;
         border-color: transparent !important;
         box-shadow: none !important;
@@ -1385,11 +1387,15 @@
         min-height: ${MINI_CHAT_INPUT_ONLY_BOX_HEIGHT}px !important;
         max-height: ${MINI_CHAT_INPUT_ONLY_BOX_HEIGHT}px !important;
         margin: auto 10px 0 !important;
-        padding: 0 !important;
+        padding: 0 8px !important;
+        position: relative !important;
+        inset: auto !important;
+        transform: none !important;
         border-radius: 10px !important;
         background: rgba(226, 227, 232, 0.98) !important;
         overflow: hidden !important;
         box-sizing: border-box !important;
+        pointer-events: auto !important;
       }
 
       @media (prefers-color-scheme: dark) {
@@ -1417,11 +1423,19 @@
         [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"] [class*="live_chatting_input" i],
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"][data-chzzk-chat-ui-toggle-mini-floating-chat-input-only="on"]
         [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"] [class*="chatting_input" i] {
+        max-width: 100% !important;
         min-height: 0 !important;
         max-height: 100% !important;
         background: transparent !important;
         overflow: hidden !important;
         box-sizing: border-box !important;
+        pointer-events: auto !important;
+      }
+
+      html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"][data-chzzk-chat-ui-toggle-mini-floating-chat-input-only="on"]
+        [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"] button {
+        flex: 0 0 auto !important;
+        align-self: center !important;
       }
 
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"][data-chzzk-chat-ui-toggle-mini-floating-chat-input-only="on"]
@@ -1432,14 +1446,18 @@
         [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"] [contenteditable="true"],
       html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"][data-chzzk-chat-ui-toggle-mini-floating-chat-input-only="on"]
         [${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}="true"] [role="textbox"] {
-        height: auto !important;
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
         min-height: 0 !important;
         max-height: ${MINI_CHAT_INPUT_ONLY_FIELD_MAX_HEIGHT}px !important;
+        margin: 0 !important;
         line-height: normal !important;
+        align-self: center !important;
         background: transparent !important;
         overflow: hidden !important;
         resize: none !important;
         box-sizing: border-box !important;
+        pointer-events: auto !important;
       }
 
       .chzzk-chat-ui-toggle-guest-chat-toggle {
@@ -2008,6 +2026,20 @@
         min-height: 0 !important;
         border: 0 !important;
         background: transparent !important;
+      }
+
+      #${MINI_CHAT_PANEL_ID}[data-input-only="true"] [data-mini-chat-body="true"] {
+        position: relative !important;
+        flex: 1 1 auto !important;
+        overflow: hidden !important;
+      }
+
+      #${MINI_CHAT_PANEL_ID}[data-input-only="true"] #${MINI_CHAT_FRAME_ID} {
+        position: static !important;
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 0 !important;
+        max-height: 100% !important;
       }
 
       #${MINI_CHAT_PANEL_ID} .${MINI_CHAT_PANEL_RESIZE_CLASS} {
@@ -4354,6 +4386,65 @@
     }
   }
 
+  function isMiniChatTextEntryField(element) {
+    if (!(element instanceof HTMLElement)) {
+      return false;
+    }
+
+    try {
+      if (element instanceof HTMLInputElement) {
+        const type = String(element.type || "text").toLowerCase();
+
+        if (/^(?:button|checkbox|color|file|hidden|image|radio|range|reset|submit)$/.test(type)) {
+          return false;
+        }
+      } else if (
+        !(element instanceof HTMLTextAreaElement) &&
+        element.getAttribute("contenteditable") !== "true" &&
+        element.getAttribute("role") !== "textbox"
+      ) {
+        return false;
+      }
+
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        style.display !== "none" &&
+        style.visibility !== "hidden" &&
+        style.opacity !== "0"
+      );
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function isReasonableMiniChatInputContainer(element) {
+    if (!(element instanceof HTMLElement)) {
+      return false;
+    }
+
+    try {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+
+      return (
+        element !== document.documentElement &&
+        element !== document.body &&
+        rect.width > 0 &&
+        rect.height > 0 &&
+        rect.height <= 160 &&
+        style.display !== "none" &&
+        style.visibility !== "hidden" &&
+        style.opacity !== "0"
+      );
+    } catch (_error) {
+      return false;
+    }
+  }
+
   function findMiniChatCompactInputContainer(actionRow) {
     let fallbackContainer = null;
 
@@ -4385,20 +4476,16 @@
   }
 
   function findMiniChatInputOnlyContainer(root = document) {
-    const inputContainers = queryAllSafe(root, MINI_CHAT_INPUT_CONTAINER_SELECTORS)
-      .filter((element) => element instanceof HTMLElement)
-      .filter(hasMiniChatInputField);
-
-    if (inputContainers.length > 0) {
-      return inputContainers[0];
-    }
-
     const inputFields = queryAllSafe(root, [
       "textarea",
       "input",
       "[contenteditable='true']",
       "[role='textbox']"
-    ]).filter((element) => element instanceof HTMLElement);
+    ])
+      .filter((element) => element instanceof HTMLElement)
+      .filter(isMiniChatTextEntryField);
+    let fallbackContainer = null;
+    let actionFallbackContainer = null;
 
     for (const field of inputFields) {
       for (
@@ -4406,13 +4493,74 @@
         current && current !== document.body && depth < 8;
         current = current.parentElement, depth += 1
       ) {
+        if (!isReasonableMiniChatInputContainer(current)) {
+          continue;
+        }
+
         if (matchesAnySafe(current, MINI_CHAT_INPUT_CONTAINER_SELECTORS)) {
           return current;
         }
+
+        if (!actionFallbackContainer && getMiniChatActionControls(current).length > 0) {
+          actionFallbackContainer = current;
+        }
+
+        fallbackContainer ??= current;
       }
     }
 
-    return inputFields[0]?.parentElement instanceof HTMLElement ? inputFields[0].parentElement : null;
+    const inputContainers = queryAllSafe(root, MINI_CHAT_INPUT_CONTAINER_SELECTORS)
+      .filter((element) => element instanceof HTMLElement)
+      .filter(hasMiniChatInputField)
+      .filter(isReasonableMiniChatInputContainer);
+
+    if (inputContainers.length > 0) {
+      return inputContainers[0];
+    }
+
+    return actionFallbackContainer || fallbackContainer;
+  }
+
+  function shouldLockMiniChatInputOnlyScroll() {
+    return isMiniChatFrameEmbedUrl(window.location.href) && currentOptions.miniFloatingChatInputOnly === true;
+  }
+
+  function resetMiniChatInputOnlyScroll() {
+    miniChatInputOnlyScrollFrame = 0;
+
+    if (!shouldLockMiniChatInputOnlyScroll()) {
+      return;
+    }
+
+    for (const scroller of [document.scrollingElement, document.documentElement, document.body]) {
+      if (!(scroller instanceof Element)) {
+        continue;
+      }
+
+      scroller.scrollTop = 0;
+      scroller.scrollLeft = 0;
+    }
+
+    if (window.scrollX !== 0 || window.scrollY !== 0) {
+      window.scrollTo(0, 0);
+    }
+  }
+
+  function scheduleMiniChatInputOnlyScrollReset() {
+    if (!shouldLockMiniChatInputOnlyScroll() || miniChatInputOnlyScrollFrame) {
+      return;
+    }
+
+    miniChatInputOnlyScrollFrame = window.requestAnimationFrame(resetMiniChatInputOnlyScroll);
+  }
+
+  function connectMiniChatInputOnlyScrollGuard() {
+    if (!isMiniChatFrameEmbedUrl(window.location.href)) {
+      return;
+    }
+
+    document.addEventListener("focusin", scheduleMiniChatInputOnlyScrollReset, true);
+    document.addEventListener("input", scheduleMiniChatInputOnlyScrollReset, true);
   }
 
   function markMiniChatInputOnlyLayout() {
@@ -4450,6 +4598,8 @@
         }
       }
     }
+
+    scheduleMiniChatInputOnlyScrollReset();
   }
 
   function findMiniChatActionControlRow(control) {
@@ -5252,6 +5402,7 @@
     injectStyle();
     connectMessages();
     connectStorageListener();
+    connectMiniChatInputOnlyScrollGuard();
 
     const cachedOptions = readCachedOptions();
 
