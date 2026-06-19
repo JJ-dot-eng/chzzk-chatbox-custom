@@ -645,6 +645,7 @@ for (const token of [
   'useNicknameFontSize: "chzzkChatUiToggleNicknameFontSize"',
   "document.documentElement.dataset.chzzkChatUiToggleNicknameFontSizePt",
   '"--chzzk-chat-ui-toggle-nickname-font-size"',
+  '"--chzzk-chat-ui-toggle-chat-emote-size"',
   'html[data-chzzk-chat-ui-toggle-large-text="on"][data-chzzk-chat-ui-toggle-nickname-font-size="on"]',
   "currentOptions.useNicknameFontSize",
   "Math.max(currentOptions.chatFontSizePt, effectiveNicknameFontSizePt)"
@@ -673,6 +674,13 @@ for (const token of [
   "white-space: normal !important;",
   "overflow-wrap: anywhere !important;",
   "word-break: break-word !important;",
+  "--chzzk-chat-ui-toggle-chat-emote-size",
+  "object-fit: contain !important;",
+  "vertical-align: middle !important;",
+  "not([src*=\"/glive/icon/\" i])",
+  "const chatEmoteSizePx = Math.max(20, chatTextFontSizePx);",
+  "Math.max(chatLineTextHeightPx, chatEmoteSizePx)",
+  "[class*='live_chatting_message_text' i] img",
   "white-space: nowrap !important;",
   '[${ROLE_ATTR}~="nickname"]',
   "[${MESSAGE_PREFIX_ATTR}]",
@@ -1183,8 +1191,8 @@ for (const token of [
   }
 }
 
-if (!readmeSource.includes("글씨 크기/닉네임 크기 조정")) {
-  throw new Error("README-facing feature wording must include nickname font size adjustment.");
+if (!readmeSource.includes("글씨 크기/닉네임 크기 조정(이모티콘 포함)")) {
+  throw new Error("README-facing feature wording must include nickname and emoticon font size adjustment.");
 }
 
 const unsafeRoleSelectors = [

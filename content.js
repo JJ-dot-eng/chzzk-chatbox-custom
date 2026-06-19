@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.3.11";
+  const SCRIPT_VERSION = "0.3.12";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -2156,6 +2156,30 @@
       html[data-chzzk-chat-ui-toggle-large-text="on"]
         ${NATIVE_CHAT_ROW_SELECTOR}
         :where(
+          [class*="live_chatting_message_text" i],
+          [class*="_chatting_message_" i] [class*="_text_" i],
+          [class*="message_text" i],
+          [class*="message" i] [class*="text" i]
+        )
+        :where(img, [class*="emoticon" i], [class*="emote" i], [class*="emoji" i]),
+      html[data-chzzk-chat-ui-toggle-large-text="on"]
+        ${NATIVE_CHAT_ROW_SELECTOR}
+        :where(
+          [class*="live_chatting_message_container" i],
+          [class*="_chatting_message_" i]
+        )
+        img:not([class*="badge" i]):not([class*="grade" i]):not([class*="profile" i]):not([src*="badge" i]):not([src*="profile_image" i]):not([src*="/glive/icon/" i]) {
+        width: auto !important;
+        height: var(--chzzk-chat-ui-toggle-chat-emote-size, 20px) !important;
+        max-width: min(100%, calc(var(--chzzk-chat-ui-toggle-chat-emote-size, 20px) * 4)) !important;
+        max-height: var(--chzzk-chat-ui-toggle-chat-emote-size, 20px) !important;
+        object-fit: contain !important;
+        vertical-align: middle !important;
+      }
+
+      html[data-chzzk-chat-ui-toggle-large-text="on"]
+        ${NATIVE_CHAT_ROW_SELECTOR}
+        :where(
           [class*="live_chatting_username_nickname" i],
           button[class*="nickname" i] [class*="nickname" i],
           [class*="name_text" i],
@@ -2389,12 +2413,18 @@
       "--chzzk-chat-ui-toggle-nickname-font-size",
       `${currentOptions.nicknameFontSizePt}pt`
     );
+    const chatTextFontSizePx = currentOptions.chatFontSizePt * 96 / 72;
+    const chatEmoteSizePx = Math.max(20, chatTextFontSizePx);
+    document.documentElement.style.setProperty(
+      "--chzzk-chat-ui-toggle-chat-emote-size",
+      `${chatEmoteSizePx.toFixed(2)}px`
+    );
     const effectiveNicknameFontSizePt = currentOptions.useNicknameFontSize
       ? currentOptions.nicknameFontSizePt
       : currentOptions.chatFontSizePt;
     const maxChatLineFontSizePt = Math.max(currentOptions.chatFontSizePt, effectiveNicknameFontSizePt);
-    const chatFontSizePx = maxChatLineFontSizePt * 96 / 72;
-    const chatLineHeightPx = chatFontSizePx * 1.45;
+    const chatLineTextHeightPx = maxChatLineFontSizePt * 96 / 72 * 1.45;
+    const chatLineHeightPx = Math.max(chatLineTextHeightPx, chatEmoteSizePx);
     document.documentElement.style.setProperty(
       "--chzzk-chat-ui-toggle-chat-line-height",
       `${chatLineHeightPx.toFixed(2)}px`
@@ -4847,9 +4877,13 @@
       ".chzzk-chat-ui-toggle-timestamp",
       "[class*='live_chatting_message_container' i]",
       "[class*='live_chatting_message_text' i]",
+      "[class*='live_chatting_message_text' i] img",
       "[class*='_chatting_message_' i]",
+      "[class*='_chatting_message_' i] img",
       "[class*='message_text' i]",
+      "[class*='message_text' i] img",
       "[class*='message' i] [class*='text' i]",
+      "[class*='message' i] [class*='text' i] img",
       "[class*='live_chatting_username' i]",
       "[class*='name_text' i]",
       "button[class*='nickname' i]"
@@ -4879,7 +4913,8 @@
         ? currentOptions.nicknameFontSizePt
         : currentOptions.chatFontSizePt;
       const maxChatLineFontSizePt = Math.max(currentOptions.chatFontSizePt, effectiveNicknameFontSizePt);
-      const minimumHeight = maxChatLineFontSizePt * 96 / 72 * 1.45 + 8;
+      const chatEmoteSizePx = Math.max(20, currentOptions.chatFontSizePt * 96 / 72);
+      const minimumHeight = Math.max(maxChatLineFontSizePt * 96 / 72 * 1.45, chatEmoteSizePx) + 8;
       let contentBottom = rowRect.top + minimumHeight - 8;
 
       for (const element of getLargeTextLayoutElements(row)) {
