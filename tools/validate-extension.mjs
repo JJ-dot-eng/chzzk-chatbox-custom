@@ -535,8 +535,16 @@ if (!backgroundSource.includes("showHeaderSettingsButton: options?.showHeaderSet
   throw new Error("background script must normalize the header settings button visibility option.");
 }
 
-if (!backgroundSource.includes("showDonationRanking: options?.showDonationRanking !== false")) {
-  throw new Error("background script must normalize the donation ranking visibility option.");
+if (!backgroundSource.includes("showNonChatPanels: true")) {
+  throw new Error("background script must default the non-chat panel visibility option on.");
+}
+
+if (
+  !backgroundSource.includes("options?.showNonChatPanels !== undefined") ||
+  !backgroundSource.includes("options?.showDonationRanking !== false") ||
+  !backgroundSource.includes("showNonChatPanels,")
+) {
+  throw new Error("background script must normalize the non-chat panel option with donation ranking legacy storage.");
 }
 
 if (!backgroundSource.includes("useMiniFloatingChat: options?.useMiniFloatingChat === true")) {
@@ -613,8 +621,8 @@ for (const token of [
   }
 }
 
-if (!contentSource.includes("showDonationRanking: true")) {
-  throw new Error("content script must default the donation ranking visibility option on.");
+if (!contentSource.includes("showNonChatPanels: true")) {
+  throw new Error("content script must default the non-chat panel visibility option on.");
 }
 
 if (!contentSource.includes("chatFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT")) {
@@ -695,12 +703,39 @@ for (const token of [
   }
 }
 
-if (!contentSource.includes('showDonationRanking: "chzzkChatUiToggleDonationRanking"')) {
-  throw new Error("content script must expose the donation ranking option as a dataset flag.");
+if (!contentSource.includes('showNonChatPanels: "chzzkChatUiToggleNonChatPanels"')) {
+  throw new Error("content script must expose the non-chat panel option as a dataset flag.");
 }
 
-if (!contentSource.includes('html[data-chzzk-chat-ui-toggle-donation-ranking="off"]')) {
-  throw new Error("content script must hide donation ranking when the option is off.");
+if (!contentSource.includes('html[data-chzzk-chat-ui-toggle-non-chat-panels="off"]')) {
+  throw new Error("content script must hide non-chat panels when the option is off.");
+}
+
+if (!contentSource.includes("function annotateNonChatPanels()")) {
+  throw new Error("content script must centralize non-chat panel annotation.");
+}
+
+if (!contentSource.includes("if (currentOptions.showNonChatPanels !== false)")) {
+  throw new Error("content script must leave non-chat panels visible when the option is on.");
+}
+
+if (!contentSource.includes("clearNonChatPanelAnnotations();")) {
+  throw new Error("content script must clear stale non-chat panel annotations before reapplying the option.");
+}
+
+const miniChatHiddenControlsStart = contentSource.indexOf("function annotateMiniChatHiddenControls()");
+const miniChatHiddenControlsEnd = contentSource.indexOf("function looksLikeTimestamp", miniChatHiddenControlsStart);
+const miniChatHiddenControlsSource =
+  miniChatHiddenControlsStart >= 0 && miniChatHiddenControlsEnd > miniChatHiddenControlsStart
+    ? contentSource.slice(miniChatHiddenControlsStart, miniChatHiddenControlsEnd)
+    : "";
+
+if (!miniChatHiddenControlsSource || miniChatHiddenControlsSource.includes("markNonChatPanel(")) {
+  throw new Error("mini chat cleanup must not hide non-chat panels outside the shared option gate.");
+}
+
+if (miniChatHiddenControlsSource.includes("NON_CHAT_PANEL_SELECTORS")) {
+  throw new Error("mini chat cleanup must not apply non-chat panel selectors separately from the shared option.");
 }
 
 if (!contentSource.includes('[class*="live_chatting_ranking_container" i]')) {
@@ -735,9 +770,9 @@ const requiredMiniChatContentTokens = [
   'const MINI_CHAT_BUBBLE_ID = "chzzk-chat-ui-toggle-mini-chat-bubble";',
   'const MINI_CHAT_BUBBLE_ICON_CLASS = "chzzk-chat-ui-toggle-mini-chat-bubble__icon";',
   'const MINI_CHAT_HIDDEN_CONTROL_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-hidden-control";',
-  'const MINI_CHAT_NON_CHAT_PANEL_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-non-chat-panel";',
+  'const NON_CHAT_PANEL_ATTR = "data-chzzk-chat-ui-toggle-non-chat-panel";',
   'const MINI_CHAT_COMPACT_INPUT_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-compact-input";',
-  "const MINI_CHAT_NON_CHAT_PANEL_SELECTORS = [",
+  "const NON_CHAT_PANEL_SELECTORS = [",
   'const MINI_CHAT_INPUT_ONLY_PATH_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-path";',
   'const MINI_CHAT_INPUT_ONLY_KEEP_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-keep";',
   'const MINI_CHAT_INPUT_ONLY_HIDDEN_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-hidden";',
@@ -780,10 +815,10 @@ const requiredMiniChatContentTokens = [
   "function shouldRenderMiniFloatingChatPanel()",
   "currentOptions.miniFloatingChatFullscreenOnly",
   "function annotateMiniChatHiddenControls()",
-  "function hasMiniChatNonChatPanelSignal(element)",
-  "function findMiniChatNonChatPanelRoot(element)",
-  "hasMiniChatMessageContent(element)",
-  "[${MINI_CHAT_NON_CHAT_PANEL_ATTR}=\"true\"]",
+  "function hasNonChatPanelSignal(element)",
+  "function findNonChatPanelRoot(element)",
+  "hasChatMessageContent(element)",
+  "[${NON_CHAT_PANEL_ATTR}=\"true\"]",
   "승부예측",
   "broadcast-information-sports",
   "function markMiniChatInputOnlyLayout()",
@@ -1079,12 +1114,15 @@ if (!popupSource.includes("...currentOptions")) {
   throw new Error("popup script must preserve mini floating chat bounds when toggles change.");
 }
 
-if (!popupMarkup.includes('id="showDonationRanking"')) {
-  throw new Error("popup must include a donation ranking visibility toggle.");
+if (!popupMarkup.includes('id="showNonChatPanels"')) {
+  throw new Error("popup must include a non-chat panel visibility toggle.");
 }
 
-if (!popupSource.includes('"showDonationRanking"')) {
-  throw new Error("popup script must store and apply the donation ranking visibility option.");
+if (
+  !popupSource.includes('"showNonChatPanels"') ||
+  !popupSource.includes("options?.showDonationRanking !== false")
+) {
+  throw new Error("popup script must store and apply the non-chat panel option with donation ranking legacy storage.");
 }
 
 if (!popupMarkup.includes("<strong>글씨 크기 조정</strong>")) {

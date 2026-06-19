@@ -54,7 +54,7 @@
   const GUEST_CHAT_EMBED_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-embed";
   const MINI_CHAT_EMBED_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-embed";
   const MINI_CHAT_HIDDEN_CONTROL_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-hidden-control";
-  const MINI_CHAT_NON_CHAT_PANEL_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-non-chat-panel";
+  const NON_CHAT_PANEL_ATTR = "data-chzzk-chat-ui-toggle-non-chat-panel";
   const MINI_CHAT_COMPACT_INPUT_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-compact-input";
   const MINI_CHAT_INPUT_ONLY_PATH_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-path";
   const MINI_CHAT_INPUT_ONLY_KEEP_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-keep";
@@ -98,7 +98,7 @@
     showNicknames: true,
     showBadges: true,
     showTimestamps: true,
-    showDonationRanking: true,
+    showNonChatPanels: true,
     showChatBoxes: true,
     useGuestChatFrame: false,
     useMiniFloatingChat: false,
@@ -128,7 +128,7 @@
     showNicknames: "chzzkChatUiToggleNicknames",
     showBadges: "chzzkChatUiToggleBadges",
     showTimestamps: "chzzkChatUiToggleTimestamps",
-    showDonationRanking: "chzzkChatUiToggleDonationRanking",
+    showNonChatPanels: "chzzkChatUiToggleNonChatPanels",
     showChatBoxes: "chzzkChatUiToggleChatBoxes",
     useGuestChatFrame: "chzzkChatUiToggleGuestChatFrame",
     useMiniFloatingChat: "chzzkChatUiToggleMiniFloatingChat",
@@ -195,7 +195,9 @@
     "[class*='chatting_input' i]"
   ];
 
-  const MINI_CHAT_NON_CHAT_PANEL_SELECTORS = [
+  const NON_CHAT_PANEL_SELECTORS = [
+    "[class*='live_chatting_ranking_container' i]",
+    "aside#aside-chatting > :has([class*='ranking' i])",
     "[class*='_fixed_' i]:has(button)",
     "section:has([aria-controls*='broadcast-information-sports' i])",
     "[aria-controls*='broadcast-information-sports' i]",
@@ -422,12 +424,16 @@
   function normalizeOptions(options) {
     const legacyBoldText = options?.showBoldText === undefined && options?.showLargeText === true;
     const miniFloatingChatInputOnly = options?.miniFloatingChatInputOnly === true;
+    const showNonChatPanels =
+      options?.showNonChatPanels !== undefined
+        ? options.showNonChatPanels !== false
+        : options?.showDonationRanking !== false;
 
     return {
       showNicknames: options?.showNicknames !== false,
       showBadges: options?.showBadges !== false,
       showTimestamps: options?.showTimestamps !== false,
-      showDonationRanking: options?.showDonationRanking !== false,
+      showNonChatPanels,
       showChatBoxes: options?.showChatBoxes !== false,
       useGuestChatFrame: options?.useGuestChatFrame === true,
       useMiniFloatingChat: options?.useMiniFloatingChat === true,
@@ -1348,8 +1354,12 @@
         display: none !important;
       }
 
-      html[${LIVE_CHAT_FRAME_ATTR}="true"][${MINI_CHAT_EMBED_ATTR}="true"]
-        [${MINI_CHAT_NON_CHAT_PANEL_ATTR}="true"] {
+      html[data-chzzk-chat-ui-toggle-non-chat-panels="off"]
+        [${NON_CHAT_PANEL_ATTR}="true"],
+      html[data-chzzk-chat-ui-toggle-non-chat-panels="off"]
+        [class*="live_chatting_ranking_container" i],
+      html[data-chzzk-chat-ui-toggle-non-chat-panels="off"]
+        aside#aside-chatting > :has([class*="ranking" i]) {
         display: none !important;
       }
 
@@ -2320,13 +2330,6 @@
         visibility: hidden !important;
       }
 
-      html[data-chzzk-chat-ui-toggle-donation-ranking="off"]
-        [class*="live_chatting_ranking_container" i],
-      html[data-chzzk-chat-ui-toggle-donation-ranking="off"]
-        aside#aside-chatting > :has([class*="ranking" i]) {
-        display: none !important;
-      }
-
       html[data-chzzk-chat-ui-toggle-nicknames="off"]
         ${CHAT_ROW_SCOPE_SELECTOR}
         [class*="live_chatting_username_nickname" i],
@@ -2516,6 +2519,8 @@
     }
 
     syncGuestChatUi();
+    annotateNonChatPanels();
+    annotateMiniChatHiddenControls();
     scheduleLargeTextLayoutSync();
 
     if (markAsReady) {
@@ -4383,7 +4388,7 @@
     element.removeAttribute(ROLE_ATTR);
     element.removeAttribute(MESSAGE_PREFIX_ATTR);
     element.removeAttribute(MINI_CHAT_HIDDEN_CONTROL_ATTR);
-    element.removeAttribute(MINI_CHAT_NON_CHAT_PANEL_ATTR);
+    element.removeAttribute(NON_CHAT_PANEL_ATTR);
     element.removeAttribute(MINI_CHAT_COMPACT_INPUT_ATTR);
     element.removeAttribute(MINI_CHAT_INPUT_ONLY_PATH_ATTR);
     element.removeAttribute(MINI_CHAT_INPUT_ONLY_KEEP_ATTR);
@@ -4420,13 +4425,13 @@
     }
   }
 
-  function markMiniChatNonChatPanel(element) {
+  function markNonChatPanel(element) {
     if (element instanceof HTMLElement) {
-      element.setAttribute(MINI_CHAT_NON_CHAT_PANEL_ATTR, "true");
+      element.setAttribute(NON_CHAT_PANEL_ATTR, "true");
     }
   }
 
-  function hasMiniChatMessageContent(element) {
+  function hasChatMessageContent(element) {
     if (!(element instanceof HTMLElement)) {
       return false;
     }
@@ -4444,9 +4449,13 @@
     }
   }
 
-  function hasMiniChatNonChatPanelSignal(element) {
+  function hasNonChatPanelSignal(element) {
     if (!(element instanceof HTMLElement)) {
       return false;
+    }
+
+    if (isDonationRankingPanel(element)) {
+      return true;
     }
 
     const text = getCompactText(element);
@@ -4471,16 +4480,16 @@
     }
   }
 
-  function isMiniChatNonChatPanelCandidate(element) {
+  function isNonChatPanelCandidate(element) {
     return (
       element instanceof HTMLElement &&
       !hasMiniChatInputField(element) &&
-      !hasMiniChatMessageContent(element) &&
-      hasMiniChatNonChatPanelSignal(element)
+      !hasChatMessageContent(element) &&
+      hasNonChatPanelSignal(element)
     );
   }
 
-  function findMiniChatNonChatPanelRoot(element) {
+  function findNonChatPanelRoot(element) {
     let candidate = element instanceof HTMLElement ? element : null;
 
     for (
@@ -4492,11 +4501,11 @@
         break;
       }
 
-      if (hasMiniChatInputField(current) || hasMiniChatMessageContent(current)) {
+      if (hasMiniChatInputField(current) || hasChatMessageContent(current)) {
         break;
       }
 
-      if (hasMiniChatNonChatPanelSignal(current)) {
+      if (hasNonChatPanelSignal(current)) {
         candidate = current;
       }
 
@@ -4513,6 +4522,28 @@
     }
 
     return candidate;
+  }
+
+  function clearNonChatPanelAnnotations() {
+    for (const element of document.querySelectorAll(`[${NON_CHAT_PANEL_ATTR}]`)) {
+      element.removeAttribute(NON_CHAT_PANEL_ATTR);
+    }
+  }
+
+  function annotateNonChatPanels() {
+    clearNonChatPanelAnnotations();
+
+    if (currentOptions.showNonChatPanels !== false) {
+      return;
+    }
+
+    for (const element of queryAllSafe(document, NON_CHAT_PANEL_SELECTORS)) {
+      const panel = findNonChatPanelRoot(element);
+
+      if (isNonChatPanelCandidate(panel)) {
+        markNonChatPanel(panel);
+      }
+    }
   }
 
   function hasMiniChatInputField(element) {
@@ -4777,10 +4808,6 @@
       element.removeAttribute(MINI_CHAT_HIDDEN_CONTROL_ATTR);
     }
 
-    for (const element of document.querySelectorAll(`[${MINI_CHAT_NON_CHAT_PANEL_ATTR}]`)) {
-      element.removeAttribute(MINI_CHAT_NON_CHAT_PANEL_ATTR);
-    }
-
     for (const element of document.querySelectorAll(`[${MINI_CHAT_COMPACT_INPUT_ATTR}]`)) {
       element.removeAttribute(MINI_CHAT_COMPACT_INPUT_ATTR);
     }
@@ -4818,14 +4845,6 @@
     for (const control of controls) {
       if (getCompactText(control) === "채팅") {
         markMiniChatHiddenControl(control);
-      }
-    }
-
-    for (const element of queryAllSafe(document, MINI_CHAT_NON_CHAT_PANEL_SELECTORS)) {
-      const panel = findMiniChatNonChatPanelRoot(element);
-
-      if (isMiniChatNonChatPanelCandidate(panel)) {
-        markMiniChatNonChatPanel(panel);
       }
     }
 
@@ -5294,6 +5313,7 @@
       annotateChatRow(row);
     }
 
+    annotateNonChatPanels();
     annotateMiniChatHiddenControls();
     scheduleLargeTextLayoutSync();
   }
@@ -5313,6 +5333,7 @@
         scanRows(getChatRows(root));
       }
 
+      annotateNonChatPanels();
       annotateMiniChatHiddenControls();
       syncGuestChatUi();
     } finally {

@@ -36,7 +36,7 @@ const DEFAULT_OPTIONS = {
   showNicknames: true,
   showBadges: true,
   showTimestamps: true,
-  showDonationRanking: true,
+  showNonChatPanels: true,
   showChatBoxes: true,
   useGuestChatFrame: false,
   useMiniFloatingChat: false,
@@ -87,12 +87,16 @@ function normalizeHexColor(value) {
 function normalizeOptions(options) {
   const legacyBoldText = options?.showBoldText === undefined && options?.showLargeText === true;
   const miniFloatingChatInputOnly = options?.miniFloatingChatInputOnly === true;
+  const showNonChatPanels =
+    options?.showNonChatPanels !== undefined
+      ? options.showNonChatPanels !== false
+      : options?.showDonationRanking !== false;
 
   return {
     showNicknames: options?.showNicknames !== false,
     showBadges: options?.showBadges !== false,
     showTimestamps: options?.showTimestamps !== false,
-    showDonationRanking: options?.showDonationRanking !== false,
+    showNonChatPanels,
     showChatBoxes: options?.showChatBoxes !== false,
     useGuestChatFrame: options?.useGuestChatFrame === true,
     useMiniFloatingChat: options?.useMiniFloatingChat === true,
