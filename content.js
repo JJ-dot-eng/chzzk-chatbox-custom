@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.3.3";
+  const SCRIPT_VERSION = "0.3.4";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -2060,11 +2060,14 @@
 
       html[data-chzzk-chat-ui-toggle-large-text="on"]
         ${NATIVE_CHAT_ROW_SELECTOR} {
+        display: flex !important;
         font-size: var(--chzzk-chat-ui-toggle-chat-font-size, 13pt) !important;
         line-height: 1.45 !important;
         height: auto !important;
         min-height: var(--chzzk-chat-ui-toggle-chat-row-min-height, 33px) !important;
         align-items: flex-start !important;
+        flex-wrap: wrap !important;
+        gap: 0 4px !important;
         overflow: visible !important;
       }
 
@@ -2076,13 +2079,17 @@
           button[class*="live_chatting_message_nickname" i],
           button[class*="nickname" i],
           [class*="live_chatting_username_container" i],
-          [class*="live_chatting_username_wrapper" i]
+          [class*="live_chatting_username_wrapper" i],
+          [${MESSAGE_PREFIX_ATTR}]
         ) {
         height: auto !important;
         min-height: var(--chzzk-chat-ui-toggle-chat-line-height, 25px) !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
         line-height: inherit !important;
         align-items: flex-start !important;
         overflow: visible !important;
+        max-height: none !important;
       }
 
       html[data-chzzk-chat-ui-toggle-large-text="on"]
@@ -2101,11 +2108,21 @@
         ${NATIVE_CHAT_ROW_SELECTOR}
         [class*="name_text" i],
       html[data-chzzk-chat-ui-toggle-large-text="on"]
+        ${NATIVE_CHAT_ROW_SELECTOR}
+        [${MESSAGE_PREFIX_ATTR}],
+      html[data-chzzk-chat-ui-toggle-large-text="on"]
+        ${NATIVE_CHAT_ROW_SELECTOR}
+        [${MESSAGE_PREFIX_ATTR}] :where(span, button),
+      html[data-chzzk-chat-ui-toggle-large-text="on"]
+        ${NATIVE_CHAT_ROW_SELECTOR}
+        [${ROLE_ATTR}~="nickname"],
+      html[data-chzzk-chat-ui-toggle-large-text="on"]
         .chzzk-chat-ui-toggle-timestamp {
         font-size: inherit !important;
         line-height: inherit !important;
         height: auto !important;
         overflow: visible !important;
+        max-height: none !important;
       }
 
       html[data-chzzk-chat-ui-toggle-large-text="on"]
@@ -2113,8 +2130,14 @@
         :where(
           [class*="live_chatting_message_text" i],
           [class*="_chatting_message_" i] [class*="_text_" i],
-          [class*="message_text" i]
+          [class*="message_text" i],
+          [class*="message" i] [class*="text" i]
         ) {
+        font-size: inherit !important;
+        line-height: inherit !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
         white-space: normal !important;
         overflow-wrap: anywhere !important;
         word-break: break-word !important;
@@ -2126,8 +2149,14 @@
           [class*="live_chatting_username_nickname" i],
           button[class*="nickname" i] [class*="nickname" i],
           [class*="name_text" i],
+          [${ROLE_ATTR}~="nickname"],
           .chzzk-chat-ui-toggle-timestamp
         ) {
+        font-size: inherit !important;
+        line-height: inherit !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
         white-space: nowrap !important;
       }
 

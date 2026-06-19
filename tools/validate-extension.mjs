@@ -616,14 +616,23 @@ if (!contentSource.includes("font-size: var(--chzzk-chat-ui-toggle-chat-font-siz
 for (const token of [
   '"--chzzk-chat-ui-toggle-chat-line-height"',
   '"--chzzk-chat-ui-toggle-chat-row-min-height"',
+  "display: flex !important;",
   "min-height: var(--chzzk-chat-ui-toggle-chat-row-min-height, 33px) !important;",
   "min-height: var(--chzzk-chat-ui-toggle-chat-line-height, 25px) !important;",
   "align-items: flex-start !important;",
+  "flex-wrap: wrap !important;",
+  "gap: 0 4px !important;",
+  "max-width: 100% !important;",
+  "min-width: 0 !important;",
   "overflow: visible !important;",
+  "max-height: none !important;",
   "white-space: normal !important;",
   "overflow-wrap: anywhere !important;",
   "word-break: break-word !important;",
-  "white-space: nowrap !important;"
+  "white-space: nowrap !important;",
+  '[${ROLE_ATTR}~="nickname"]',
+  "[${MESSAGE_PREFIX_ATTR}]",
+  '[class*="message" i] [class*="text" i]'
 ]) {
   if (!contentSource.includes(token)) {
     throw new Error(`content script must prevent large chat font overlap: ${token}`);

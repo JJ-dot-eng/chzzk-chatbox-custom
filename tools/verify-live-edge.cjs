@@ -190,6 +190,14 @@ function summarizeFrameState(frameStates) {
           summary.layout.chatBoxes.maxWidth === null
             ? chatBoxes.maxWidth
             : Math.max(summary.layout.chatBoxes.maxWidth, chatBoxes.maxWidth || summary.layout.chatBoxes.maxWidth);
+        summary.layout.chatBoxes.minHeight =
+          summary.layout.chatBoxes.minHeight === null
+            ? chatBoxes.minHeight
+            : Math.min(summary.layout.chatBoxes.minHeight, chatBoxes.minHeight || summary.layout.chatBoxes.minHeight);
+        summary.layout.chatBoxes.maxHeight =
+          summary.layout.chatBoxes.maxHeight === null
+            ? chatBoxes.maxHeight
+            : Math.max(summary.layout.chatBoxes.maxHeight, chatBoxes.maxHeight || summary.layout.chatBoxes.maxHeight);
         summary.layout.chatBoxes.widthSpread =
           summary.layout.chatBoxes.minWidth !== null && summary.layout.chatBoxes.maxWidth !== null
             ? summary.layout.chatBoxes.maxWidth - summary.layout.chatBoxes.minWidth
@@ -201,6 +209,10 @@ function summarizeFrameState(frameStates) {
 
         for (const fontSize of chatBoxes.fontSizes || []) {
           summary.layout.chatBoxes.fontSizes.push(fontSize);
+        }
+
+        for (const fontSize of chatBoxes.nicknameFontSizes || []) {
+          summary.layout.chatBoxes.nicknameFontSizes.push(fontSize);
         }
 
         for (const fontWeight of chatBoxes.fontWeights || []) {
@@ -248,11 +260,15 @@ function summarizeFrameState(frameStates) {
           shrunkenCount: 0,
           minWidth: null,
           maxWidth: null,
+          minHeight: null,
+          maxHeight: null,
           widthSpread: null,
           textInsetDeltas: [],
           maxTextInsetDelta: null,
           fontSizes: [],
           maxFontSize: null,
+          nicknameFontSizes: [],
+          maxNicknameFontSize: null,
           fontWeights: [],
           maxFontWeight: null,
           messageFontWeights: [],
@@ -275,6 +291,8 @@ function summarizeFrameState(frameStates) {
   summary.layout.chatBoxes.maxTextInsetDelta = insetDeltas.length ? Math.max(...insetDeltas) : null;
   const fontSizes = summary.layout.chatBoxes.fontSizes;
   summary.layout.chatBoxes.maxFontSize = fontSizes.length ? Math.max(...fontSizes) : null;
+  const nicknameFontSizes = summary.layout.chatBoxes.nicknameFontSizes;
+  summary.layout.chatBoxes.maxNicknameFontSize = nicknameFontSizes.length ? Math.max(...nicknameFontSizes) : null;
   const fontWeights = summary.layout.chatBoxes.fontWeights;
   summary.layout.chatBoxes.maxFontWeight = fontWeights.length ? Math.max(...fontWeights) : null;
   const messageFontWeights = summary.layout.chatBoxes.messageFontWeights;
@@ -372,6 +390,9 @@ async function collectFrameStates(page) {
             const messageFontWeight = messageTextStyle
               ? Number.parseInt(messageTextStyle.fontWeight, 10) || 0
               : 0;
+            const nicknameText = row.querySelector(`[${roleAttr}~="nickname"]`);
+            const nicknameTextStyle = nicknameText ? getComputedStyle(nicknameText) : null;
+            const nicknameFontSize = nicknameTextStyle ? Number.parseFloat(nicknameTextStyle.fontSize) || 0 : 0;
             let textLeftInset = null;
             let textRightInset = null;
 
@@ -396,6 +417,7 @@ async function collectFrameStates(page) {
               paddingLeft,
               marginLeft: Number.parseFloat(style.marginLeft) || 0,
               fontSize,
+              nicknameFontSize,
               fontWeight,
               messageFontWeight,
               backgroundIsVisible,
@@ -420,6 +442,9 @@ async function collectFrameStates(page) {
           .filter((delta) => Number.isFinite(delta));
         const fontSizes = chatBoxSamples
           .map((sample) => sample.fontSize)
+          .filter((fontSize) => Number.isFinite(fontSize) && fontSize > 0);
+        const nicknameFontSizes = chatBoxSamples
+          .map((sample) => sample.nicknameFontSize)
           .filter((fontSize) => Number.isFinite(fontSize) && fontSize > 0);
         const fontWeights = chatBoxSamples
           .map((sample) => sample.fontWeight)
@@ -464,6 +489,7 @@ async function collectFrameStates(page) {
               widthSpread: chatBoxWidths.length ? Math.max(...chatBoxWidths) - Math.min(...chatBoxWidths) : null,
               textInsetDeltas,
               fontSizes,
+              nicknameFontSizes,
               fontWeights,
               messageFontWeights,
               backgroundColors,
@@ -1108,6 +1134,10 @@ function assertLargeTextOn(label, summary, expectedFontSizePt = CHAT_FONT_SIZE_P
 
   if (chatBoxes.maxFontSize === null || chatBoxes.maxFontSize < expectedFontSizePx - 0.5) {
     throw new Error(`${label}: large text font size was not applied`);
+  }
+
+  if (chatBoxes.maxNicknameFontSize === null || chatBoxes.maxNicknameFontSize < expectedFontSizePx - 0.5) {
+    throw new Error(`${label}: large text nickname font size was not applied`);
   }
 
   if (chatBoxes.maxHeight === null || chatBoxes.maxHeight < expectedLineHeightPx - 1) {
