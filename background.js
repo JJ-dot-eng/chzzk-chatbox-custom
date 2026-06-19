@@ -21,6 +21,9 @@ const MINI_CHAT_SCALE_MIN = 50;
 const MINI_CHAT_SCALE_MAX = 150;
 const MINI_CHAT_SCALE_STEP = 10;
 const MINI_CHAT_SCALE_DEFAULT = 100;
+const CHAT_FONT_SIZE_PT_MIN = 8;
+const CHAT_FONT_SIZE_PT_MAX = 36;
+const CHAT_FONT_SIZE_PT_DEFAULT = 13;
 const NAMED_CHAT_BOX_COLORS = {
   gray: "#808080",
   green: "#00c471",
@@ -52,6 +55,7 @@ const DEFAULT_OPTIONS = {
   miniFloatingChatExpandedBounds: null,
   miniFloatingChatScale: MINI_CHAT_SCALE_DEFAULT,
   showLargeText: false,
+  chatFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT,
   showBoldText: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
@@ -102,6 +106,7 @@ function normalizeOptions(options) {
     miniFloatingChatExpandedBounds: normalizeOptionalMiniChatBounds(options?.miniFloatingChatExpandedBounds),
     miniFloatingChatScale: normalizeMiniChatScale(options?.miniFloatingChatScale),
     showLargeText: options?.showLargeText === true,
+    chatFontSizePt: normalizeChatFontSizePt(options?.chatFontSizePt),
     showBoldText: options?.showBoldText === true || legacyBoldText,
     chatBoxColor: normalizeHexColor(options?.chatBoxColor)
   };
@@ -131,6 +136,22 @@ function normalizeMiniChatScale(value) {
     MINI_CHAT_SCALE_MIN,
     MINI_CHAT_SCALE_MAX,
     MINI_CHAT_SCALE_DEFAULT
+  );
+}
+
+function normalizeChatFontSizePt(value) {
+  const clampedFontSize = clampNumber(
+    value,
+    CHAT_FONT_SIZE_PT_MIN,
+    CHAT_FONT_SIZE_PT_MAX,
+    CHAT_FONT_SIZE_PT_DEFAULT
+  );
+
+  return clampNumber(
+    Math.round(clampedFontSize),
+    CHAT_FONT_SIZE_PT_MIN,
+    CHAT_FONT_SIZE_PT_MAX,
+    CHAT_FONT_SIZE_PT_DEFAULT
   );
 }
 

@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.3.1";
+  const SCRIPT_VERSION = "0.3.2";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -79,6 +79,9 @@
   const MINI_CHAT_SCALE_MAX = 150;
   const MINI_CHAT_SCALE_STEP = 10;
   const MINI_CHAT_SCALE_DEFAULT = 100;
+  const CHAT_FONT_SIZE_PT_MIN = 8;
+  const CHAT_FONT_SIZE_PT_MAX = 36;
+  const CHAT_FONT_SIZE_PT_DEFAULT = 13;
   const GUEST_CHAT_NATIVE_THEME_CLASSES = ["light", "dark", "theme_light", "theme_dark"];
   const GUEST_CHAT_CLEANBOT_STORAGE_KEY = "cleanbot";
   const GUEST_CHAT_CLEANBOT_DISABLED_VALUE = "false";
@@ -113,6 +116,7 @@
     miniFloatingChatExpandedBounds: null,
     miniFloatingChatScale: MINI_CHAT_SCALE_DEFAULT,
     showLargeText: false,
+    chatFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT,
     showBoldText: false,
     chatBoxColor: "#808080"
   };
@@ -385,6 +389,22 @@
     );
   }
 
+  function normalizeChatFontSizePt(value) {
+    const clampedFontSize = clampNumber(
+      value,
+      CHAT_FONT_SIZE_PT_MIN,
+      CHAT_FONT_SIZE_PT_MAX,
+      CHAT_FONT_SIZE_PT_DEFAULT
+    );
+
+    return clampNumber(
+      Math.round(clampedFontSize),
+      CHAT_FONT_SIZE_PT_MIN,
+      CHAT_FONT_SIZE_PT_MAX,
+      CHAT_FONT_SIZE_PT_DEFAULT
+    );
+  }
+
   function normalizeOptions(options) {
     const legacyBoldText = options?.showBoldText === undefined && options?.showLargeText === true;
     const miniFloatingChatInputOnly = options?.miniFloatingChatInputOnly === true;
@@ -409,6 +429,7 @@
       miniFloatingChatExpandedBounds: normalizeOptionalMiniChatBounds(options?.miniFloatingChatExpandedBounds),
       miniFloatingChatScale: normalizeMiniChatScale(options?.miniFloatingChatScale),
       showLargeText: options?.showLargeText === true,
+      chatFontSizePt: normalizeChatFontSizePt(options?.chatFontSizePt),
       showBoldText: options?.showBoldText === true || legacyBoldText,
       chatBoxColor: normalizeHexColor(options?.chatBoxColor)
     };
@@ -2039,7 +2060,7 @@
 
       html[data-chzzk-chat-ui-toggle-large-text="on"]
         ${NATIVE_CHAT_ROW_SELECTOR} {
-        font-size: 17px !important;
+        font-size: var(--chzzk-chat-ui-toggle-chat-font-size, 13pt) !important;
         line-height: 1.45 !important;
       }
 
@@ -2233,6 +2254,8 @@
 
     document.documentElement.dataset.chzzkChatUiToggleVersion = SCRIPT_VERSION;
     document.documentElement.dataset.chzzkChatUiToggleChatBoxColor = currentOptions.chatBoxColor;
+    document.documentElement.dataset.chzzkChatUiToggleChatFontSizePt =
+      String(currentOptions.chatFontSizePt);
     document.documentElement.dataset.chzzkChatUiToggleMiniFloatingChatScale =
       String(currentOptions.miniFloatingChatScale);
 
@@ -2247,6 +2270,10 @@
     document.documentElement.style.setProperty(
       "--chzzk-chat-ui-toggle-mini-chat-scale",
       String(currentOptions.miniFloatingChatScale / 100)
+    );
+    document.documentElement.style.setProperty(
+      "--chzzk-chat-ui-toggle-chat-font-size",
+      `${currentOptions.chatFontSizePt}pt`
     );
 
     for (const [optionKey, datasetKey] of Object.entries(DATASET_KEYS)) {

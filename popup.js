@@ -1,5 +1,5 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
-const CONTENT_VERSION = "0.3.1";
+const CONTENT_VERSION = "0.3.2";
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const MINI_CHAT_MIN_WIDTH = 280;
 const MINI_CHAT_MIN_HEIGHT = 28;
@@ -12,6 +12,9 @@ const MINI_CHAT_SCALE_MIN = 50;
 const MINI_CHAT_SCALE_MAX = 150;
 const MINI_CHAT_SCALE_STEP = 10;
 const MINI_CHAT_SCALE_DEFAULT = 100;
+const CHAT_FONT_SIZE_PT_MIN = 8;
+const CHAT_FONT_SIZE_PT_MAX = 36;
+const CHAT_FONT_SIZE_PT_DEFAULT = 13;
 const NAMED_CHAT_BOX_COLORS = {
   gray: "#808080",
   green: "#00c471",
@@ -43,6 +46,7 @@ const DEFAULT_OPTIONS = {
   miniFloatingChatExpandedBounds: null,
   miniFloatingChatScale: MINI_CHAT_SCALE_DEFAULT,
   showLargeText: false,
+  chatFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT,
   showBoldText: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
@@ -71,12 +75,16 @@ const resetColorButton = document.getElementById("resetChatBoxColor");
 const colorField = document.getElementById("colorField");
 const colorFieldHandle = document.getElementById("colorFieldHandle");
 const hueSlider = document.getElementById("hueSlider");
+const chatFontSizeSlider = document.getElementById("chatFontSizePt");
+const chatFontSizeValue = document.getElementById("chatFontSizeValue");
+const resetChatFontSizeButton = document.getElementById("resetChatFontSize");
 const statusElement = document.getElementById("status");
 
 let currentColor = DEFAULT_CHAT_BOX_COLOR;
 let currentOptions = { ...DEFAULT_OPTIONS };
 let hsv = { hue: 0, saturation: 0, value: 0.5 };
 let colorApplyTimer = 0;
+let fontSizeApplyTimer = 0;
 
 function normalizeHexColor(value) {
   if (typeof value !== "string") {
@@ -260,6 +268,22 @@ function normalizeMiniChatScale(value) {
   );
 }
 
+function normalizeChatFontSizePt(value) {
+  const clampedFontSize = clampNumber(
+    value,
+    CHAT_FONT_SIZE_PT_MIN,
+    CHAT_FONT_SIZE_PT_MAX,
+    CHAT_FONT_SIZE_PT_DEFAULT
+  );
+
+  return clampNumber(
+    Math.round(clampedFontSize),
+    CHAT_FONT_SIZE_PT_MIN,
+    CHAT_FONT_SIZE_PT_MAX,
+    CHAT_FONT_SIZE_PT_DEFAULT
+  );
+}
+
 function normalizeOptions(options) {
   const legacyBoldText = options?.showBoldText === undefined && options?.showLargeText === true;
   const miniFloatingChatInputOnly = options?.miniFloatingChatInputOnly === true;
@@ -284,6 +308,7 @@ function normalizeOptions(options) {
     miniFloatingChatExpandedBounds: normalizeOptionalMiniChatBounds(options?.miniFloatingChatExpandedBounds),
     miniFloatingChatScale: normalizeMiniChatScale(options?.miniFloatingChatScale),
     showLargeText: options?.showLargeText === true,
+    chatFontSizePt: normalizeChatFontSizePt(options?.chatFontSizePt),
     showBoldText: options?.showBoldText === true || legacyBoldText,
     chatBoxColor: normalizeHexColor(options?.chatBoxColor)
   };
@@ -324,6 +349,12 @@ function updateColorUi(hexColor, { syncInput = true } = {}) {
   }
 }
 
+function updateChatFontSizeUi(fontSizePt) {
+  const normalizedFontSize = normalizeChatFontSizePt(fontSizePt);
+  chatFontSizeSlider.value = String(normalizedFontSize);
+  chatFontSizeValue.textContent = `${normalizedFontSize}pt`;
+}
+
 function setControls(options) {
   const normalized = normalizeOptions(options);
   currentOptions = normalized;
@@ -333,6 +364,7 @@ function setControls(options) {
   }
 
   syncDependentControls(normalized);
+  updateChatFontSizeUi(normalized.chatFontSizePt);
   updateColorUi(normalized.chatBoxColor);
 }
 
@@ -364,6 +396,7 @@ function readControls() {
     showHeaderSettingsButton: controls.showHeaderSettingsButton.checked,
     showMiniFloatingChatButton: controls.showMiniFloatingChatButton.checked,
     showLargeText: controls.showLargeText.checked,
+    chatFontSizePt: chatFontSizeSlider.value,
     showBoldText: controls.showBoldText.checked,
     chatBoxColor: currentColor
   });
@@ -527,9 +560,19 @@ function scheduleColorApply() {
   colorApplyTimer = window.setTimeout(applyCurrentOptions, 100);
 }
 
+function scheduleFontSizeApply() {
+  window.clearTimeout(fontSizeApplyTimer);
+  fontSizeApplyTimer = window.setTimeout(applyCurrentOptions, 100);
+}
+
 async function handleControlChange() {
   syncDependentControls(readControls());
   await applyCurrentOptions();
+}
+
+function handleChatFontSizeInput() {
+  updateChatFontSizeUi(chatFontSizeSlider.value);
+  scheduleFontSizeApply();
 }
 
 function setColorFromHsv(nextHsv, { commit = true } = {}) {
@@ -623,6 +666,11 @@ async function handleResetColor() {
   await applyCurrentOptions();
 }
 
+async function handleResetChatFontSize() {
+  updateChatFontSizeUi(CHAT_FONT_SIZE_PT_DEFAULT);
+  await applyCurrentOptions();
+}
+
 async function init() {
   const options = await getStoredOptions();
   setControls(options);
@@ -641,6 +689,8 @@ async function init() {
   colorField.addEventListener("pointerdown", handleColorFieldPointerDown);
   colorField.addEventListener("pointermove", handleColorFieldPointerMove);
   hueSlider.addEventListener("input", handleHueChange);
+  chatFontSizeSlider.addEventListener("input", handleChatFontSizeInput);
+  resetChatFontSizeButton.addEventListener("click", handleResetChatFontSize);
   hexInput.addEventListener("input", handleHexInput);
   hexInput.addEventListener("keydown", handleHexKeyDown);
   hexInput.addEventListener("blur", handleHexBlur);

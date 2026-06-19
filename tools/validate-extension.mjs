@@ -565,6 +565,10 @@ if (!backgroundSource.includes("miniFloatingChatScale: normalizeMiniChatScale(op
   throw new Error("background script must normalize the mini floating chat scale option.");
 }
 
+if (!backgroundSource.includes("chatFontSizePt: normalizeChatFontSizePt(options?.chatFontSizePt)")) {
+  throw new Error("background script must normalize the chat font size pt option.");
+}
+
 if (!popupSource.includes("miniFloatingChatInputOnly")) {
   throw new Error("popup script must preserve the mini floating chat input-only option.");
 }
@@ -581,8 +585,32 @@ if (!popupSource.includes("miniFloatingChatFullscreenOnly: options?.miniFloating
   throw new Error("popup script must preserve the mini floating chat fullscreen-only option.");
 }
 
+if (!popupSource.includes("chatFontSizePt: normalizeChatFontSizePt(options?.chatFontSizePt)")) {
+  throw new Error("popup script must preserve the chat font size pt option.");
+}
+
 if (!contentSource.includes("showDonationRanking: true")) {
   throw new Error("content script must default the donation ranking visibility option on.");
+}
+
+if (!contentSource.includes("chatFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT")) {
+  throw new Error("content script must default the chat font size pt option.");
+}
+
+if (!contentSource.includes("chatFontSizePt: normalizeChatFontSizePt(options?.chatFontSizePt)")) {
+  throw new Error("content script must normalize the chat font size pt option.");
+}
+
+if (!contentSource.includes("document.documentElement.dataset.chzzkChatUiToggleChatFontSizePt")) {
+  throw new Error("content script must expose the chat font size pt value.");
+}
+
+if (!contentSource.includes('"--chzzk-chat-ui-toggle-chat-font-size"')) {
+  throw new Error("content script must apply the chat font size through a CSS variable.");
+}
+
+if (!contentSource.includes("font-size: var(--chzzk-chat-ui-toggle-chat-font-size, 13pt) !important;")) {
+  throw new Error("content script must use the configured chat font size pt value.");
 }
 
 if (!contentSource.includes('showDonationRanking: "chzzkChatUiToggleDonationRanking"')) {
@@ -949,6 +977,33 @@ if (!popupMarkup.includes('id="showDonationRanking"')) {
 
 if (!popupSource.includes('"showDonationRanking"')) {
   throw new Error("popup script must store and apply the donation ranking visibility option.");
+}
+
+if (!popupMarkup.includes("<strong>글씨 크기 조정</strong>")) {
+  throw new Error("popup must rename the large text control to 글씨 크기 조정.");
+}
+
+if (popupMarkup.includes("<strong>큰 글씨</strong>")) {
+  throw new Error("popup must not show the old 큰 글씨 label.");
+}
+
+for (const token of ['id="chatFontSizePt"', 'min="8"', 'max="36"', 'step="1"', 'value="13"', 'id="chatFontSizeValue"', 'id="resetChatFontSize"']) {
+  if (!popupMarkup.includes(token)) {
+    throw new Error(`popup must include the chat font size pt slider control: ${token}`);
+  }
+}
+
+for (const token of [
+  'const chatFontSizeSlider = document.getElementById("chatFontSizePt");',
+  'const chatFontSizeValue = document.getElementById("chatFontSizeValue");',
+  'const resetChatFontSizeButton = document.getElementById("resetChatFontSize");',
+  "chatFontSizePt: chatFontSizeSlider.value",
+  'chatFontSizeSlider.addEventListener("input", handleChatFontSizeInput);',
+  'resetChatFontSizeButton.addEventListener("click", handleResetChatFontSize);'
+]) {
+  if (!popupSource.includes(token)) {
+    throw new Error(`popup script must wire the chat font size pt slider: ${token}`);
+  }
 }
 
 const unsafeRoleSelectors = [

@@ -56,9 +56,20 @@
           </label>
 
           <label class="toggle-row">
-            <span><strong>큰 글씨</strong></span>
+            <span><strong>글씨 크기 조정</strong></span>
             <input type="checkbox" id="showLargeText">
           </label>
+
+          <section class="font-size-control" aria-label="글씨 크기">
+            <div class="font-size-control__header">
+              <strong>글씨 크기</strong>
+              <output id="chatFontSizeValue" class="font-size-value" for="chatFontSizePt">13pt</output>
+            </div>
+            <div class="font-size-control__controls">
+              <input type="range" id="chatFontSizePt" class="font-size-slider" min="8" max="36" step="1" value="13" aria-label="글씨 크기 pt">
+              <button type="button" id="resetChatFontSize" class="default-button">기본</button>
+            </div>
+          </section>
 
           <label class="toggle-row">
             <span><strong>굵게</strong></span>

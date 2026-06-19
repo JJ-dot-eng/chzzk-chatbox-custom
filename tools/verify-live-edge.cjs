@@ -11,6 +11,7 @@ const ROLE_ATTR = "data-chzzk-chat-ui-toggle-role";
 const CHAT_ROW_ATTR = "data-chzzk-chat-ui-toggle-chat-row";
 const OUTPUT_DIR = path.join(process.cwd(), "output", "playwright");
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
+const CHAT_FONT_SIZE_PT_DEFAULT = 13;
 const EXTENSION_NAME = "치지직 채팅 커스텀";
 const EXTENSION_BACKGROUND_FILE = "background.js";
 const GUEST_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-guest-chat-frame";
@@ -96,6 +97,7 @@ const largeTextColorOptions = {
   useGuestChatFrame: false,
   showGuestChatToggleButton: true,
   showLargeText: true,
+  chatFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT,
   showBoldText: false,
   chatBoxColor: "#4b8bff"
 };
@@ -436,6 +438,7 @@ async function collectFrameStates(page) {
             timestamps: document.documentElement.dataset.chzzkChatUiToggleTimestamps || null,
             chatBoxes: document.documentElement.dataset.chzzkChatUiToggleChatBoxes || null,
             largeText: document.documentElement.dataset.chzzkChatUiToggleLargeText || null,
+            chatFontSizePt: document.documentElement.dataset.chzzkChatUiToggleChatFontSizePt || null,
             boldText: document.documentElement.dataset.chzzkChatUiToggleBoldText || null,
             chatBoxColor: document.documentElement.dataset.chzzkChatUiToggleChatBoxColor || null
           },
@@ -1093,10 +1096,11 @@ function assertChatBoxColor(label, summary, hexColor) {
   }
 }
 
-function assertLargeTextOn(label, summary) {
+function assertLargeTextOn(label, summary, expectedFontSizePt = CHAT_FONT_SIZE_PT_DEFAULT) {
   const chatBoxes = summary.layout.chatBoxes;
+  const expectedFontSizePx = expectedFontSizePt * 96 / 72;
 
-  if (chatBoxes.maxFontSize === null || chatBoxes.maxFontSize < 16.8) {
+  if (chatBoxes.maxFontSize === null || chatBoxes.maxFontSize < expectedFontSizePx - 0.5) {
     throw new Error(`${label}: large text font size was not applied`);
   }
 }
@@ -1273,6 +1277,13 @@ async function setPopupOptions(popup, options) {
   await selectPopupTab(popup, "stylePanel");
   await popup.locator("#showChatBoxes").setChecked(options.showChatBoxes);
   await popup.locator("#showLargeText").setChecked(options.showLargeText);
+  if (typeof options.chatFontSizePt === "number") {
+    await popup.locator("#chatFontSizePt").evaluate((slider, fontSizePt) => {
+      slider.value = String(fontSizePt);
+      slider.dispatchEvent(new Event("input", { bubbles: true }));
+    }, options.chatFontSizePt);
+    await popup.waitForTimeout(150);
+  }
   await popup.locator("#showBoldText").setChecked(options.showBoldText);
 
   if (options.chatBoxColor) {
@@ -1385,7 +1396,7 @@ async function main() {
   const largeTextColor = await collectState(page, "large-text color state");
   assertOnState(largeTextColor.summary);
   assertChatBoxesOn("large-text color state", largeTextColor.summary);
-  assertLargeTextOn("large-text color state", largeTextColor.summary);
+  assertLargeTextOn("large-text color state", largeTextColor.summary, largeTextColorOptions.chatFontSizePt);
   assertBoldTextOff("large-text color state", largeTextColor.summary);
   assertChatBoxColor("large-text color state", largeTextColor.summary, largeTextColorOptions.chatBoxColor);
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-large-text-blue.png"), fullPage: false });
