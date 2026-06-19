@@ -1266,11 +1266,11 @@ async function setPopupOptions(popup, options) {
   await popup.locator("#showNicknames").setChecked(options.showNicknames);
   await popup.locator("#showBadges").setChecked(options.showBadges);
   await popup.locator("#showTimestamps").setChecked(options.showTimestamps);
-
-  await selectPopupTab(popup, "stylePanel");
   if (typeof options.useGuestChatFrame === "boolean") {
     await popup.locator("#useGuestChatFrame").setChecked(options.useGuestChatFrame);
   }
+
+  await selectPopupTab(popup, "stylePanel");
   await popup.locator("#showChatBoxes").setChecked(options.showChatBoxes);
   await popup.locator("#showLargeText").setChecked(options.showLargeText);
   await popup.locator("#showBoldText").setChecked(options.showBoldText);
