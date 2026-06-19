@@ -3223,6 +3223,9 @@
     }
   }
 
+  // Mini chat mode names (user-facing Korean terms):
+  // - Chat view mode / "채팅 보기 모드": shows the chat list with the input box.
+  // - Input-only mode / "입력 전용 모드": shows only the chat input/send box.
   function setMiniFloatingChatPanelState(panel) {
     const isInputOnly = currentOptions.miniFloatingChatInputOnly === true;
     const scale = currentOptions.miniFloatingChatScale;
