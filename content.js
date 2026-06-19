@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.3.4";
+  const SCRIPT_VERSION = "0.3.5";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -261,6 +261,7 @@
   let messagesConnected = false;
   let storageListenerConnected = false;
   let themeSyncTimer = 0;
+  let largeTextLayoutFrame = 0;
   let lastOptionsSource = "default";
   let lastOptionsLoadError = "";
   let currentGuestChatTheme = null;
@@ -2064,10 +2065,14 @@
         font-size: var(--chzzk-chat-ui-toggle-chat-font-size, 13pt) !important;
         line-height: 1.45 !important;
         height: auto !important;
-        min-height: var(--chzzk-chat-ui-toggle-chat-row-min-height, 33px) !important;
+        min-height: var(
+          --chzzk-chat-ui-toggle-row-dynamic-height,
+          var(--chzzk-chat-ui-toggle-chat-row-min-height, 33px)
+        ) !important;
         align-items: flex-start !important;
         flex-wrap: wrap !important;
         gap: 0 4px !important;
+        contain: none !important;
         overflow: visible !important;
       }
 
@@ -2366,6 +2371,7 @@
     }
 
     syncGuestChatUi();
+    scheduleLargeTextLayoutSync();
 
     if (markAsReady) {
       markReady();
@@ -4238,6 +4244,10 @@
       element.removeAttribute(CHAT_ROW_ATTR);
     }
 
+    if (element instanceof HTMLElement) {
+      clearLargeTextRowLayout(element);
+    }
+
     if (element.hasAttribute(GENERATED_TIMESTAMP_ATTR)) {
       element.remove();
     }
@@ -4788,6 +4798,70 @@
     annotateSelectorTargets(row, "nickname");
   }
 
+  function clearLargeTextRowLayout(row) {
+    row.style.removeProperty("--chzzk-chat-ui-toggle-row-dynamic-height");
+  }
+
+  function getLargeTextLayoutElements(row) {
+    return queryAllSafe(row, [
+      `[${ROLE_ATTR}]`,
+      `[${MESSAGE_PREFIX_ATTR}]`,
+      ".chzzk-chat-ui-toggle-timestamp",
+      "[class*='live_chatting_message_container' i]",
+      "[class*='live_chatting_message_text' i]",
+      "[class*='_chatting_message_' i]",
+      "[class*='message_text' i]",
+      "[class*='message' i] [class*='text' i]",
+      "[class*='live_chatting_username' i]",
+      "[class*='name_text' i]",
+      "button[class*='nickname' i]"
+    ]).filter((element) => element instanceof Element);
+  }
+
+  function syncLargeTextRowLayout() {
+    largeTextLayoutFrame = 0;
+
+    for (const row of queryAllSafe(document, [`[${CHAT_ROW_ATTR}="true"]`])) {
+      if (!(row instanceof HTMLElement)) {
+        continue;
+      }
+
+      if (!currentOptions.showLargeText) {
+        clearLargeTextRowLayout(row);
+        continue;
+      }
+
+      const rowRect = row.getBoundingClientRect();
+
+      if (rowRect.width <= 0 && rowRect.height <= 0) {
+        continue;
+      }
+
+      const minimumHeight = currentOptions.chatFontSizePt * 96 / 72 * 1.45 + 8;
+      let contentBottom = rowRect.top + minimumHeight - 8;
+
+      for (const element of getLargeTextLayoutElements(row)) {
+        for (const rect of element.getClientRects()) {
+          if (rect.width > 0 || rect.height > 0) {
+            contentBottom = Math.max(contentBottom, rect.bottom);
+          }
+        }
+      }
+
+      const measuredHeight = Math.ceil(contentBottom - rowRect.top + 8);
+      const dynamicHeight = Math.max(minimumHeight, measuredHeight);
+      row.style.setProperty("--chzzk-chat-ui-toggle-row-dynamic-height", `${dynamicHeight.toFixed(2)}px`);
+    }
+  }
+
+  function scheduleLargeTextLayoutSync() {
+    if (largeTextLayoutFrame) {
+      return;
+    }
+
+    largeTextLayoutFrame = window.requestAnimationFrame(syncLargeTextRowLayout);
+  }
+
   function cleanupUnscopedAnnotations(root = document) {
     const annotatedElements = queryAllIncludingRootSafe(root, [
       `[${CHAT_ROW_ATTR}="true"]`,
@@ -4838,6 +4912,7 @@
     }
 
     annotateMiniChatHiddenControls();
+    scheduleLargeTextLayoutSync();
   }
 
   function scan() {
