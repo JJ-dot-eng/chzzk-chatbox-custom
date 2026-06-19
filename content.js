@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.3.2";
+  const SCRIPT_VERSION = "0.3.3";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -2062,6 +2062,27 @@
         ${NATIVE_CHAT_ROW_SELECTOR} {
         font-size: var(--chzzk-chat-ui-toggle-chat-font-size, 13pt) !important;
         line-height: 1.45 !important;
+        height: auto !important;
+        min-height: var(--chzzk-chat-ui-toggle-chat-row-min-height, 33px) !important;
+        align-items: flex-start !important;
+        overflow: visible !important;
+      }
+
+      html[data-chzzk-chat-ui-toggle-large-text="on"]
+        ${NATIVE_CHAT_ROW_SELECTOR}
+        :where(
+          [class*="live_chatting_message_container" i],
+          [class*="_chatting_message_" i],
+          button[class*="live_chatting_message_nickname" i],
+          button[class*="nickname" i],
+          [class*="live_chatting_username_container" i],
+          [class*="live_chatting_username_wrapper" i]
+        ) {
+        height: auto !important;
+        min-height: var(--chzzk-chat-ui-toggle-chat-line-height, 25px) !important;
+        line-height: inherit !important;
+        align-items: flex-start !important;
+        overflow: visible !important;
       }
 
       html[data-chzzk-chat-ui-toggle-large-text="on"]
@@ -2083,6 +2104,31 @@
         .chzzk-chat-ui-toggle-timestamp {
         font-size: inherit !important;
         line-height: inherit !important;
+        height: auto !important;
+        overflow: visible !important;
+      }
+
+      html[data-chzzk-chat-ui-toggle-large-text="on"]
+        ${NATIVE_CHAT_ROW_SELECTOR}
+        :where(
+          [class*="live_chatting_message_text" i],
+          [class*="_chatting_message_" i] [class*="_text_" i],
+          [class*="message_text" i]
+        ) {
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
+      }
+
+      html[data-chzzk-chat-ui-toggle-large-text="on"]
+        ${NATIVE_CHAT_ROW_SELECTOR}
+        :where(
+          [class*="live_chatting_username_nickname" i],
+          button[class*="nickname" i] [class*="nickname" i],
+          [class*="name_text" i],
+          .chzzk-chat-ui-toggle-timestamp
+        ) {
+        white-space: nowrap !important;
       }
 
       html[data-chzzk-chat-ui-toggle-bold-text="on"]
@@ -2274,6 +2320,16 @@
     document.documentElement.style.setProperty(
       "--chzzk-chat-ui-toggle-chat-font-size",
       `${currentOptions.chatFontSizePt}pt`
+    );
+    const chatFontSizePx = currentOptions.chatFontSizePt * 96 / 72;
+    const chatLineHeightPx = chatFontSizePx * 1.45;
+    document.documentElement.style.setProperty(
+      "--chzzk-chat-ui-toggle-chat-line-height",
+      `${chatLineHeightPx.toFixed(2)}px`
+    );
+    document.documentElement.style.setProperty(
+      "--chzzk-chat-ui-toggle-chat-row-min-height",
+      `${(chatLineHeightPx + 8).toFixed(2)}px`
     );
 
     for (const [optionKey, datasetKey] of Object.entries(DATASET_KEYS)) {

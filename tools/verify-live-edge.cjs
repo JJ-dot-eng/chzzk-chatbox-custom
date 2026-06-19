@@ -97,7 +97,7 @@ const largeTextColorOptions = {
   useGuestChatFrame: false,
   showGuestChatToggleButton: true,
   showLargeText: true,
-  chatFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT,
+  chatFontSizePt: 36,
   showBoldText: false,
   chatBoxColor: "#4b8bff"
 };
@@ -412,6 +412,9 @@ async function collectFrameStates(page) {
             };
           });
         const chatBoxWidths = chatBoxSamples.map((sample) => sample.width);
+        const chatBoxHeights = chatBoxSamples
+          .map((sample) => sample.height)
+          .filter((height) => Number.isFinite(height) && height > 0);
         const textInsetDeltas = chatBoxSamples
           .map((sample) => sample.textInsetDelta)
           .filter((delta) => Number.isFinite(delta));
@@ -456,6 +459,8 @@ async function collectFrameStates(page) {
               shrunkenCount: chatBoxSamples.filter((sample) => sample.isShrunken).length,
               minWidth: chatBoxWidths.length ? Math.min(...chatBoxWidths) : null,
               maxWidth: chatBoxWidths.length ? Math.max(...chatBoxWidths) : null,
+              minHeight: chatBoxHeights.length ? Math.min(...chatBoxHeights) : null,
+              maxHeight: chatBoxHeights.length ? Math.max(...chatBoxHeights) : null,
               widthSpread: chatBoxWidths.length ? Math.max(...chatBoxWidths) - Math.min(...chatBoxWidths) : null,
               textInsetDeltas,
               fontSizes,
@@ -1099,9 +1104,14 @@ function assertChatBoxColor(label, summary, hexColor) {
 function assertLargeTextOn(label, summary, expectedFontSizePt = CHAT_FONT_SIZE_PT_DEFAULT) {
   const chatBoxes = summary.layout.chatBoxes;
   const expectedFontSizePx = expectedFontSizePt * 96 / 72;
+  const expectedLineHeightPx = expectedFontSizePx * 1.45;
 
   if (chatBoxes.maxFontSize === null || chatBoxes.maxFontSize < expectedFontSizePx - 0.5) {
     throw new Error(`${label}: large text font size was not applied`);
+  }
+
+  if (chatBoxes.maxHeight === null || chatBoxes.maxHeight < expectedLineHeightPx - 1) {
+    throw new Error(`${label}: large text row height was not expanded`);
   }
 }
 

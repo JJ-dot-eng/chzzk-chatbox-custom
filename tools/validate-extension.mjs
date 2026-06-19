@@ -613,6 +613,23 @@ if (!contentSource.includes("font-size: var(--chzzk-chat-ui-toggle-chat-font-siz
   throw new Error("content script must use the configured chat font size pt value.");
 }
 
+for (const token of [
+  '"--chzzk-chat-ui-toggle-chat-line-height"',
+  '"--chzzk-chat-ui-toggle-chat-row-min-height"',
+  "min-height: var(--chzzk-chat-ui-toggle-chat-row-min-height, 33px) !important;",
+  "min-height: var(--chzzk-chat-ui-toggle-chat-line-height, 25px) !important;",
+  "align-items: flex-start !important;",
+  "overflow: visible !important;",
+  "white-space: normal !important;",
+  "overflow-wrap: anywhere !important;",
+  "word-break: break-word !important;",
+  "white-space: nowrap !important;"
+]) {
+  if (!contentSource.includes(token)) {
+    throw new Error(`content script must prevent large chat font overlap: ${token}`);
+  }
+}
+
 if (!contentSource.includes('showDonationRanking: "chzzkChatUiToggleDonationRanking"')) {
   throw new Error("content script must expose the donation ranking option as a dataset flag.");
 }
