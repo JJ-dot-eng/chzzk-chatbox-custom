@@ -1020,7 +1020,18 @@ if (popupMarkup.includes("<strong>큰 글씨</strong>")) {
   throw new Error("popup must not show the old 큰 글씨 label.");
 }
 
-for (const token of ['id="chatFontSizePt"', 'min="8"', 'max="36"', 'step="1"', 'value="13"', 'id="chatFontSizeValue"', 'id="resetChatFontSize"']) {
+for (const token of [
+  'id="toggleChatFontSizePanel"',
+  'aria-controls="chatFontSizePanel"',
+  'id="chatFontSizePanel"',
+  'id="chatFontSizePt"',
+  'min="8"',
+  'max="36"',
+  'step="1"',
+  'value="13"',
+  'id="chatFontSizeValue"',
+  'id="resetChatFontSize"'
+]) {
   if (!popupMarkup.includes(token)) {
     throw new Error(`popup must include the chat font size pt slider control: ${token}`);
   }
@@ -1030,7 +1041,14 @@ for (const token of [
   'const chatFontSizeSlider = document.getElementById("chatFontSizePt");',
   'const chatFontSizeValue = document.getElementById("chatFontSizeValue");',
   'const resetChatFontSizeButton = document.getElementById("resetChatFontSize");',
+  'const chatFontSizePanel = document.getElementById("chatFontSizePanel");',
+  'const toggleChatFontSizePanelButton = document.getElementById("toggleChatFontSizePanel");',
+  "function setChatFontSizePanelExpanded(",
+  "function syncChatFontSizePanel(",
+  'event?.target?.id === "showLargeText"',
+  "function handleChatFontSizePanelToggle()",
   "chatFontSizePt: chatFontSizeSlider.value",
+  'toggleChatFontSizePanelButton.addEventListener("click", handleChatFontSizePanelToggle);',
   'chatFontSizeSlider.addEventListener("input", handleChatFontSizeInput);',
   'resetChatFontSizeButton.addEventListener("click", handleResetChatFontSize);'
 ]) {

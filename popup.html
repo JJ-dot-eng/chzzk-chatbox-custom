@@ -55,12 +55,13 @@
             <input type="checkbox" id="showChatBoxes">
           </label>
 
-          <label class="toggle-row">
-            <span><strong>글씨 크기 조정</strong></span>
+          <div class="toggle-row toggle-row--with-disclosure">
+            <button type="button" id="toggleChatFontSizePanel" class="disclosure-button" aria-label="글씨 크기 항목 펼치기" aria-expanded="false" aria-controls="chatFontSizePanel" disabled></button>
+            <label class="toggle-row__label" for="showLargeText"><strong>글씨 크기 조정</strong></label>
             <input type="checkbox" id="showLargeText">
-          </label>
+          </div>
 
-          <section class="font-size-control" aria-label="글씨 크기">
+          <section id="chatFontSizePanel" class="font-size-control font-size-control--sub" aria-label="글씨 크기" hidden>
             <div class="font-size-control__header">
               <strong>글씨 크기</strong>
               <output id="chatFontSizeValue" class="font-size-value" for="chatFontSizePt">13pt</output>

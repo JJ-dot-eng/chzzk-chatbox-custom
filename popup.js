@@ -1,5 +1,5 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
-const CONTENT_VERSION = "0.3.5";
+const CONTENT_VERSION = "0.3.6";
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const MINI_CHAT_MIN_WIDTH = 280;
 const MINI_CHAT_MIN_HEIGHT = 28;
@@ -78,6 +78,8 @@ const hueSlider = document.getElementById("hueSlider");
 const chatFontSizeSlider = document.getElementById("chatFontSizePt");
 const chatFontSizeValue = document.getElementById("chatFontSizeValue");
 const resetChatFontSizeButton = document.getElementById("resetChatFontSize");
+const chatFontSizePanel = document.getElementById("chatFontSizePanel");
+const toggleChatFontSizePanelButton = document.getElementById("toggleChatFontSizePanel");
 const statusElement = document.getElementById("status");
 
 let currentColor = DEFAULT_CHAT_BOX_COLOR;
@@ -85,6 +87,7 @@ let currentOptions = { ...DEFAULT_OPTIONS };
 let hsv = { hue: 0, saturation: 0, value: 0.5 };
 let colorApplyTimer = 0;
 let fontSizeApplyTimer = 0;
+let isChatFontSizePanelExpanded = false;
 
 function normalizeHexColor(value) {
   if (typeof value !== "string") {
@@ -355,6 +358,29 @@ function updateChatFontSizeUi(fontSizePt) {
   chatFontSizeValue.textContent = `${normalizedFontSize}pt`;
 }
 
+function setChatFontSizePanelExpanded(expanded, { enabled = controls.showLargeText?.checked === true } = {}) {
+  const shouldExpand = enabled && expanded === true;
+  isChatFontSizePanelExpanded = shouldExpand;
+  chatFontSizePanel.hidden = !shouldExpand;
+  toggleChatFontSizePanelButton.disabled = !enabled;
+  toggleChatFontSizePanelButton.setAttribute("aria-expanded", String(shouldExpand));
+  toggleChatFontSizePanelButton.setAttribute(
+    "aria-label",
+    shouldExpand ? "글씨 크기 항목 접기" : "글씨 크기 항목 펼치기"
+  );
+}
+
+function syncChatFontSizePanel(options = currentOptions) {
+  const isLargeTextEnabled = options.showLargeText === true;
+
+  if (!isLargeTextEnabled) {
+    setChatFontSizePanelExpanded(false, { enabled: false });
+    return;
+  }
+
+  setChatFontSizePanelExpanded(isChatFontSizePanelExpanded, { enabled: true });
+}
+
 function setControls(options) {
   const normalized = normalizeOptions(options);
   currentOptions = normalized;
@@ -363,6 +389,7 @@ function setControls(options) {
     controls[id].checked = normalized[id];
   }
 
+  isChatFontSizePanelExpanded = normalized.showLargeText;
   syncDependentControls(normalized);
   updateChatFontSizeUi(normalized.chatFontSizePt);
   updateColorUi(normalized.chatBoxColor);
@@ -373,12 +400,12 @@ function syncDependentControls(options = currentOptions) {
   const fullscreenOnlyRow = fullscreenOnlyControl?.closest(".toggle-row");
   const isMiniChatEnabled = options.useMiniFloatingChat === true;
 
-  if (!fullscreenOnlyControl) {
-    return;
+  if (fullscreenOnlyControl) {
+    fullscreenOnlyControl.disabled = !isMiniChatEnabled;
+    fullscreenOnlyRow?.classList.toggle("is-disabled", !isMiniChatEnabled);
   }
 
-  fullscreenOnlyControl.disabled = !isMiniChatEnabled;
-  fullscreenOnlyRow?.classList.toggle("is-disabled", !isMiniChatEnabled);
+  syncChatFontSizePanel(options);
 }
 
 function readControls() {
@@ -565,14 +592,28 @@ function scheduleFontSizeApply() {
   fontSizeApplyTimer = window.setTimeout(applyCurrentOptions, 100);
 }
 
-async function handleControlChange() {
-  syncDependentControls(readControls());
+async function handleControlChange(event) {
+  const options = readControls();
+
+  if (event?.target?.id === "showLargeText") {
+    isChatFontSizePanelExpanded = options.showLargeText;
+  }
+
+  syncDependentControls(options);
   await applyCurrentOptions();
 }
 
 function handleChatFontSizeInput() {
   updateChatFontSizeUi(chatFontSizeSlider.value);
   scheduleFontSizeApply();
+}
+
+function handleChatFontSizePanelToggle() {
+  if (controls.showLargeText.checked !== true) {
+    return;
+  }
+
+  setChatFontSizePanelExpanded(!isChatFontSizePanelExpanded);
 }
 
 function setColorFromHsv(nextHsv, { commit = true } = {}) {
@@ -689,6 +730,7 @@ async function init() {
   colorField.addEventListener("pointerdown", handleColorFieldPointerDown);
   colorField.addEventListener("pointermove", handleColorFieldPointerMove);
   hueSlider.addEventListener("input", handleHueChange);
+  toggleChatFontSizePanelButton.addEventListener("click", handleChatFontSizePanelToggle);
   chatFontSizeSlider.addEventListener("input", handleChatFontSizeInput);
   resetChatFontSizeButton.addEventListener("click", handleResetChatFontSize);
   hexInput.addEventListener("input", handleHexInput);
