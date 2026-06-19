@@ -1,5 +1,5 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
-const CONTENT_VERSION = "0.3.6";
+const CONTENT_VERSION = "0.3.7";
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const MINI_CHAT_MIN_WIDTH = 280;
 const MINI_CHAT_MIN_HEIGHT = 28;
@@ -361,6 +361,7 @@ function updateChatFontSizeUi(fontSizePt) {
 function setChatFontSizePanelExpanded(expanded, { enabled = controls.showLargeText?.checked === true } = {}) {
   const shouldExpand = enabled && expanded === true;
   isChatFontSizePanelExpanded = shouldExpand;
+  document.body.classList.toggle("is-chat-font-size-panel-expanded", shouldExpand);
   chatFontSizePanel.hidden = !shouldExpand;
   toggleChatFontSizePanelButton.disabled = !enabled;
   toggleChatFontSizePanelButton.setAttribute("aria-expanded", String(shouldExpand));

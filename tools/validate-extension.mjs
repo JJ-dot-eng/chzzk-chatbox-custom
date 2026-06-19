@@ -9,6 +9,7 @@ const packageLock = JSON.parse(await readFile(path.join(root, "package-lock.json
 const contentSource = await readFile(path.join(root, "content.js"), "utf8");
 const backgroundSource = await readFile(path.join(root, "background.js"), "utf8");
 const popupMarkup = await readFile(path.join(root, "popup.html"), "utf8");
+const popupStyles = await readFile(path.join(root, "popup.css"), "utf8");
 const popupSource = await readFile(path.join(root, "popup.js"), "utf8");
 const liveVerifySource = await readFile(path.join(root, "tools", "verify-live-edge.cjs"), "utf8");
 const normalizedContentSource = contentSource.replace(/\r\n/g, "\n");
@@ -1044,6 +1045,7 @@ for (const token of [
   'const chatFontSizePanel = document.getElementById("chatFontSizePanel");',
   'const toggleChatFontSizePanelButton = document.getElementById("toggleChatFontSizePanel");',
   "function setChatFontSizePanelExpanded(",
+  'document.body.classList.toggle("is-chat-font-size-panel-expanded", shouldExpand);',
   "function syncChatFontSizePanel(",
   'event?.target?.id === "showLargeText"',
   "function handleChatFontSizePanelToggle()",
@@ -1054,6 +1056,23 @@ for (const token of [
 ]) {
   if (!popupSource.includes(token)) {
     throw new Error(`popup script must wire the chat font size pt slider: ${token}`);
+  }
+}
+
+for (const token of [
+  "body.is-chat-font-size-panel-expanded",
+  "scrollbar-width: none;",
+  "body::-webkit-scrollbar",
+  ".disclosure-button {",
+  "border: 0;",
+  "background: transparent;",
+  ".disclosure-button:not(:disabled):hover",
+  "body.is-chat-font-size-panel-expanded .color-picker__body",
+  "body.is-chat-font-size-panel-expanded .color-field",
+  "body.is-chat-font-size-panel-expanded .hue-slider"
+]) {
+  if (!popupStyles.includes(token)) {
+    throw new Error(`popup styles must keep the adaptive font-size panel layout: ${token}`);
   }
 }
 

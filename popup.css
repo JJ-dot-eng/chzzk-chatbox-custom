@@ -15,12 +15,32 @@
 }
 
 body {
-  width: 320px;
-  min-width: 320px;
+  width: 340px;
+  min-width: 340px;
   margin: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: var(--bg);
   color: var(--text);
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html {
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+body.is-chat-font-size-panel-expanded {
+  width: 360px;
+  min-width: 360px;
 }
 
 .popup {
@@ -200,21 +220,22 @@ h1 {
   display: grid;
   place-items: center;
   flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   padding: 0;
-  border: 1px solid #c8d0d8;
-  border-radius: 6px;
-  background: #ffffff;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
   cursor: pointer;
+  transition: background-color 140ms ease;
 }
 
 .disclosure-button::before {
   content: "";
-  width: 8px;
-  height: 8px;
-  border-right: 2px solid var(--muted);
-  border-bottom: 2px solid var(--muted);
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid #4f5b66;
+  border-bottom: 2px solid #4f5b66;
   transform: rotate(-45deg);
   transition: transform 140ms ease;
 }
@@ -223,13 +244,17 @@ h1 {
   transform: rotate(45deg);
 }
 
+.disclosure-button:not(:disabled):hover {
+  background: rgba(10, 18, 28, 0.07);
+}
+
 .disclosure-button:focus-visible {
   box-shadow: 0 0 0 3px rgba(0, 196, 113, 0.22);
   outline: none;
 }
 
 .disclosure-button:disabled {
-  opacity: 0.42;
+  opacity: 0.48;
   cursor: not-allowed;
 }
 
@@ -371,6 +396,15 @@ h1 {
   min-height: 172px;
 }
 
+body.is-chat-font-size-panel-expanded .color-picker {
+  gap: 8px;
+  margin-top: 8px;
+}
+
+body.is-chat-font-size-panel-expanded .color-picker__body {
+  min-height: 132px;
+}
+
 .color-field {
   position: relative;
   min-width: 0;
@@ -382,6 +416,10 @@ h1 {
     linear-gradient(to right, #ffffff, var(--field-hue, #ff0000));
   cursor: crosshair;
   outline: none;
+}
+
+body.is-chat-font-size-panel-expanded .color-field {
+  min-height: 132px;
 }
 
 .color-field:focus-visible {
@@ -409,6 +447,10 @@ h1 {
   cursor: pointer;
   writing-mode: vertical-lr;
   direction: rtl;
+}
+
+body.is-chat-font-size-panel-expanded .hue-slider {
+  height: 132px;
 }
 
 .hue-slider::-webkit-slider-runnable-track {
