@@ -1109,12 +1109,12 @@ for (const token of [
   "function setChatFontSizePanelExpanded(",
   'document.body.classList.toggle("is-chat-font-size-panel-expanded", shouldExpand);',
   "function syncChatFontSizePanel(",
-  'event?.target?.id === "showChatBoxes"',
-  'event?.target?.id === "showLargeText"',
-  "options.showChatBoxes && isChatBoxColorPanelExpanded",
-  "options.showLargeText && isChatFontSizePanelExpanded",
+  "setChatBoxColorPanelExpanded(isChatBoxColorPanelExpanded);",
+  "setChatFontSizePanelExpanded(isChatFontSizePanelExpanded);",
   "function handleChatBoxColorPanelToggle()",
   "function handleChatFontSizePanelToggle()",
+  "setChatBoxColorPanelExpanded(!isChatBoxColorPanelExpanded);",
+  "setChatFontSizePanelExpanded(!isChatFontSizePanelExpanded);",
   "chatFontSizePt: chatFontSizeSlider.value",
   "useNicknameFontSize: controls.useNicknameFontSize.checked",
   "nicknameFontSizePt: nicknameFontSizeSlider.value",
@@ -1130,6 +1130,28 @@ for (const token of [
 ]) {
   if (!popupSource.includes(token)) {
     throw new Error(`popup script must wire the chat font size pt slider: ${token}`);
+  }
+}
+
+for (const token of [
+  "toggleChatBoxColorPanelButton.disabled = !enabled;",
+  "toggleChatFontSizePanelButton.disabled = !enabled;",
+  "controls.showChatBoxes.checked !== true",
+  "controls.showLargeText.checked !== true",
+  "options.showChatBoxes && isChatBoxColorPanelExpanded",
+  "options.showLargeText && isChatFontSizePanelExpanded"
+]) {
+  if (popupSource.includes(token)) {
+    throw new Error(`popup script must keep disclosure buttons independent from feature toggles: ${token}`);
+  }
+}
+
+for (const token of [
+  'id="toggleChatBoxColorPanel" class="disclosure-button" aria-label="박스 색상 항목 펼치기" aria-expanded="false" aria-controls="chatBoxColorPanel" disabled',
+  'id="toggleChatFontSizePanel" class="disclosure-button" aria-label="글씨 크기 항목 펼치기" aria-expanded="false" aria-controls="chatFontSizePanel" disabled'
+]) {
+  if (popupMarkup.includes(token)) {
+    throw new Error(`popup markup must not disable disclosure buttons by default: ${token}`);
   }
 }
 

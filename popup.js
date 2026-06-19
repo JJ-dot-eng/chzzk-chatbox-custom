@@ -1,5 +1,5 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
-const CONTENT_VERSION = "0.3.9";
+const CONTENT_VERSION = "0.3.10";
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const MINI_CHAT_MIN_WIDTH = 280;
 const MINI_CHAT_MIN_HEIGHT = 28;
@@ -376,12 +376,11 @@ function updateNicknameFontSizeUi(fontSizePt) {
   nicknameFontSizeValue.textContent = `${normalizedFontSize}pt`;
 }
 
-function setChatBoxColorPanelExpanded(expanded, { enabled = controls.showChatBoxes?.checked === true } = {}) {
-  const shouldExpand = enabled && expanded === true;
+function setChatBoxColorPanelExpanded(expanded) {
+  const shouldExpand = expanded === true;
   isChatBoxColorPanelExpanded = shouldExpand;
   document.body.classList.toggle("is-chat-box-color-panel-expanded", shouldExpand);
   chatBoxColorPanel.hidden = !shouldExpand;
-  toggleChatBoxColorPanelButton.disabled = !enabled;
   toggleChatBoxColorPanelButton.setAttribute("aria-expanded", String(shouldExpand));
   toggleChatBoxColorPanelButton.setAttribute(
     "aria-label",
@@ -389,23 +388,15 @@ function setChatBoxColorPanelExpanded(expanded, { enabled = controls.showChatBox
   );
 }
 
-function syncChatBoxColorPanel(options = currentOptions) {
-  const isChatBoxesEnabled = options.showChatBoxes === true;
-
-  if (!isChatBoxesEnabled) {
-    setChatBoxColorPanelExpanded(false, { enabled: false });
-    return;
-  }
-
-  setChatBoxColorPanelExpanded(isChatBoxColorPanelExpanded, { enabled: true });
+function syncChatBoxColorPanel() {
+  setChatBoxColorPanelExpanded(isChatBoxColorPanelExpanded);
 }
 
-function setChatFontSizePanelExpanded(expanded, { enabled = controls.showLargeText?.checked === true } = {}) {
-  const shouldExpand = enabled && expanded === true;
+function setChatFontSizePanelExpanded(expanded) {
+  const shouldExpand = expanded === true;
   isChatFontSizePanelExpanded = shouldExpand;
   document.body.classList.toggle("is-chat-font-size-panel-expanded", shouldExpand);
   chatFontSizePanel.hidden = !shouldExpand;
-  toggleChatFontSizePanelButton.disabled = !enabled;
   toggleChatFontSizePanelButton.setAttribute("aria-expanded", String(shouldExpand));
   toggleChatFontSizePanelButton.setAttribute(
     "aria-label",
@@ -413,15 +404,8 @@ function setChatFontSizePanelExpanded(expanded, { enabled = controls.showLargeTe
   );
 }
 
-function syncChatFontSizePanel(options = currentOptions) {
-  const isLargeTextEnabled = options.showLargeText === true;
-
-  if (!isLargeTextEnabled) {
-    setChatFontSizePanelExpanded(false, { enabled: false });
-    return;
-  }
-
-  setChatFontSizePanelExpanded(isChatFontSizePanelExpanded, { enabled: true });
+function syncChatFontSizePanel() {
+  setChatFontSizePanelExpanded(isChatFontSizePanelExpanded);
 }
 
 function setControls(options) {
@@ -644,16 +628,8 @@ function scheduleFontSizeApply() {
   fontSizeApplyTimer = window.setTimeout(applyCurrentOptions, 100);
 }
 
-async function handleControlChange(event) {
+async function handleControlChange() {
   const options = readControls();
-
-  if (event?.target?.id === "showLargeText") {
-    isChatFontSizePanelExpanded = options.showLargeText && isChatFontSizePanelExpanded;
-  }
-
-  if (event?.target?.id === "showChatBoxes") {
-    isChatBoxColorPanelExpanded = options.showChatBoxes && isChatBoxColorPanelExpanded;
-  }
 
   syncDependentControls(options);
   await applyCurrentOptions();
@@ -670,18 +646,10 @@ function handleNicknameFontSizeInput() {
 }
 
 function handleChatFontSizePanelToggle() {
-  if (controls.showLargeText.checked !== true) {
-    return;
-  }
-
   setChatFontSizePanelExpanded(!isChatFontSizePanelExpanded);
 }
 
 function handleChatBoxColorPanelToggle() {
-  if (controls.showChatBoxes.checked !== true) {
-    return;
-  }
-
   setChatBoxColorPanelExpanded(!isChatBoxColorPanelExpanded);
 }
 
