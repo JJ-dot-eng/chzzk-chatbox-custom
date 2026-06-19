@@ -1,5 +1,5 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
-const CONTENT_VERSION = "0.3.10";
+const CONTENT_VERSION = "0.3.11";
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const MINI_CHAT_MIN_WIDTH = 280;
 const MINI_CHAT_MIN_HEIGHT = 28;
@@ -97,7 +97,7 @@ let hsv = { hue: 0, saturation: 0, value: 0.5 };
 let colorApplyTimer = 0;
 let fontSizeApplyTimer = 0;
 let isChatBoxColorPanelExpanded = false;
-let isChatFontSizePanelExpanded = false;
+let isChatFontSizePanelExpanded = true;
 
 function normalizeHexColor(value) {
   if (typeof value !== "string") {
@@ -417,7 +417,7 @@ function setControls(options) {
   }
 
   isChatBoxColorPanelExpanded = false;
-  isChatFontSizePanelExpanded = false;
+  isChatFontSizePanelExpanded = true;
   syncDependentControls(normalized);
   updateChatFontSizeUi(normalized.chatFontSizePt);
   updateNicknameFontSizeUi(normalized.nicknameFontSizePt);
