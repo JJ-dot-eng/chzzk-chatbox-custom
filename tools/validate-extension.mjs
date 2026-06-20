@@ -28,8 +28,19 @@ function assertExcludes(source, token, message) {
 const manifest = await readJson("manifest.json");
 const packageJson = await readJson("package.json");
 const packageLock = await readJson("package-lock.json");
+const contentScriptFiles = [
+  "content-bootstrap.js",
+  "content-options.js",
+  "content-theme.js",
+  "content-core.js",
+  "content-mini-chat.js",
+  "content-guest-chat.js",
+  "content-chat-annotate.js",
+  "content-runtime.js"
+];
 const backgroundSource = await readText("background.js");
-const contentSource = await readText("content.js");
+const contentSources = await Promise.all(contentScriptFiles.map((file) => readText(file)));
+const contentSource = contentSources.join("\n");
 const contentCssSource = await readText("content.css");
 const popupMarkup = await readText("popup.html");
 const popupStyles = await readText("popup.css");
@@ -42,7 +53,7 @@ const contentSurface = `${contentSource}\n${contentCssSource}`;
 const requiredRootFiles = [
   "manifest.json",
   "background.js",
-  "content.js",
+  ...contentScriptFiles,
   "content.css",
   "popup.html",
   "popup.css",
@@ -70,7 +81,7 @@ assert(
   packageLock.version === manifest.version && packageLock.packages?.[""]?.version === manifest.version,
   "package-lock root versions must match manifest version."
 );
-assertIncludes(contentSource, `const SCRIPT_VERSION = "${manifest.version}";`, "content script version must match manifest version");
+assertIncludes(contentSource, `var SCRIPT_VERSION = "${manifest.version}";`, "content script version must match manifest version");
 assertIncludes(popupSource, `const CONTENT_VERSION = "${manifest.version}";`, "popup content version must match manifest version");
 
 assert(manifest.action?.default_popup === "popup.html", "default popup must point to popup.html.");
@@ -102,9 +113,9 @@ assert(
 );
 assert(
   Array.isArray(contentScript.js) &&
-    contentScript.js.length === 1 &&
-    contentScript.js[0] === "content.js",
-  "content script JS must load content.js."
+    contentScript.js.length === contentScriptFiles.length &&
+    contentScript.js.every((file, index) => file === contentScriptFiles[index]),
+  "content script JS files must load in the expected module order."
 );
 
 for (const token of [
@@ -136,10 +147,10 @@ for (const token of [
 }
 
 for (const token of [
-  'const NATIVE_CHAT_ROW_SELECTOR = `:is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i]):has(:is([class*="live_chatting_message_container" i], [class*="_chatting_message_" i]))`;',
-  'const CHAT_ROW_SCOPE_SELECTOR = `:is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i])[${CHAT_ROW_ATTR}="true"]`;',
+  'var NATIVE_CHAT_ROW_SELECTOR = `:is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i]):has(:is([class*="live_chatting_message_container" i], [class*="_chatting_message_" i]))`;',
+  'var CHAT_ROW_SCOPE_SELECTOR = `:is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i])[${CHAT_ROW_ATTR}="true"]`;',
   "function readOptionsFromBackground()",
-  "Promise.all([\n      readOptionsFromStorageLocal(),\n      readOptionsFromBackground()\n    ])",
+  "Promise.all([\n    readOptionsFromStorageLocal(),\n    readOptionsFromBackground()\n  ])",
   "connectMessages();",
   "connectStorageListener();",
   "function syncGuestChatFrame()",
@@ -152,11 +163,11 @@ for (const token of [
 }
 
 for (const token of [
-  'const GUEST_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-guest-chat-frame";',
-  'const GUEST_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleGuest";',
-  'const GUEST_CHAT_CLEANBOT_DEFAULT_ATTR = "data-chzzk-chat-ui-toggle-guest-cleanbot-default";',
-  'const GUEST_CHAT_CLEANBOT_STORAGE_KEY = "cleanbot";',
-  'const GUEST_CHAT_CLEANBOT_DISABLED_VALUE = "false";',
+  'var GUEST_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-guest-chat-frame";',
+  'var GUEST_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleGuest";',
+  'var GUEST_CHAT_CLEANBOT_DEFAULT_ATTR = "data-chzzk-chat-ui-toggle-guest-cleanbot-default";',
+  'var GUEST_CHAT_CLEANBOT_STORAGE_KEY = "cleanbot";',
+  'var GUEST_CHAT_CLEANBOT_DISABLED_VALUE = "false";',
   "function applyGuestChatCleanBotDefault()",
   "if (!isGuestChatFrameEmbedUrl(window.location.href))",
   "window.localStorage?.setItem(GUEST_CHAT_CLEANBOT_STORAGE_KEY, GUEST_CHAT_CLEANBOT_DISABLED_VALUE);",

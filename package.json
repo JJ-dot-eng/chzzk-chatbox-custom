@@ -4,7 +4,7 @@
   "private": true,
   "description": "Chrome/Edge extension for local-only CHZZK chat UI visibility toggles.",
   "scripts": {
-    "check": "node tools/validate-extension.mjs && node --check background.js && node --check content.js && node --check popup.js && node --check tools/verify-live-edge.cjs",
+    "check": "node tools/validate-extension.mjs && node --check background.js && node --check content-bootstrap.js && node --check content-options.js && node --check content-theme.js && node --check content-core.js && node --check content-mini-chat.js && node --check content-guest-chat.js && node --check content-chat-annotate.js && node --check content-runtime.js && node --check popup.js && node --check tools/verify-live-edge.cjs",
     "icons": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/generate-icons.ps1",
     "package": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/package-extension.ps1",
     "verify:edge-cdp": "node tools/verify-live-edge.cjs"

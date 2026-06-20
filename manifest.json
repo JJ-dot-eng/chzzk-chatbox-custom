@@ -38,7 +38,14 @@
         "content.css"
       ],
       "js": [
-        "content.js"
+        "content-bootstrap.js",
+        "content-options.js",
+        "content-theme.js",
+        "content-core.js",
+        "content-mini-chat.js",
+        "content-guest-chat.js",
+        "content-chat-annotate.js",
+        "content-runtime.js"
       ],
       "run_at": "document_start",
       "all_frames": true
