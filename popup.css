@@ -22,20 +22,37 @@ body {
   background: var(--bg);
   color: var(--text);
   overflow-x: hidden;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #c8d0d8 transparent;
+  -ms-overflow-style: auto;
 }
 
 html {
   overflow-x: hidden;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #c8d0d8 transparent;
+  -ms-overflow-style: auto;
 }
 
 html::-webkit-scrollbar,
 body::-webkit-scrollbar {
-  width: 0;
+  width: 8px;
   height: 0;
+}
+
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: #c8d0d8;
+  background-clip: padding-box;
 }
 
 body.is-chat-font-size-panel-expanded,
