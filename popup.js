@@ -526,8 +526,6 @@ function syncDependentControls(options = currentOptions) {
 
   const shouldDisableChatTextColor = options.useNicknameColorForMessage === true;
   const chatTextColorControls = [
-    controls.useChatTextColor,
-    toggleChatTextColorPanelButton,
     chatTextHexInput,
     resetChatTextColorButton,
     chatTextColorField,
@@ -538,7 +536,7 @@ function syncDependentControls(options = currentOptions) {
     control.disabled = shouldDisableChatTextColor;
   }
 
-  chatTextColorControl.classList.toggle("is-disabled", shouldDisableChatTextColor);
+  chatTextColorPanel.classList.toggle("is-disabled", shouldDisableChatTextColor);
 }
 
 function readControls() {

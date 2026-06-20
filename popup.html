@@ -72,42 +72,44 @@
           </section>
 
           <div class="toggle-row toggle-row--with-disclosure">
-            <button type="button" id="toggleChatFontSizePanel" class="disclosure-button" aria-label="글씨 크기 항목 접기" aria-expanded="true" aria-controls="chatFontSizePanel"></button>
-            <label class="toggle-row__label" for="showLargeText"><strong>글씨 크기 조정</strong></label>
-            <input type="checkbox" id="showLargeText">
-          </div>
-
-          <section id="chatFontSizePanel" class="font-size-control font-size-control--sub" aria-label="글씨 크기">
-            <div class="font-size-control__header">
-              <strong>글씨 크기</strong>
-              <output id="chatFontSizeValue" class="font-size-value" for="chatFontSizePt">13pt</output>
-            </div>
-            <div class="font-size-control__controls">
-              <input type="range" id="chatFontSizePt" class="font-size-slider" min="8" max="36" step="1" value="13" aria-label="글씨 크기 pt">
-              <button type="button" id="resetChatFontSize" class="default-button">기본</button>
-            </div>
-            <label class="font-size-control__toggle">
-              <span><strong>닉네임 크기 따로 조정</strong></span>
-              <input type="checkbox" id="useNicknameFontSize">
-            </label>
-            <div id="nicknameFontSizeControl" class="font-size-control__nested">
-              <div class="font-size-control__header">
-                <strong>닉네임 크기</strong>
-                <output id="nicknameFontSizeValue" class="font-size-value" for="nicknameFontSizePt">13pt</output>
-              </div>
-              <div class="font-size-control__controls">
-                <input type="range" id="nicknameFontSizePt" class="font-size-slider" min="8" max="36" step="1" value="13" aria-label="닉네임 크기 pt">
-                <button type="button" id="resetNicknameFontSize" class="default-button">기본</button>
-              </div>
-            </div>
-          </section>
-
-          <div class="toggle-row toggle-row--with-disclosure">
             <button type="button" id="toggleChatTextStylePanel" class="disclosure-button" aria-label="채팅 글자 스타일 항목 접기" aria-expanded="true" aria-controls="chatTextStylePanel"></button>
             <span class="toggle-row__label"><strong>채팅 글자 스타일</strong></span>
           </div>
 
           <section id="chatTextStylePanel" class="text-style-control text-style-control--sub" aria-label="채팅 글자 스타일">
+            <div id="chatFontSizeControl" class="text-style-control__font-size">
+              <div class="text-style-control__toggle text-style-control__toggle--with-disclosure">
+                <label class="text-style-control__label" for="showLargeText"><strong>글씨 크기 조정</strong></label>
+                <button type="button" id="toggleChatFontSizePanel" class="disclosure-button disclosure-button--trailing" aria-label="글씨 크기 항목 접기" aria-expanded="true" aria-controls="chatFontSizePanel"></button>
+                <input type="checkbox" id="showLargeText">
+              </div>
+
+              <section id="chatFontSizePanel" class="font-size-control font-size-control--nested" aria-label="글씨 크기">
+                <div class="font-size-control__header">
+                  <strong>글씨 크기</strong>
+                  <output id="chatFontSizeValue" class="font-size-value" for="chatFontSizePt">13pt</output>
+                </div>
+                <div class="font-size-control__controls">
+                  <input type="range" id="chatFontSizePt" class="font-size-slider" min="8" max="36" step="1" value="13" aria-label="글씨 크기 pt">
+                  <button type="button" id="resetChatFontSize" class="default-button">기본</button>
+                </div>
+                <label class="font-size-control__toggle">
+                  <span><strong>닉네임 크기 따로 조정</strong></span>
+                  <input type="checkbox" id="useNicknameFontSize">
+                </label>
+                <div id="nicknameFontSizeControl" class="font-size-control__nested">
+                  <div class="font-size-control__header">
+                    <strong>닉네임 크기</strong>
+                    <output id="nicknameFontSizeValue" class="font-size-value" for="nicknameFontSizePt">13pt</output>
+                  </div>
+                  <div class="font-size-control__controls">
+                    <input type="range" id="nicknameFontSizePt" class="font-size-slider" min="8" max="36" step="1" value="13" aria-label="닉네임 크기 pt">
+                    <button type="button" id="resetNicknameFontSize" class="default-button">기본</button>
+                  </div>
+                </div>
+              </section>
+            </div>
+
             <label class="text-style-control__toggle">
               <span><strong>굵게</strong></span>
               <input type="checkbox" id="showBoldText">
@@ -134,12 +136,12 @@
                   <input type="range" id="chatTextHueSlider" class="hue-slider" min="0" max="360" value="0" aria-label="글자 색상 범위">
                 </div>
               </section>
-            </div>
 
-            <label class="text-style-control__toggle">
-              <span><strong>닉네임 색상으로 채팅 표시</strong></span>
-              <input type="checkbox" id="useNicknameColorForMessage">
-            </label>
+              <label class="text-style-control__toggle text-style-control__toggle--nested-option">
+                <span><strong>닉네임 색상으로 채팅 표시</strong></span>
+                <input type="checkbox" id="useNicknameColorForMessage">
+              </label>
+            </div>
           </section>
 
         </div>
