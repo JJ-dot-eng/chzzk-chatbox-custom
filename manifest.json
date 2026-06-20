@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "치지직 채팅 커스텀",
   "short_name": "채팅 커스텀",
-  "version": "0.3.16",
-  "description": "치지직 채팅창의 텍스트 표시와 꾸미기 옵션을 내 브라우저에서만 토글합니다.",
+  "version": "0.4.1",
+  "description": "치지직 채팅창의 표시 항목, 글자 크기, 채팅 패널, 비로그인/미니 채팅창을 내 브라우저에서만 조정합니다.",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
@@ -24,20 +24,18 @@
     "service_worker": "background.js"
   },
   "permissions": [
-    "storage",
-    "activeTab",
-    "scripting",
-    "webNavigation"
+    "storage"
   ],
   "host_permissions": [
-    "https://chzzk.naver.com/*",
-    "https://*.chzzk.naver.com/*"
+    "https://chzzk.naver.com/*"
   ],
   "content_scripts": [
     {
       "matches": [
-        "https://chzzk.naver.com/*",
-        "https://*.chzzk.naver.com/*"
+        "https://chzzk.naver.com/*"
+      ],
+      "css": [
+        "content.css"
       ],
       "js": [
         "content.js"

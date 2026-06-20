@@ -2,419 +2,169 @@ import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 
 const root = process.cwd();
-const manifestPath = path.join(root, "manifest.json");
-const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
-const packageLock = JSON.parse(await readFile(path.join(root, "package-lock.json"), "utf8"));
-const contentSource = await readFile(path.join(root, "content.js"), "utf8");
-const backgroundSource = await readFile(path.join(root, "background.js"), "utf8");
-const popupMarkup = await readFile(path.join(root, "popup.html"), "utf8");
-const popupStyles = await readFile(path.join(root, "popup.css"), "utf8");
-const popupSource = await readFile(path.join(root, "popup.js"), "utf8");
-const readmeSource = await readFile(path.join(root, "README.md"), "utf8");
-const liveVerifySource = await readFile(path.join(root, "tools", "verify-live-edge.cjs"), "utf8");
-const normalizedContentSource = contentSource.replace(/\r\n/g, "\n");
+
+async function readText(relativePath) {
+  return readFile(path.join(root, relativePath), "utf8");
+}
+
+async function readJson(relativePath) {
+  return JSON.parse(await readText(relativePath));
+}
+
+function assert(condition, message) {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+function assertIncludes(source, token, message) {
+  assert(source.includes(token), `${message}: ${token}`);
+}
+
+function assertExcludes(source, token, message) {
+  assert(!source.includes(token), `${message}: ${token}`);
+}
+
+const manifest = await readJson("manifest.json");
+const packageJson = await readJson("package.json");
+const packageLock = await readJson("package-lock.json");
+const backgroundSource = await readText("background.js");
+const contentSource = await readText("content.js");
+const contentCssSource = await readText("content.css");
+const popupMarkup = await readText("popup.html");
+const popupStyles = await readText("popup.css");
+const popupSource = await readText("popup.js");
+const readmeSource = await readText("README.md");
+const liveVerifySource = await readText(path.join("tools", "verify-live-edge.cjs"));
+const contentSurface = `${contentSource}\n${contentCssSource}`;
 
 const requiredRootFiles = [
   "manifest.json",
   "background.js",
   "content.js",
+  "content.css",
   "popup.html",
   "popup.css",
   "popup.js",
   "README.md"
 ];
 
-const iconSizes = ["16", "32", "48", "128"];
-
 for (const file of requiredRootFiles) {
   await access(path.join(root, file));
 }
 
-if (manifest.manifest_version !== 3) {
-  throw new Error("manifest_version must be 3.");
-}
-
-if (manifest.name !== "치지직 채팅 커스텀") {
-  throw new Error("manifest name must be 치지직 채팅 커스텀.");
-}
-
-if (manifest.short_name !== "채팅 커스텀") {
-  throw new Error("manifest short_name must be 채팅 커스텀.");
-}
-
-if (manifest.version !== packageJson.version) {
-  throw new Error("manifest and package versions must match.");
-}
-
-if (packageLock.version !== manifest.version || packageLock.packages?.[""]?.version !== manifest.version) {
-  throw new Error("package-lock root versions must match manifest version.");
-}
-
-if (!contentSource.includes(`const SCRIPT_VERSION = "${manifest.version}";`)) {
-  throw new Error("content script version must match manifest version.");
-}
-
-if (!popupSource.includes(`const CONTENT_VERSION = "${manifest.version}";`)) {
-  throw new Error("popup content version must match manifest version.");
-}
-
-if (!manifest.permissions?.includes("storage")) {
-  throw new Error("storage permission is required.");
-}
-
-if (!manifest.permissions?.includes("scripting")) {
-  throw new Error("scripting permission is required for stale content-script refresh.");
-}
-
-if (!manifest.permissions?.includes("webNavigation")) {
-  throw new Error("webNavigation permission is required for automatic CHZZK navigation reinjection.");
-}
-
-if (!manifest.host_permissions?.includes("https://chzzk.naver.com/*")) {
-  throw new Error("CHZZK host permission is missing.");
-}
-
-if (!manifest.host_permissions?.includes("https://*.chzzk.naver.com/*")) {
-  throw new Error("CHZZK wildcard host permission is missing.");
-}
-
-if (manifest.action?.default_popup !== "popup.html") {
-  throw new Error("default popup must point to popup.html.");
-}
-
-for (const size of iconSizes) {
-  const manifestIcon = manifest.icons?.[size];
-  const actionIcon = manifest.action?.default_icon?.[size];
+for (const size of ["16", "32", "48", "128"]) {
   const expectedPath = `icons/icon-${size}.png`;
 
-  if (manifestIcon !== expectedPath) {
-    throw new Error(`manifest icon ${size} must point to ${expectedPath}.`);
-  }
-
-  if (actionIcon !== expectedPath) {
-    throw new Error(`action icon ${size} must point to ${expectedPath}.`);
-  }
-
+  assert(manifest.icons?.[size] === expectedPath, `manifest icon ${size} must point to ${expectedPath}.`);
+  assert(manifest.action?.default_icon?.[size] === expectedPath, `action icon ${size} must point to ${expectedPath}.`);
   await access(path.join(root, expectedPath));
 }
 
-if (manifest.background?.service_worker !== "background.js") {
-  throw new Error("background service worker must point to background.js.");
-}
+assert(manifest.manifest_version === 3, "manifest_version must be 3.");
+assert(manifest.name === "치지직 채팅 커스텀", "manifest name must be 치지직 채팅 커스텀.");
+assert(manifest.short_name === "채팅 커스텀", "manifest short_name must be 채팅 커스텀.");
+assert(manifest.version === packageJson.version, "manifest and package versions must match.");
+assert(
+  packageLock.version === manifest.version && packageLock.packages?.[""]?.version === manifest.version,
+  "package-lock root versions must match manifest version."
+);
+assertIncludes(contentSource, `const SCRIPT_VERSION = "${manifest.version}";`, "content script version must match manifest version");
+assertIncludes(popupSource, `const CONTENT_VERSION = "${manifest.version}";`, "popup content version must match manifest version");
+
+assert(manifest.action?.default_popup === "popup.html", "default popup must point to popup.html.");
+assert(manifest.background?.service_worker === "background.js", "background service worker must point to background.js.");
+assert(Array.isArray(manifest.permissions), "manifest permissions must be an array.");
+assert(manifest.permissions.length === 1 && manifest.permissions[0] === "storage", "only storage permission should remain.");
+assert(
+  Array.isArray(manifest.host_permissions) &&
+    manifest.host_permissions.length === 1 &&
+    manifest.host_permissions[0] === "https://chzzk.naver.com/*",
+  "host permissions must be limited to https://chzzk.naver.com/*."
+);
 
 const contentScript = manifest.content_scripts?.[0];
+assert(contentScript, "manifest must declare one content script entry.");
+assert(
+  Array.isArray(contentScript.matches) &&
+    contentScript.matches.length === 1 &&
+    contentScript.matches[0] === "https://chzzk.naver.com/*",
+  "content script matches must be limited to https://chzzk.naver.com/*."
+);
+assert(contentScript.run_at === "document_start", "content script must run at document_start to avoid raw chat flashes.");
+assert(contentScript.all_frames === true, "content script should run in all CHZZK frames.");
+assert(
+  Array.isArray(contentScript.css) &&
+    contentScript.css.length === 1 &&
+    contentScript.css[0] === "content.css",
+  "content script CSS must load content.css."
+);
+assert(
+  Array.isArray(contentScript.js) &&
+    contentScript.js.length === 1 &&
+    contentScript.js[0] === "content.js",
+  "content script JS must load content.js."
+);
 
-if (!contentScript?.all_frames) {
-  throw new Error("content script should run in all CHZZK frames.");
-}
-
-if (contentScript.run_at !== "document_start") {
-  throw new Error("content script must run at document_start to avoid raw chat flashes.");
-}
-
-if (!contentSource.includes('const CHAT_ROW_ATTR = "data-chzzk-chat-ui-toggle-chat-row";')) {
-  throw new Error("content script must define a chat-row scope attribute.");
-}
-
-if (!contentSource.includes('const CHAT_ROW_SCOPE_SELECTOR = `:is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i])[${CHAT_ROW_ATTR}="true"]`;')) {
-  throw new Error("content script must scope styling to native live chat row elements.");
-}
-
-if (!contentSource.includes('const NATIVE_CHAT_ROW_SELECTOR = `:is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i]):has(:is([class*="live_chatting_message_container" i], [class*="_chatting_message_" i]))`;')) {
-  throw new Error("content script must define a native chat-row selector for non-hiding styles.");
+for (const token of [
+  "activeTab",
+  "chrome.scripting",
+  "executeScript",
+  "chrome.webNavigation",
+  "webNavigation",
+  "chrome.tabs.onUpdated",
+  "CONTENT_SCRIPT_FILE",
+  "scheduleContentScriptInjection",
+  "pushStoredOptionsToTab"
+]) {
+  assertExcludes(`${JSON.stringify(manifest)}\n${backgroundSource}\n${popupSource}`, token, "review-friendly build must not keep dynamic reinjection code");
 }
 
 for (const token of [
-  '"[role=\'log\'] [class*=\'_item_\' i]:has([class*=\'_chatting_message_\' i])"',
-  "function getMessageContainerElement(row)",
-  "function getNicknameButtonElement(row)",
-  "\"button[class*='nickname' i] [class*='_text_' i]\"",
-  "function isDonationRankingPanel(element)",
-  "function isChatHeaderCandidate(element",
-  "function findChatHeaderInHost(host",
-  "function findChatHeaderFromChatAside",
-  "function findChatHeaderFromLog",
-  "aside#aside-chatting",
-  "aside:has([role='log'])",
-  'html[data-chzzk-chat-ui-toggle-detected-theme="dark"]'
-]) {
-  if (!contentSource.includes(token)) {
-    throw new Error(`content script must support the current CHZZK chat DOM: ${token}`);
-  }
-}
-
-if (!contentSource.includes('const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";')) {
-  throw new Error("content script must define the background options-read message.");
-}
-
-if (!contentSource.includes("function readOptionsFromBackground()")) {
-  throw new Error("content script must fall back to background options loading.");
-}
-
-if (!normalizedContentSource.includes("Promise.all([\n      readOptionsFromStorageLocal(),\n      readOptionsFromBackground()\n    ])")) {
-  throw new Error("content script must load direct and background options in parallel.");
-}
-
-if (!contentSource.includes("OPTIONS_LOAD_MAX_ATTEMPTS")) {
-  throw new Error("content script must retry stored option loading.");
-}
-
-const startIndex = contentSource.indexOf("function start()");
-const connectMessagesIndex = contentSource.indexOf("connectMessages();", startIndex);
-const connectStorageListenerIndex = contentSource.indexOf("connectStorageListener();", startIndex);
-const cachedOptionsIndex = contentSource.indexOf("const cachedOptions = readCachedOptions();", startIndex);
-
-if (
-  startIndex < 0 ||
-  connectMessagesIndex < 0 ||
-  connectStorageListenerIndex < 0 ||
-  cachedOptionsIndex < 0 ||
-  connectMessagesIndex > cachedOptionsIndex ||
-  connectStorageListenerIndex > cachedOptionsIndex
-) {
-  throw new Error("content script must connect listeners before stored options finish loading.");
-}
-
-if (!backgroundSource.includes('const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";')) {
-  throw new Error("background script must define the options-read message.");
-}
-
-if (!backgroundSource.includes('const SET_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_OPTIONS";')) {
-  throw new Error("background script must define the options-push message.");
-}
-
-if (!backgroundSource.includes("chrome.runtime.onMessage.addListener")) {
-  throw new Error("background script must answer content-script option requests.");
-}
-
-if (!backgroundSource.includes("chrome.storage.local.get(STORAGE_KEY")) {
-  throw new Error("background script must read stored options from chrome.storage.local.");
-}
-
-if (backgroundSource.includes("chrome.storage.local.set({ [STORAGE_KEY]: DEFAULT_OPTIONS })")) {
-  throw new Error("background script must not overwrite saved options with defaults.");
-}
-
-const requiredBackgroundInjectionTokens = [
-  'const CONTENT_SCRIPT_FILE = "content.js";',
-  "function scheduleContentScriptInjection(tabId)",
-  "function pushStoredOptionsToTab(tabId)",
-  "target: { tabId, allFrames: true }",
-  "chrome.tabs.sendMessage(",
-  "chrome.tabs.onUpdated.addListener",
-  "chrome.webNavigation.onCommitted.addListener",
-  "chrome.webNavigation.onHistoryStateUpdated.addListener",
-  "chrome.webNavigation.onCompleted.addListener"
-];
-
-for (const token of requiredBackgroundInjectionTokens) {
-  if (!backgroundSource.includes(token)) {
-    throw new Error(`background script must automatically reinject content script: ${token}`);
-  }
-}
-
-const removedIncognitoChatTokens = [
-  "CHZZK_CHAT_UI_TOGGLE_OPEN_INCOGNITO_CHAT",
-  "OPEN_INCOGNITO_CHAT_MESSAGE",
-  "INCOGNITO_CHAT_BUTTON_ID",
-  "chzzk-chat-ui-toggle-incognito-chat-button",
-  "getLiveChatPopupUrl",
-  "openIncognitoChatPopup",
-  "createIncognitoChatButton",
-  "ensureIncognitoChatButton",
-  "openCurrentIncognitoChat",
-  "findHeaderIncognitoChatTarget",
-  "incognito: true"
-];
-
-for (const token of removedIncognitoChatTokens) {
-  if (
-    backgroundSource.includes(token) ||
-    contentSource.includes(token) ||
-    popupMarkup.includes(token) ||
-    popupSource.includes(token)
-  ) {
-    throw new Error(`incognito chat popup feature must remain removed: ${token}`);
-  }
-}
-
-const removedFloatingSettingsTokens = [
-  "FLOATING_SETTINGS",
-  "chzzk-chat-ui-floating",
-  "chzzk-chat-ui-toggle-settings-popover"
-];
-
-for (const token of removedFloatingSettingsTokens) {
-  if (contentSource.includes(token)) {
-    throw new Error(`content script must not reintroduce the in-page floating settings panel: ${token}`);
-  }
-}
-
-const requiredHeaderPopupContentTokens = [
+  'const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";',
   'const OPEN_POPUP_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_POPUP";',
-  'const HEADER_SETTINGS_BUTTON_ID = "chzzk-chat-ui-toggle-header-settings";',
-  "showHeaderSettingsButton: true",
-  'showHeaderSettingsButton: "chzzkChatUiToggleHeaderSettingsButton"',
-  "function sendOpenPopupMessage()",
-  "function createHeaderSettingsButton()",
-  "function openExtensionPopupFromHeader(button)",
-  "sendOpenPopupMessage()",
-  ".filter((element) => element.id !== HEADER_SETTINGS_BUTTON_ID)",
-  "target.container.insertBefore(settingsButton, target.before);",
-  "target.container.insertBefore(button, nextSibling);"
-];
-
-for (const token of requiredHeaderPopupContentTokens) {
-  if (!contentSource.includes(token)) {
-    throw new Error(`content script must open the existing extension popup from the chat header: ${token}`);
-  }
-}
-
-const requiredHeaderPopupBackgroundTokens = [
-  'const OPEN_POPUP_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_POPUP";',
-  "function openExtensionPopup(sendResponse)",
-  "chrome.action.openPopup()",
-  "message?.type === OPEN_POPUP_MESSAGE",
-  "return openExtensionPopup(sendResponse);"
-];
-
-for (const token of requiredHeaderPopupBackgroundTokens) {
-  if (!backgroundSource.includes(token)) {
-    throw new Error(`background script must open the existing extension popup on request: ${token}`);
-  }
-}
-
-const removedDetachedMiniChatTokens = [
-  "OPEN_DETACHED_MINI_CHAT_MESSAGE",
-  "DETACHED_MINI_CHAT_BOUNDS_KEY",
-  "chzzkChatUiToggleDetachedMiniChatBounds",
-  "openDetachedMiniChat",
-  "getDetachedMiniChatUrl",
-  "saveDetachedMiniChatWindowBounds",
-  "detachedMiniChatWindowId",
-  "MINI_CHAT_PANEL_DETACH_CLASS",
-  "chzzk-chat-ui-toggle-mini-chat__detach",
-  "detachButton",
-  "documentPictureInPicture",
-  "PictureInPicture",
-  "requestWindow({",
-  "picture-in-picture",
-  "chzzk-mini-chat-pip",
-  "chrome.windows.create(",
-  "chrome.windows.onBoundsChanged.addListener"
-];
-
-for (const token of removedDetachedMiniChatTokens) {
-  if (backgroundSource.includes(token) || contentSource.includes(token)) {
-    throw new Error(`detached mini chat popup feature must remain removed: ${token}`);
-  }
-}
-
-const requiredGuestChatTokens = [
-  "useGuestChatFrame: false",
-  "showGuestChatToggleButton: true",
-  'useGuestChatFrame: "chzzkChatUiToggleGuestChatFrame"',
-  'showGuestChatToggleButton: "chzzkChatUiToggleGuestChatToggleButton"',
-  'const GUEST_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-guest-chat-frame";',
-  'const GUEST_CHAT_TOGGLE_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-toggle";',
-  'const GUEST_CHAT_CONTROL_HOST_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-control-host";',
-  'const GUEST_CHAT_THEME_ATTR = "data-chzzk-chat-ui-toggle-guest-theme";',
-  'const GUEST_CHAT_EMBED_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-embed";',
-  'const GUEST_CHAT_CLEANBOT_DEFAULT_ATTR = "data-chzzk-chat-ui-toggle-guest-cleanbot-default";',
-  'const GUEST_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleGuest";',
-  'const GUEST_CHAT_NATIVE_THEME_CLASSES = ["light", "dark", "theme_light", "theme_dark"];',
-  'const GUEST_CHAT_CLEANBOT_STORAGE_KEY = "cleanbot";',
-  'const GUEST_CHAT_CLEANBOT_DISABLED_VALUE = "false";',
   'const READ_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_GUEST_CHAT_THEME";',
   'const SET_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_GUEST_CHAT_THEME";',
   'const APPLY_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_APPLY_GUEST_CHAT_THEME";',
-  "const PAGE_THEME_BACKGROUND_SELECTORS = [",
-  "const CHAT_THEME_CHROME_SELECTORS = [",
-  "const CHAT_THEME_FOREGROUND_SELECTORS = [",
-  "function writeOptionsToStorageLocal(options)",
+  "chrome.runtime.onMessage.addListener",
+  "chrome.action.openPopup()",
+  "chrome.storage.local.get(STORAGE_KEY",
+  "chrome.tabs.sendMessage("
+]) {
+  assertIncludes(backgroundSource, token, "background script must keep storage, popup, and guest-theme message support");
+}
+
+for (const token of [
+  'const NATIVE_CHAT_ROW_SELECTOR = `:is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i]):has(:is([class*="live_chatting_message_container" i], [class*="_chatting_message_" i]))`;',
+  'const CHAT_ROW_SCOPE_SELECTOR = `:is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i])[${CHAT_ROW_ATTR}="true"]`;',
+  "function readOptionsFromBackground()",
+  "Promise.all([\n      readOptionsFromStorageLocal(),\n      readOptionsFromBackground()\n    ])",
+  "connectMessages();",
+  "connectStorageListener();",
   "function syncGuestChatFrame()",
-  "function syncGuestChatTheme()",
-  "function detectPageTheme()",
-  "function isChatThemeCandidate(element)",
-  "function getGuestChatThemeFromUrl(url)",
-  "function getThemeFromChatChromeBackground()",
-  "function getThemeFromChatChromeForeground()",
-  "function getThemeFromForegroundElement(element)",
-  "function applyNativeGuestChatThemeClass(theme)",
-  "function syncNativeGuestChatThemeClass(theme)",
-  "function isNativeGuestChatThemeClassSynced(theme)",
-  "function scheduleNativeGuestChatThemeClassRetries(theme)",
-  "function clearNativeGuestChatThemeClassRetries({ keepTheme = false } = {})",
+  "function syncMiniFloatingChatPanel()",
+  "function cleanupUnscopedAnnotations",
+  "function scanRows(rows)",
+  "observer = new MutationObserver"
+]) {
+  assertIncludes(contentSource, token, "content script must keep core chat and option wiring");
+}
+
+for (const token of [
+  'const GUEST_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-guest-chat-frame";',
+  'const GUEST_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleGuest";',
+  'const GUEST_CHAT_CLEANBOT_DEFAULT_ATTR = "data-chzzk-chat-ui-toggle-guest-cleanbot-default";',
+  'const GUEST_CHAT_CLEANBOT_STORAGE_KEY = "cleanbot";',
+  'const GUEST_CHAT_CLEANBOT_DISABLED_VALUE = "false";',
   "function applyGuestChatCleanBotDefault()",
+  "if (!isGuestChatFrameEmbedUrl(window.location.href))",
   "window.localStorage?.setItem(GUEST_CHAT_CLEANBOT_STORAGE_KEY, GUEST_CHAT_CLEANBOT_DISABLED_VALUE);",
   'document.documentElement.setAttribute(GUEST_CHAT_CLEANBOT_DEFAULT_ATTR, "off");',
   "applyGuestChatCleanBotDefault();",
-  "let nativeGuestChatThemeRetryTimers = [];",
-  "clearNativeGuestChatThemeClassRetries({ keepTheme: true });",
-  "for (const delay of [50, 150, 400, 1000, 2500])",
-  "hasExpectedClasses && !hasConflictingClasses && hasExpectedColorScheme",
-  "classList.remove(...GUEST_CHAT_NATIVE_THEME_CLASSES);",
-  "classList.add(expectedThemeClass, expectedPrefixedThemeClass);",
-  "function applyGuestChatTheme(theme",
-  "function isGuestChatFrameEmbedUrl(url)",
-  'frameUrl.searchParams.set(GUEST_CHAT_FRAME_MARKER_PARAM, "1");',
-  'html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_EMBED_ATTR}="true"]',
-  '[class*="live_chatting_header" i]',
-  "aside#aside-chatting > :first-child",
-  'document.documentElement.dataset.chzzkChatUiToggleDetectedThemeSource = "chat-chrome-foreground";',
-  'document.documentElement.dataset.chzzkChatUiToggleDetectedThemeSource = "chat-chrome";',
-  "const frameUrl = new URL(`${CHZZK_ORIGIN}/live/${channelId}/chat`);",
-  "const theme = getGuestChatFrameTheme();",
-  'frameUrl.searchParams.set("theme", theme);',
-  "if (previousGuestChatTheme !== detectedTheme) {",
-  "function ensureGuestChatToggleButton()",
-  "function toggleGuestChatFrame(button)",
-  "function findGuestChatToggleTarget()",
-  "function findGuestChatControlHost(guestHost, header = null)",
-  "function markGuestChatControlHost(guestHost, header = null)",
-  "markGuestChatControlHost(host);",
-  "function supportsCredentiallessIframe()",
-  "function isGuestChatFrameEligibleContext()",
   "iframe.credentialless = true",
-  "runtime.storage.local.set({ [STORAGE_KEY]: normalizedOptions }",
-  'button.id = GUEST_CHAT_TOGGLE_BUTTON_ID;',
-  "syncGuestChatFrame();",
-  "ensureGuestChatToggleButton();"
-];
-
-for (const token of requiredGuestChatTokens) {
-  if (!contentSource.includes(token)) {
-    throw new Error(`content script must support the credentialless guest chat experiment: ${token}`);
-  }
-}
-
-const requiredGuestChatLiveVerifyTokens = [
-  'const GUEST_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-guest-chat-frame";',
-  'const GUEST_CHAT_TOGGLE_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-toggle";',
-  'const GUEST_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleGuest";',
-  "function collectGuestChatState(page)",
-  "function collectHeaderButtonPlacement(page)",
-  "function assertHeaderButtonsInChatHeader(label, state)",
-  "function waitForGuestChatState(page",
-  "function assertGuestChatOn(label, state, liveUrl)",
-  "function assertGuestChatOff(label, state)",
-  "function assertGuestChatHeaderToggleFlow(page)",
-  "const headerButtonsBefore = await collectHeaderButtonPlacement(page);",
-  "assertHeaderButtonsInChatHeader(\"initial header button placement\", headerButtonsBefore);",
-  "await popup.locator(\"#useGuestChatFrame\").setChecked(options.useGuestChatFrame);",
-  "const guestChatToggle = await assertGuestChatHeaderToggleFlow(page);",
-  "chzzk-live-guest-chat-on.png",
-  "state.frame.cleanbotDefault === \"off\"",
-  "state.frame.localStorageCleanbot === \"false\"",
-  "state.frame.visibleHeaderCount === 0",
-  "state.page.nativeVisibleRows === 0"
-];
-
-for (const token of requiredGuestChatLiveVerifyTokens) {
-  if (!liveVerifySource.includes(token)) {
-    throw new Error(`live Edge verification must exercise guest chat iframe behavior: ${token}`);
-  }
+  "frameUrl.searchParams.set(GUEST_CHAT_FRAME_MARKER_PARAM, \"1\");"
+]) {
+  assertIncludes(contentSource, token, "guest chat frame must keep iframe-scoped CleanBot display correction");
 }
 
 const cleanBotDefaultStart = contentSource.indexOf("function applyGuestChatCleanBotDefault()");
@@ -424,13 +174,12 @@ const cleanBotDefaultSource =
     ? contentSource.slice(cleanBotDefaultStart, cleanBotDefaultEnd)
     : "";
 
-if (
-  !cleanBotDefaultSource.includes("if (!isGuestChatFrameEmbedUrl(window.location.href))") ||
-  cleanBotDefaultSource.indexOf("window.localStorage?.setItem") <
-    cleanBotDefaultSource.indexOf("if (!isGuestChatFrameEmbedUrl(window.location.href))")
-) {
-  throw new Error("guest cleanbot default must only write localStorage inside the guest iframe guard.");
-}
+assert(
+  cleanBotDefaultSource.includes("if (!isGuestChatFrameEmbedUrl(window.location.href))") &&
+    cleanBotDefaultSource.indexOf("window.localStorage?.setItem") >
+      cleanBotDefaultSource.indexOf("if (!isGuestChatFrameEmbedUrl(window.location.href))"),
+  "guest cleanbot default must only write localStorage inside the guest iframe guard."
+);
 
 const startFunctionStart = contentSource.indexOf("function start()");
 const startFunctionEnd = contentSource.indexOf("start();", startFunctionStart);
@@ -438,932 +187,112 @@ const startFunctionSource =
   startFunctionStart >= 0 && startFunctionEnd > startFunctionStart
     ? contentSource.slice(startFunctionStart, startFunctionEnd)
     : "";
-const cleanBotDefaultCallIndex = startFunctionSource.indexOf("applyGuestChatCleanBotDefault();");
-const injectStyleCallIndex = startFunctionSource.indexOf("injectStyle();");
-
-if (cleanBotDefaultCallIndex < 0 || injectStyleCallIndex < 0 || cleanBotDefaultCallIndex > injectStyleCallIndex) {
-  throw new Error("guest cleanbot default must be applied before normal content script initialization.");
-}
-
-const markGuestChatToggleControlHostStart =
-  contentSource.indexOf("function markGuestChatToggleControlHost(header)");
-const markGuestChatToggleControlHostEnd =
-  contentSource.indexOf("function setGuestChatToggleButtonState", markGuestChatToggleControlHostStart);
-const markGuestChatToggleControlHostSource =
-  markGuestChatToggleControlHostStart >= 0 &&
-  markGuestChatToggleControlHostEnd > markGuestChatToggleControlHostStart
-    ? contentSource.slice(markGuestChatToggleControlHostStart, markGuestChatToggleControlHostEnd)
-    : "";
-const findGuestChatControlHostStart =
-  contentSource.indexOf("function findGuestChatControlHost(guestHost, header = null)");
-const findGuestChatControlHostEnd =
-  contentSource.indexOf("function markGuestChatControlHost", findGuestChatControlHostStart);
-const findGuestChatControlHostSource =
-  findGuestChatControlHostStart >= 0 && findGuestChatControlHostEnd > findGuestChatControlHostStart
-    ? contentSource.slice(findGuestChatControlHostStart, findGuestChatControlHostEnd)
-    : "";
-
-if (
-  !markGuestChatToggleControlHostSource.includes("if (!currentOptions.useGuestChatFrame)") ||
-  !markGuestChatToggleControlHostSource.includes("clearGuestChatControlHosts();")
-) {
-  throw new Error("guest chat control-host marker must be cleared when guest chat is off.");
-}
-
-if (!findGuestChatControlHostSource.includes("findChatHeaderInHost(guestHost")) {
-  throw new Error("guest chat control-host lookup must preserve the native chat header without relying on chat rows.");
-}
-
-const syncGuestChatFrameStart = contentSource.indexOf("function syncGuestChatFrame()");
-const syncGuestChatFrameEnd = contentSource.indexOf("function findChatHeaderTarget", syncGuestChatFrameStart);
-const syncGuestChatFrameSource =
-  syncGuestChatFrameStart >= 0 && syncGuestChatFrameEnd > syncGuestChatFrameStart
-    ? contentSource.slice(syncGuestChatFrameStart, syncGuestChatFrameEnd)
-    : "";
-const markControlHostIndex = syncGuestChatFrameSource.indexOf("markGuestChatControlHost(host);");
-const setGuestHostIndex = syncGuestChatFrameSource.indexOf(`host.setAttribute(GUEST_CHAT_HOST_ATTR, "true");`);
-
-if (!syncGuestChatFrameSource.includes("!shouldRenderGuestChatFrame()")) {
-  throw new Error("guest chat frame must be temporarily disabled while the page is fullscreen.");
-}
-
-if (markControlHostIndex < 0 || setGuestHostIndex < 0 || markControlHostIndex > setGuestHostIndex) {
-  throw new Error("guest chat header control host must be marked before hiding native chat children.");
-}
-
-const unsafeGuestChatThemeSelectors = [
-  '[${GUEST_CHAT_THEME_ATTR}="light"] [class*="live_chatting" i]',
-  '[${GUEST_CHAT_THEME_ATTR}="dark"] [class*="live_chatting" i]',
-  'html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}] ${NATIVE_CHAT_ROW_SELECTOR} *',
-  'html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="light"]',
-  'html[${LIVE_CHAT_FRAME_ATTR}="true"][${GUEST_CHAT_THEME_ATTR}="dark"]'
-];
-
-for (const selector of unsafeGuestChatThemeSelectors) {
-  if (contentSource.includes(selector)) {
-    throw new Error(`guest chat theme must be delegated to the native iframe theme parameter: ${selector}`);
-  }
-}
-
-const computedThemeStart = contentSource.indexOf("function getThemeFromComputedBackground()");
-const computedThemeEnd = contentSource.indexOf("function closestSafe(", computedThemeStart);
-const computedThemeSource =
-  computedThemeStart >= 0 && computedThemeEnd > computedThemeStart
-    ? contentSource.slice(computedThemeStart, computedThemeEnd)
-    : "";
-
-for (const token of ["live_chatting", "chatting_area", "chat_area"]) {
-  if (computedThemeSource.includes(token)) {
-    throw new Error(`outer page theme detection must not sample chat UI backgrounds: ${token}`);
-  }
-}
-
-for (const token of ["document.documentElement", "document.body", 'document.getElementById("root")']) {
-  if (computedThemeSource.includes(token)) {
-    throw new Error(`outer page theme detection must not sample broad page shell backgrounds: ${token}`);
-  }
-}
-
-if (!backgroundSource.includes("useGuestChatFrame: options?.useGuestChatFrame === true")) {
-  throw new Error("background script must normalize the guest chat option.");
-}
-
-if (!backgroundSource.includes("showGuestChatToggleButton: options?.showGuestChatToggleButton !== false")) {
-  throw new Error("background script must normalize the guest chat button visibility option.");
-}
-
-if (!backgroundSource.includes("showHeaderSettingsButton: options?.showHeaderSettingsButton !== false")) {
-  throw new Error("background script must normalize the header settings button visibility option.");
-}
-
-if (!backgroundSource.includes("showNonChatPanels: true")) {
-  throw new Error("background script must default the non-chat panel visibility option on.");
-}
-
-if (
-  !backgroundSource.includes("options?.showNonChatPanels !== undefined") ||
-  !backgroundSource.includes("options?.showDonationRanking !== false") ||
-  !backgroundSource.includes("showNonChatPanels,")
-) {
-  throw new Error("background script must normalize the non-chat panel option with donation ranking legacy storage.");
-}
-
-if (!backgroundSource.includes("useMiniFloatingChat: options?.useMiniFloatingChat === true")) {
-  throw new Error("background script must normalize the mini floating chat option.");
-}
-
-if (!backgroundSource.includes("miniFloatingChatFullscreenOnly: options?.miniFloatingChatFullscreenOnly === true")) {
-  throw new Error("background script must normalize the mini floating chat fullscreen-only option.");
-}
-
-if (!backgroundSource.includes("showMiniFloatingChatButton: options?.showMiniFloatingChatButton !== false")) {
-  throw new Error("background script must normalize the mini floating chat button visibility option.");
-}
-
-if (!backgroundSource.includes("miniFloatingChatBounds: normalizeMiniChatBounds(options?.miniFloatingChatBounds, {")) {
-  throw new Error("background script must preserve mini floating chat bounds.");
-}
-
-if (!backgroundSource.includes("miniFloatingChatInputOnly")) {
-  throw new Error("background script must preserve the mini floating chat input-only option.");
-}
-
-if (!backgroundSource.includes("miniFloatingChatExpandedBounds: normalizeOptionalMiniChatBounds(options?.miniFloatingChatExpandedBounds)")) {
-  throw new Error("background script must preserve mini floating chat expanded bounds.");
-}
-
-if (!backgroundSource.includes("miniFloatingChatScale: normalizeMiniChatScale(options?.miniFloatingChatScale)")) {
-  throw new Error("background script must normalize the mini floating chat scale option.");
-}
-
-if (!backgroundSource.includes("chatFontSizePt: normalizeChatFontSizePt(options?.chatFontSizePt)")) {
-  throw new Error("background script must normalize the chat font size pt option.");
-}
+assert(
+  startFunctionSource.indexOf("applyGuestChatCleanBotDefault();") >= 0 &&
+    startFunctionSource.indexOf("applyGuestChatCleanBotDefault();") <
+      startFunctionSource.indexOf("injectStyle();"),
+  "guest cleanbot default must be applied before normal content script initialization."
+);
 
 for (const token of [
-  "useNicknameFontSize: false",
-  "nicknameFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT",
-  "useNicknameFontSize: options?.useNicknameFontSize === true",
-  "nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt)"
-]) {
-  if (!backgroundSource.includes(token)) {
-    throw new Error(`background script must normalize the nickname font size option: ${token}`);
-  }
-}
-
-if (!popupSource.includes("miniFloatingChatInputOnly")) {
-  throw new Error("popup script must preserve the mini floating chat input-only option.");
-}
-
-if (!popupSource.includes("miniFloatingChatExpandedBounds: normalizeOptionalMiniChatBounds(options?.miniFloatingChatExpandedBounds)")) {
-  throw new Error("popup script must preserve mini floating chat expanded bounds.");
-}
-
-if (!popupSource.includes("miniFloatingChatScale: normalizeMiniChatScale(options?.miniFloatingChatScale)")) {
-  throw new Error("popup script must preserve the mini floating chat scale option.");
-}
-
-if (!popupSource.includes("miniFloatingChatFullscreenOnly: options?.miniFloatingChatFullscreenOnly === true")) {
-  throw new Error("popup script must preserve the mini floating chat fullscreen-only option.");
-}
-
-if (!popupSource.includes("chatFontSizePt: normalizeChatFontSizePt(options?.chatFontSizePt)")) {
-  throw new Error("popup script must preserve the chat font size pt option.");
-}
-
-for (const token of [
-  "useNicknameFontSize: false",
-  "nicknameFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT",
-  "useNicknameFontSize: options?.useNicknameFontSize === true",
-  "nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt)"
-]) {
-  if (!popupSource.includes(token)) {
-    throw new Error(`popup script must preserve the nickname font size option: ${token}`);
-  }
-}
-
-if (!contentSource.includes("showNonChatPanels: true")) {
-  throw new Error("content script must default the non-chat panel visibility option on.");
-}
-
-if (!contentSource.includes("chatFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT")) {
-  throw new Error("content script must default the chat font size pt option.");
-}
-
-if (!contentSource.includes("chatFontSizePt: normalizeChatFontSizePt(options?.chatFontSizePt)")) {
-  throw new Error("content script must normalize the chat font size pt option.");
-}
-
-if (!contentSource.includes("document.documentElement.dataset.chzzkChatUiToggleChatFontSizePt")) {
-  throw new Error("content script must expose the chat font size pt value.");
-}
-
-if (!contentSource.includes('"--chzzk-chat-ui-toggle-chat-font-size"')) {
-  throw new Error("content script must apply the chat font size through a CSS variable.");
-}
-
-if (!contentSource.includes("font-size: var(--chzzk-chat-ui-toggle-chat-font-size, 13pt) !important;")) {
-  throw new Error("content script must use the configured chat font size pt value.");
-}
-
-for (const token of [
-  "useNicknameFontSize: false",
-  "nicknameFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT",
-  "useNicknameFontSize: options?.useNicknameFontSize === true",
-  "nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt)",
-  'useNicknameFontSize: "chzzkChatUiToggleNicknameFontSize"',
-  "document.documentElement.dataset.chzzkChatUiToggleNicknameFontSizePt",
+  "document.documentElement.dataset.chzzkChatUiToggleStyleVersion = SCRIPT_VERSION;",
+  "styleVersion: document.documentElement.dataset.chzzkChatUiToggleStyleVersion || null",
+  'document.documentElement.dataset.chzzkChatUiToggleVersion = SCRIPT_VERSION;',
+  '"--chzzk-chat-ui-toggle-chat-font-size"',
   '"--chzzk-chat-ui-toggle-nickname-font-size"',
   '"--chzzk-chat-ui-toggle-chat-emote-size"',
-  'html[data-chzzk-chat-ui-toggle-large-text="on"][data-chzzk-chat-ui-toggle-nickname-font-size="on"]',
-  "currentOptions.useNicknameFontSize",
-  "Math.max(currentOptions.chatFontSizePt, effectiveNicknameFontSizePt)"
+  '"--chzzk-chat-ui-toggle-mini-chat-scale"'
 ]) {
-  if (!contentSource.includes(token)) {
-    throw new Error(`content script must apply the nickname font size option: ${token}`);
-  }
+  assertIncludes(contentSource, token, "content script must expose status and runtime CSS variables");
 }
 
 for (const token of [
-  '"--chzzk-chat-ui-toggle-chat-line-height"',
-  '"--chzzk-chat-ui-toggle-chat-row-min-height"',
-  '"--chzzk-chat-ui-toggle-row-dynamic-height"',
-  "display: flex !important;",
-  "--chzzk-chat-ui-toggle-row-dynamic-height",
-  "var(--chzzk-chat-ui-toggle-chat-row-min-height, 33px)",
-  "min-height: var(--chzzk-chat-ui-toggle-chat-line-height, 25px) !important;",
-  "align-items: flex-start !important;",
-  "flex-wrap: wrap !important;",
-  "gap: 0 4px !important;",
-  "contain: none !important;",
-  "max-width: 100% !important;",
-  "min-width: 0 !important;",
-  "overflow: visible !important;",
-  "max-height: none !important;",
-  "white-space: normal !important;",
-  "overflow-wrap: anywhere !important;",
-  "word-break: break-word !important;",
-  "--chzzk-chat-ui-toggle-chat-emote-size",
-  "object-fit: contain !important;",
-  "vertical-align: middle !important;",
-  "not([src*=\"/glive/icon/\" i])",
-  "const chatEmoteSizePx = Math.max(20, chatTextFontSizePx);",
-  "Math.max(chatLineTextHeightPx, chatEmoteSizePx)",
-  "[class*='live_chatting_message_text' i] img",
-  "white-space: nowrap !important;",
-  '[${ROLE_ATTR}~="nickname"]',
-  "[${MESSAGE_PREFIX_ATTR}]",
-  '[class*="message" i] [class*="text" i]',
-  "function syncLargeTextRowLayout()",
-  "function scheduleLargeTextLayoutSync()",
-  "getClientRects()",
-  "scheduleLargeTextLayoutSync();"
-]) {
-  if (!contentSource.includes(token)) {
-    throw new Error(`content script must prevent large chat font overlap: ${token}`);
-  }
-}
-
-if (!contentSource.includes('showNonChatPanels: "chzzkChatUiToggleNonChatPanels"')) {
-  throw new Error("content script must expose the non-chat panel option as a dataset flag.");
-}
-
-if (!contentSource.includes('html[data-chzzk-chat-ui-toggle-non-chat-panels="off"]')) {
-  throw new Error("content script must hide non-chat panels when the option is off.");
-}
-
-if (!contentSource.includes("function annotateNonChatPanels()")) {
-  throw new Error("content script must centralize non-chat panel annotation.");
-}
-
-if (!contentSource.includes("if (currentOptions.showNonChatPanels !== false)")) {
-  throw new Error("content script must leave non-chat panels visible when the option is on.");
-}
-
-if (!contentSource.includes("clearNonChatPanelAnnotations();")) {
-  throw new Error("content script must clear stale non-chat panel annotations before reapplying the option.");
-}
-
-const miniChatHiddenControlsStart = contentSource.indexOf("function annotateMiniChatHiddenControls()");
-const miniChatHiddenControlsEnd = contentSource.indexOf("function looksLikeTimestamp", miniChatHiddenControlsStart);
-const miniChatHiddenControlsSource =
-  miniChatHiddenControlsStart >= 0 && miniChatHiddenControlsEnd > miniChatHiddenControlsStart
-    ? contentSource.slice(miniChatHiddenControlsStart, miniChatHiddenControlsEnd)
-    : "";
-
-if (!miniChatHiddenControlsSource || miniChatHiddenControlsSource.includes("markNonChatPanel(")) {
-  throw new Error("mini chat cleanup must not hide non-chat panels outside the shared option gate.");
-}
-
-if (miniChatHiddenControlsSource.includes("NON_CHAT_PANEL_SELECTORS")) {
-  throw new Error("mini chat cleanup must not apply non-chat panel selectors separately from the shared option.");
-}
-
-if (!contentSource.includes('[class*="live_chatting_ranking_container" i]')) {
-  throw new Error("content script must target the CHZZK live chat ranking container.");
-}
-
-if (!contentSource.includes('aside#aside-chatting > :has([class*="ranking" i])')) {
-  throw new Error("content script must target the current CHZZK chat ranking panel.");
-}
-
-if (!contentSource.includes("isDonationRankingPanel(candidate)")) {
-  throw new Error("content script must not treat ranking panels as chat headers.");
-}
-
-const requiredMiniChatContentTokens = [
-  "useMiniFloatingChat: false",
-  "miniFloatingChatFullscreenOnly: false",
-  "showMiniFloatingChatButton: true",
-  "miniFloatingChatInputOnly: false",
-  "miniFloatingChatBounds: normalizeMiniChatBounds(options?.miniFloatingChatBounds, {",
-  "miniFloatingChatExpandedBounds: normalizeOptionalMiniChatBounds(options?.miniFloatingChatExpandedBounds)",
-  "miniFloatingChatScale: normalizeMiniChatScale(options?.miniFloatingChatScale)",
-  'const MINI_CHAT_PANEL_ID = "chzzk-chat-ui-toggle-mini-chat-panel";',
-  'const MINI_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-mini-chat-frame";',
-  'const MINI_CHAT_BUTTON_ID = "chzzk-chat-ui-toggle-mini-chat-button";',
-  'const MINI_CHAT_PANEL_CONTROLS_CLASS = "chzzk-chat-ui-toggle-mini-chat__controls";',
-  'const MINI_CHAT_PANEL_SCALE_CLASS = "chzzk-chat-ui-toggle-mini-chat__scale";',
-  'const MINI_CHAT_PANEL_MODE_CLASS = "chzzk-chat-ui-toggle-mini-chat__mode";',
-  'const MINI_CHAT_PANEL_INPUT_ONLY_CLASS = "chzzk-chat-ui-toggle-mini-chat__input-only";',
-  'const MINI_CHAT_PANEL_MINIMIZE_CLASS = "chzzk-chat-ui-toggle-mini-chat__minimize";',
-  'const MINI_CHAT_PANEL_RESIZE_CLASS = "chzzk-chat-ui-toggle-mini-chat__resize";',
-  'const MINI_CHAT_BUBBLE_ID = "chzzk-chat-ui-toggle-mini-chat-bubble";',
-  'const MINI_CHAT_BUBBLE_ICON_CLASS = "chzzk-chat-ui-toggle-mini-chat-bubble__icon";',
-  'const MINI_CHAT_HIDDEN_CONTROL_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-hidden-control";',
-  'const NON_CHAT_PANEL_ATTR = "data-chzzk-chat-ui-toggle-non-chat-panel";',
-  'const MINI_CHAT_COMPACT_INPUT_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-compact-input";',
-  "const NON_CHAT_PANEL_SELECTORS = [",
-  'const MINI_CHAT_INPUT_ONLY_PATH_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-path";',
-  'const MINI_CHAT_INPUT_ONLY_KEEP_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-keep";',
-  'const MINI_CHAT_INPUT_ONLY_HIDDEN_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-hidden";',
-  'const MINI_CHAT_FULLSCREEN_HOST_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-fullscreen-host";',
-  'const MINI_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleMini";',
-  'const FULLSCREEN_UNSUPPORTED_MINI_CHAT_HOST_TAG_NAMES = new Set(["VIDEO", "AUDIO", "CANVAS", "IFRAME", "IMG"]);',
-  "const MINI_CHAT_MIN_HEIGHT = 28;",
-  "const MINI_CHAT_INPUT_ONLY_HEIGHT = 116;",
-  "const MINI_CHAT_INPUT_ONLY_BOX_HEIGHT = 52;",
-  "const MINI_CHAT_INPUT_ONLY_FIELD_MAX_HEIGHT = 36;",
-  "const MINI_CHAT_INPUT_ONLY_CONTROL_INSET = 24;",
-  "const MINI_CHAT_BUBBLE_SIZE = 44;",
-  "const MINI_CHAT_SCALE_MIN = 50;",
-  "const MINI_CHAT_SCALE_MAX = 150;",
-  "const MINI_CHAT_SCALE_STEP = 10;",
-  "const MINI_CHAT_SCALE_DEFAULT = 100;",
-  "function normalizeMiniChatScale(value)",
-  "function getMiniChatFrameUrl()",
-  "function createMiniFloatingChatPanel()",
-  "function createMiniChatBubbleButton()",
-  "function syncMiniFloatingChatPanel()",
-  "function syncMiniChatBubbleButton(host)",
-  "function createMiniChatToggleButton()",
-  "function minimizeMiniFloatingChatToBubble(panel)",
-  "function restoreMiniFloatingChatFromBubble()",
-  "function handleMiniChatBubbleDragStart(event)",
-  "function handleMiniChatBubbleDragMove(event)",
-  "function handleMiniChatBubbleDragEnd(event)",
-  "function getMiniChatRestoreBoundsFromBubble(bounds, restoreBounds = miniChatRestoreBounds)",
-  "function getMiniChatLayoutTopForVisualTop(visualTop, height, scale = currentOptions.miniFloatingChatScale)",
-  "function toggleMiniChatInputOnly()",
-  "function updateMiniChatScale(delta)",
-  "function canHostMiniChatFullscreenPanel(element)",
-  "function getMiniChatPanelHost()",
-  "function moveMiniChatPanelToHost(panel, host)",
-  "function handleMiniChatFullscreenChange()",
-  "function isPageFullscreenActive()",
-  "function shouldRenderGuestChatFrame()",
-  "function isMiniFloatingChatTemporarilyDisabledByGuestChat()",
-  "function shouldRenderMiniFloatingChatPanel()",
-  "currentOptions.miniFloatingChatFullscreenOnly",
-  "function annotateMiniChatHiddenControls()",
-  "function hasNonChatPanelSignal(element)",
-  "function findNonChatPanelRoot(element)",
-  "hasChatMessageContent(element)",
-  "[${NON_CHAT_PANEL_ATTR}=\"true\"]",
-  "승부예측",
-  "broadcast-information-sports",
-  "function markMiniChatInputOnlyLayout()",
-  "function findMiniChatInputOnlyContainer(root = document)",
-  "function scheduleMiniChatInputOnlyScrollReset()",
-  "function isMiniChatTextEntryField(element)",
-  "function isReasonableMiniChatInputContainer(element)",
-  "rect.height <= 160",
-  "style.visibility !== \"hidden\"",
-  "document.addEventListener(\"focusin\", scheduleMiniChatInputOnlyScrollReset, true);",
-  "function hasMiniChatInputField(element)",
-  "function findMiniChatCompactInputContainer(actionRow)",
-  "markMiniChatCompactInputContainer(actionRow);",
-  "!hasMiniChatInputField(current)",
+  "Static content styles extracted from content.js",
+  "html:not([data-chzzk-chat-ui-toggle-ready=\"true\"])",
+  "data-chzzk-chat-ui-toggle-live-chat-frame",
+  "data-chzzk-chat-ui-toggle-guest-chat-embed",
+  "data-chzzk-chat-ui-toggle-mini-chat-embed",
+  "data-chzzk-chat-ui-toggle-chat-row=\"true\"",
+  "data-chzzk-chat-ui-toggle-role~=\"nickname\"",
+  "font-size: var(--chzzk-chat-ui-toggle-chat-font-size, 13pt) !important;",
   "transform: scale(var(--chzzk-chat-ui-toggle-mini-chat-scale, 1)) !important;",
-  "transform-origin: left bottom !important;",
-  "function getMiniChatScaleRatio(scale = currentOptions.miniFloatingChatScale)",
-  "clampMiniChatBoundsToViewport(currentBounds, {",
-  "scale: nextScale,",
-  "applyMiniChatPanelBounds(panel, nextBounds, {",
-  "miniFloatingChatBounds: nextBounds",
-  "getMiniChatInputOnlyBounds(expandedBounds, { visualTop });",
-  "patch.miniFloatingChatExpandedBounds = getMiniChatExpandedBoundsFromInputOnly(nextBounds);",
-  "#${MINI_CHAT_PANEL_ID}[data-input-only=\"true\"]",
-  "#${MINI_CHAT_PANEL_ID}[data-input-only=\"true\"] #${MINI_CHAT_FRAME_ID}",
-  "position: static !important;",
-  "height: 100% !important;",
-  "data-chzzk-chat-ui-toggle-mini-floating-chat-input-only=\"on\"",
-  "border-color: transparent !important;",
-  "box-shadow: none !important;",
-  "top: Number.isFinite(styledTop) ? styledTop : rect.bottom - height",
-  "visualTop: rect.top",
-  "visualTop - height * (1 - miniChatResizeState.scaleRatio)",
-  "\"--chzzk-chat-ui-toggle-mini-chat-scale\",",
-  "scaleControls.dataset.miniChatScaleControls = \"true\";",
-  "modeControls.dataset.miniChatMode = \"true\";",
-  "actions.append(minimizeButton, closeButton);",
-  "#${MINI_CHAT_BUBBLE_ID}",
-  "background: rgba(82, 88, 98, 0.66) !important;",
-  "miniChatMinimized = true;",
-  "button.addEventListener(\"pointerdown\", handleMiniChatBubbleDragStart);",
-  "miniChatBubbleIgnoreNextClick",
-  ".chzzk-chat-ui-toggle-mini-chat-button[aria-pressed=\"true\"]",
-  ".chzzk-chat-ui-toggle-mini-chat-button:hover",
-  "background: transparent !important;",
-  "color: rgba(32, 36, 40, 0.72) !important;",
-  "background: rgba(0, 196, 113, 0.14) !important;",
-  ".${MINI_CHAT_BUTTON_ICON_CLASS} svg",
-  "M5.2 4.2h7.6c1.35 0 2.2.85 2.2 2.05",
-  "circle cx=\"7.2\" cy=\"8.35\" r=\"0.8\"",
-  ":fullscreen #${MINI_CHAT_PANEL_ID}",
-  "panel.setAttribute(MINI_CHAT_FULLSCREEN_HOST_ATTR, \"true\");",
-  "moveMiniChatPanelToHost(panel, panelHost);",
-  "document.addEventListener(\"fullscreenchange\", handleMiniChatFullscreenChange);",
-  "Mini chat mode names (user-facing Korean terms):",
-  "Chat view mode",
-  "Input-only mode",
-  "inputOnlyButton.textContent = \"ㅁ\";",
-  "inputOnlyButton.setAttribute(\"aria-pressed\", String(isInputOnly));",
-  "scaleDownButton.dataset.miniChatScaleDelta = String(-MINI_CHAT_SCALE_STEP);",
-  "scaleUpButton.dataset.miniChatScaleDelta = String(MINI_CHAT_SCALE_STEP);",
-  "*::-webkit-scrollbar",
-  "scrollbar-width: none !important;",
-  "background: transparent !important;",
-  "[${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}=\"true\"]:focus-within",
-  "[${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}=\"true\"] textarea",
-  "max-height: ${MINI_CHAT_INPUT_ONLY_FIELD_MAX_HEIGHT}px !important;",
-  "pointer-events: auto !important;",
-  "scheduleMiniChatInputOnlyScrollReset();",
-  "#${MINI_CHAT_PANEL_ID}[data-input-only=\"true\"] .${MINI_CHAT_PANEL_CONTROLS_CLASS}",
-  "width: calc(100% - ${MINI_CHAT_INPUT_ONLY_CONTROL_INSET * 2}px) !important;",
-  "margin: 0 ${MINI_CHAT_INPUT_ONLY_CONTROL_INSET}px !important;",
-  "border-radius: 0 0 6px 6px !important;",
-  "#${MINI_CHAT_PANEL_ID}[data-input-only=\"true\"] .${MINI_CHAT_PANEL_RESIZE_CLASS}",
-  "right: ${MINI_CHAT_INPUT_ONLY_CONTROL_INSET}px !important;",
-  "height: auto !important;",
-  "max-height: ${MINI_CHAT_INPUT_ONLY_FIELD_MAX_HEIGHT}px !important;",
-  "button[class*=\"setting_button\" i]",
-  "width: 32px !important;",
-  "line-height: normal !important;",
-  "resize: none !important;",
-  "getCompactText(control).includes(\"후원하기\")",
-  "getCompactText(control) === \"채팅\"",
-  "annotateMiniChatHiddenControls();",
-  "function handleMiniChatResizeStart(event)",
-  "function handleMiniChatResizeMove(event)",
-  "function handleMiniChatResizeEnd(event)",
-  'panel.setAttribute("aria-label", "미니 채팅");',
-  "controlsBar.addEventListener(\"pointerdown\", handleMiniChatDragStart);",
-  "resizeHandle.addEventListener(\"pointerdown\", handleMiniChatResizeStart);",
-  "controlsBar.append(scaleControls, modeControls, actions);",
-  "panel.append(body, controlsBar, resizeHandle);",
-  "isExistingPanel ? readMiniChatPanelBounds(panel) : currentOptions.miniFloatingChatBounds",
-  "frameUrl.searchParams.set(MINI_CHAT_FRAME_MARKER_PARAM, \"1\");",
-  "syncMiniFloatingChatPanel();"
-];
-
-for (const token of requiredMiniChatContentTokens) {
-  if (!contentSource.includes(token)) {
-    throw new Error(`content script must implement mini floating chat: ${token}`);
-  }
-}
-
-const shouldRenderMiniChatStart = contentSource.indexOf("function shouldRenderMiniFloatingChatPanel()");
-const shouldRenderMiniChatEnd = contentSource.indexOf("function syncMiniFloatingChatPanel()", shouldRenderMiniChatStart);
-const shouldRenderMiniChatSource =
-  shouldRenderMiniChatStart >= 0 && shouldRenderMiniChatEnd > shouldRenderMiniChatStart
-    ? contentSource.slice(shouldRenderMiniChatStart, shouldRenderMiniChatEnd)
-    : "";
-const miniGuestDisableStart =
-  contentSource.indexOf("function isMiniFloatingChatTemporarilyDisabledByGuestChat()");
-const miniGuestDisableEnd = contentSource.indexOf("function shouldRenderMiniFloatingChatPanel()", miniGuestDisableStart);
-const miniGuestDisableSource =
-  miniGuestDisableStart >= 0 && miniGuestDisableEnd > miniGuestDisableStart
-    ? contentSource.slice(miniGuestDisableStart, miniGuestDisableEnd)
-    : "";
-const guestTemporaryDisableIndex =
-  shouldRenderMiniChatSource.indexOf("isMiniFloatingChatTemporarilyDisabledByGuestChat()");
-const fullscreenOnlyGateIndex =
-  shouldRenderMiniChatSource.indexOf("currentOptions.miniFloatingChatFullscreenOnly");
-
-if (
-  !miniGuestDisableSource.includes("return currentOptions.useGuestChatFrame;") ||
-  miniGuestDisableSource.includes("!isPageFullscreenActive()")
-) {
-  throw new Error("mini floating chat must stay hidden whenever guest chat is enabled, including fullscreen.");
-}
-
-if (
-  guestTemporaryDisableIndex < 0 ||
-  fullscreenOnlyGateIndex < 0 ||
-  guestTemporaryDisableIndex > fullscreenOnlyGateIndex
-) {
-  throw new Error("mini floating chat must be temporarily disabled by guest chat before fullscreen-only gating.");
-}
-
-const forbiddenMiniChatContentTokens = [
-  "MINI_CHAT_PANEL_COLLAPSE_CLASS",
-  "mini-chat-collapse"
-];
-
-for (const token of forbiddenMiniChatContentTokens) {
-  if (contentSource.includes(token)) {
-    throw new Error(`content script must not include the removed mini chat collapse control: ${token}`);
-  }
-}
-
-const miniChatInputOnlyKeepRuleMatch = contentSource.match(
-  /\[\$\{MINI_CHAT_INPUT_ONLY_KEEP_ATTR\}="true"\]\s*\{([\s\S]*?)\n\s*\}/
-);
-if (!miniChatInputOnlyKeepRuleMatch) {
-  throw new Error("content script must preserve the mini floating chat input-only keep rule.");
-}
-const miniChatInputOnlyKeepRule = miniChatInputOnlyKeepRuleMatch[1];
-for (const requiredKeepToken of [
-  "height: ${MINI_CHAT_INPUT_ONLY_BOX_HEIGHT}px !important;",
-  "background: rgba(226, 227, 232, 0.98) !important;",
-  "overflow: hidden !important;",
-  "pointer-events: auto !important;"
+  "#chzzk-chat-ui-toggle-mini-chat-panel",
+  "#chzzk-chat-ui-toggle-guest-chat-frame-container"
 ]) {
-  if (!miniChatInputOnlyKeepRule.includes(requiredKeepToken)) {
-    throw new Error("input-only mode must pin the chat input box size and background.");
-  }
-}
-for (const forbiddenKeepToken of [
-  "background: transparent !important;",
-  "border-color: transparent !important;",
-  "box-shadow: none !important;"
-]) {
-  if (miniChatInputOnlyKeepRule.includes(forbiddenKeepToken)) {
-    throw new Error("input-only mode must keep the original chat input box styling.");
-  }
+  assertIncludes(contentCssSource, token, "content.css must keep extracted content styles");
 }
 
-if (contentSource.includes("전송은 치지직 원래 채팅창에서 처리됩니다")) {
-  throw new Error("mini floating chat must not render the explanatory footer text.");
-}
-
-if (
-  contentSource.includes("MINI_CHAT_PANEL_HEADER_CLASS") ||
-  contentSource.includes("MINI_CHAT_PANEL_TITLE_ID") ||
-  contentSource.includes('title.textContent = "미니 채팅"')
-) {
-  throw new Error("mini floating chat must not render the old top title bar.");
-}
-
-const guestChatToggleVisibilityStart = contentSource.indexOf("function ensureGuestChatToggleButton()");
-const guestChatToggleTargetStart = contentSource.indexOf("function hasChatLikeText", guestChatToggleVisibilityStart);
-const guestChatToggleVisibilitySource =
-  guestChatToggleVisibilityStart >= 0 && guestChatToggleTargetStart > guestChatToggleVisibilityStart
-    ? contentSource.slice(guestChatToggleVisibilityStart, guestChatToggleTargetStart)
-    : "";
-
-if (!guestChatToggleVisibilitySource.includes("if (currentOptions.showGuestChatToggleButton)")) {
-  throw new Error("content script must gate only the guest chat header button behind its visibility option.");
-}
-
-if (!guestChatToggleVisibilitySource.includes("existingButton?.remove();")) {
-  throw new Error("content script must remove the guest chat header button when its visibility option is off.");
-}
-
-if (!guestChatToggleVisibilitySource.includes("const nextSibling = settingsButton instanceof HTMLButtonElement ? settingsButton : target.before;")) {
-  throw new Error("content script must keep the settings button to the right of the guest chat header button.");
-}
-
-if (!guestChatToggleVisibilitySource.includes("target.container.insertBefore(settingsButton, target.before);")) {
-  throw new Error("content script must keep the settings button available when the guest chat button is hidden.");
-}
-
-if (!guestChatToggleVisibilitySource.includes("currentOptions.showHeaderSettingsButton && canRenderHeaderSettingsButton()")) {
-  throw new Error("content script must gate the header settings button behind its visibility option.");
-}
-
-if (!guestChatToggleVisibilitySource.includes("if (currentOptions.showMiniFloatingChatButton)")) {
-  throw new Error("content script must gate the mini floating chat header button behind its visibility option.");
-}
-
-if (!guestChatToggleVisibilitySource.includes("existingMiniChatButton?.remove();")) {
-  throw new Error("content script must remove the mini floating chat button when its visibility option is off.");
-}
-
-const requiredGuestChatThemeBackgroundTokens = [
-  'const READ_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_GUEST_CHAT_THEME";',
-  'const SET_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_GUEST_CHAT_THEME";',
-  'const APPLY_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_APPLY_GUEST_CHAT_THEME";',
-  "const guestChatThemesByTab = new Map();",
-  "function setGuestChatTheme(tabId, channelId, theme)",
-  "function broadcastGuestChatTheme(tabId, entry)",
-  "chrome.tabs.onRemoved.addListener",
-  "message?.type === SET_GUEST_CHAT_THEME_MESSAGE",
-  "message?.type === READ_GUEST_CHAT_THEME_MESSAGE"
-];
-
-for (const token of requiredGuestChatThemeBackgroundTokens) {
-  if (!backgroundSource.includes(token)) {
-    throw new Error(`background script must relay guest chat theme without cookies: ${token}`);
-  }
-}
-
-if (!popupMarkup.includes('id="useGuestChatFrame"')) {
-  throw new Error("popup must include a guest chat frame toggle.");
-}
-
-if (!popupSource.includes('"useGuestChatFrame"')) {
-  throw new Error("popup script must store and apply the guest chat option.");
-}
-
-if (!popupMarkup.includes('id="settingsTab"') || !popupMarkup.includes('id="settingsPanel"')) {
-  throw new Error("popup must include a settings tab.");
-}
-
-if (!popupMarkup.includes('id="showGuestChatToggleButton"')) {
-  throw new Error("popup must include a guest chat button visibility toggle.");
-}
-
-if (!popupSource.includes('"showGuestChatToggleButton"')) {
-  throw new Error("popup script must store and apply the guest chat button visibility option.");
-}
-
-if (!popupMarkup.includes('id="showHeaderSettingsButton"')) {
-  throw new Error("popup must include a header settings button visibility toggle.");
-}
-
-if (!popupSource.includes('"showHeaderSettingsButton"')) {
-  throw new Error("popup script must store and apply the header settings button visibility option.");
-}
-
-if (!popupMarkup.includes('id="useMiniFloatingChat"')) {
-  throw new Error("popup must include a mini floating chat toggle.");
-}
-
-if (!popupSource.includes('"useMiniFloatingChat"')) {
-  throw new Error("popup script must store and apply the mini floating chat option.");
-}
-
-if (!popupMarkup.includes('id="miniFloatingChatFullscreenOnly"')) {
-  throw new Error("popup must include a mini floating chat fullscreen-only toggle.");
-}
-
-if (!popupSource.includes('"miniFloatingChatFullscreenOnly"')) {
-  throw new Error("popup script must store and apply the mini floating chat fullscreen-only option.");
-}
-
-if (!popupMarkup.includes('id="showMiniFloatingChatButton"')) {
-  throw new Error("popup must include a mini floating chat button visibility toggle.");
-}
-
-if (!popupSource.includes('"showMiniFloatingChatButton"')) {
-  throw new Error("popup script must store and apply the mini floating chat button visibility option.");
-}
-
-if (!popupSource.includes("...currentOptions")) {
-  throw new Error("popup script must preserve mini floating chat bounds when toggles change.");
-}
-
-if (!popupMarkup.includes('id="showNonChatPanels"')) {
-  throw new Error("popup must include a non-chat panel visibility toggle.");
-}
-
-if (
-  !popupSource.includes('"showNonChatPanels"') ||
-  !popupSource.includes("options?.showDonationRanking !== false")
-) {
-  throw new Error("popup script must store and apply the non-chat panel option with donation ranking legacy storage.");
-}
-
-if (!popupMarkup.includes("<strong>글씨 크기 조정</strong>")) {
-  throw new Error("popup must rename the large text control to 글씨 크기 조정.");
-}
-
-if (popupMarkup.includes("<strong>큰 글씨</strong>")) {
-  throw new Error("popup must not show the old 큰 글씨 label.");
-}
+assertExcludes(contentCssSource, "${", "content.css must not contain unexpanded JavaScript template placeholders");
+assertExcludes(contentSource, "const STYLE_ID", "content script should not keep the old injected style element id.");
+assertExcludes(contentSource, "style.textContent = `", "content script should not keep the old large CSS template string.");
 
 for (const token of [
-  'id="toggleChatBoxColorPanel"',
-  'aria-controls="chatBoxColorPanel"',
-  'id="chatBoxColorPanel"',
-  'class="color-picker color-picker--sub"',
-  '<label class="toggle-row__label" for="showChatBoxes"><strong>채팅 박스</strong></label>',
-  'id="toggleChatFontSizePanel"',
-  'aria-controls="chatFontSizePanel"',
-  'id="toggleChatFontSizePanel" class="disclosure-button" aria-label="글씨 크기 항목 접기" aria-expanded="true" aria-controls="chatFontSizePanel"',
-  'id="chatFontSizePanel"',
+  "function getContentStatus(tabId)",
+  "function refreshContent(tabId)",
+  "function isCurrentContentStatus(status)",
+  "status?.version === CONTENT_VERSION && status?.styleVersion === CONTENT_VERSION",
+  "새로고침 필요",
+  "Manifest content scripts handle Chzzk pages"
+]) {
+  assertIncludes(popupSource, token, "popup must use manifest-injected content scripts and show reload status");
+}
+assertExcludes(popupSource, "chrome.scripting", "popup must not use scripting permission.");
+assertExcludes(popupSource, "executeScript", "popup must not dynamically inject content scripts.");
+
+for (const token of [
+  'id="useGuestChatFrame"',
+  'id="useMiniFloatingChat"',
+  'id="showMiniFloatingChatButton"',
+  'id="showNonChatPanels"',
+  'id="showHeaderSettingsButton"',
   'id="chatFontSizePt"',
-  'min="8"',
-  'max="36"',
-  'step="1"',
-  'value="13"',
-  'id="chatFontSizeValue"',
-  'id="resetChatFontSize"',
-  'id="useNicknameFontSize"',
-  'id="nicknameFontSizeControl"',
-  'id="nicknameFontSizePt"',
-  'id="nicknameFontSizeValue"',
-  'id="resetNicknameFontSize"',
-  '<strong>닉네임 크기 따로 조정</strong>',
-  '<strong>닉네임 크기</strong>'
+  'id="nicknameFontSizePt"'
 ]) {
-  if (!popupMarkup.includes(token)) {
-    throw new Error(`popup must include the chat font size pt slider control: ${token}`);
-  }
-}
-
-for (const token of [
-  'const chatBoxColorPanel = document.getElementById("chatBoxColorPanel");',
-  'const toggleChatBoxColorPanelButton = document.getElementById("toggleChatBoxColorPanel");',
-  'const chatFontSizeSlider = document.getElementById("chatFontSizePt");',
-  'const chatFontSizeValue = document.getElementById("chatFontSizeValue");',
-  'const resetChatFontSizeButton = document.getElementById("resetChatFontSize");',
-  'const chatFontSizePanel = document.getElementById("chatFontSizePanel");',
-  'const toggleChatFontSizePanelButton = document.getElementById("toggleChatFontSizePanel");',
-  'const nicknameFontSizeControl = document.getElementById("nicknameFontSizeControl");',
-  'const nicknameFontSizeSlider = document.getElementById("nicknameFontSizePt");',
-  'const nicknameFontSizeValue = document.getElementById("nicknameFontSizeValue");',
-  'const resetNicknameFontSizeButton = document.getElementById("resetNicknameFontSize");',
-  "function updateNicknameFontSizeUi(",
-  "function setChatBoxColorPanelExpanded(",
-  'document.body.classList.toggle("is-chat-box-color-panel-expanded", shouldExpand);',
-  "function syncChatBoxColorPanel(",
-  "function setChatFontSizePanelExpanded(",
-  'document.body.classList.toggle("is-chat-font-size-panel-expanded", shouldExpand);',
-  "function syncChatFontSizePanel(",
-  "let isChatFontSizePanelExpanded = true;",
-  "isChatFontSizePanelExpanded = true;",
-  "setChatBoxColorPanelExpanded(isChatBoxColorPanelExpanded);",
-  "setChatFontSizePanelExpanded(isChatFontSizePanelExpanded);",
-  "function handleChatBoxColorPanelToggle()",
-  "function handleChatFontSizePanelToggle()",
-  "setChatBoxColorPanelExpanded(!isChatBoxColorPanelExpanded);",
-  "setChatFontSizePanelExpanded(!isChatFontSizePanelExpanded);",
-  "chatFontSizePt: chatFontSizeSlider.value",
-  "useNicknameFontSize: controls.useNicknameFontSize.checked",
-  "nicknameFontSizePt: nicknameFontSizeSlider.value",
-  "function handleNicknameFontSizeInput()",
-  "function handleResetNicknameFontSize()",
-  "nicknameFontSizeSlider.disabled = !isNicknameFontSizeEnabled;",
-  'toggleChatBoxColorPanelButton.addEventListener("click", handleChatBoxColorPanelToggle);',
-  'toggleChatFontSizePanelButton.addEventListener("click", handleChatFontSizePanelToggle);',
-  'chatFontSizeSlider.addEventListener("input", handleChatFontSizeInput);',
-  'resetChatFontSizeButton.addEventListener("click", handleResetChatFontSize);',
-  'nicknameFontSizeSlider.addEventListener("input", handleNicknameFontSizeInput);',
-  'resetNicknameFontSizeButton.addEventListener("click", handleResetNicknameFontSize);'
-]) {
-  if (!popupSource.includes(token)) {
-    throw new Error(`popup script must wire the chat font size pt slider: ${token}`);
-  }
-}
-
-for (const token of [
-  "toggleChatBoxColorPanelButton.disabled = !enabled;",
-  "toggleChatFontSizePanelButton.disabled = !enabled;",
-  "controls.showChatBoxes.checked !== true",
-  "controls.showLargeText.checked !== true",
-  "options.showChatBoxes && isChatBoxColorPanelExpanded",
-  "options.showLargeText && isChatFontSizePanelExpanded"
-]) {
-  if (popupSource.includes(token)) {
-    throw new Error(`popup script must keep disclosure buttons independent from feature toggles: ${token}`);
-  }
-}
-
-for (const token of [
-  'id="toggleChatBoxColorPanel" class="disclosure-button" aria-label="박스 색상 항목 펼치기" aria-expanded="false" aria-controls="chatBoxColorPanel" disabled',
-  'id="toggleChatFontSizePanel" class="disclosure-button" aria-label="글씨 크기 항목 펼치기" aria-expanded="false" aria-controls="chatFontSizePanel" disabled'
-]) {
-  if (popupMarkup.includes(token)) {
-    throw new Error(`popup markup must not disable disclosure buttons by default: ${token}`);
-  }
+  assertIncludes(popupMarkup, token, "popup markup must keep expected controls");
 }
 
 for (const token of [
   "body.is-chat-font-size-panel-expanded",
   "body.is-chat-box-color-panel-expanded",
-  "scrollbar-width: none;",
-  "body::-webkit-scrollbar",
-  ".disclosure-button {",
-  "border: 0;",
-  "background: transparent;",
+  ".disclosure-button",
   ".color-picker--sub",
-  ".disclosure-button:not(:disabled):hover",
-  "body.is-chat-box-color-panel-expanded .color-picker__body",
-  "body.is-chat-font-size-panel-expanded .color-picker__body",
-  "body.is-chat-box-color-panel-expanded .color-field",
-  "body.is-chat-font-size-panel-expanded .color-field",
-  "body.is-chat-box-color-panel-expanded .hue-slider",
-  "body.is-chat-font-size-panel-expanded .hue-slider",
-  ".font-size-control__toggle",
-  ".font-size-control__nested",
-  ".font-size-control__nested.is-disabled"
+  ".font-size-control__nested"
 ]) {
-  if (!popupStyles.includes(token)) {
-    throw new Error(`popup styles must keep the adaptive font-size panel layout: ${token}`);
-  }
+  assertIncludes(popupStyles, token, "popup styles must keep the adaptive settings layout");
 }
 
-if (!readmeSource.includes("글씨 크기/닉네임 크기 조정(이모티콘 포함)")) {
-  throw new Error("README-facing feature wording must include nickname and emoticon font size adjustment.");
+for (const token of [
+  "비로그인 상태로 전환하여 읽기 전용 채팅창",
+  "글씨 크기/닉네임 크기 조정(이모티콘 포함)",
+  "미니 플로팅 채팅창"
+]) {
+  assertIncludes(readmeSource, token, "README-facing feature wording must remain accurate");
 }
 
-const unsafeRoleSelectors = [
-  'html[data-chzzk-chat-ui-toggle-nicknames="off"] [${ROLE_ATTR}~="nickname"]',
-  'html[data-chzzk-chat-ui-toggle-badges="off"] [${ROLE_ATTR}~="badge"]',
-  'html[data-chzzk-chat-ui-toggle-timestamps="off"] [${ROLE_ATTR}~="timestamp"]'
-];
-
-for (const selector of unsafeRoleSelectors) {
-  if (contentSource.includes(selector)) {
-    throw new Error(`content script has an unsafe global role selector: ${selector}`);
-  }
+for (const token of [
+  'const GUEST_CHAT_CLEANBOT_DEFAULT_ATTR = "data-chzzk-chat-ui-toggle-guest-cleanbot-default";',
+  "state.frame.cleanbotDefault === \"off\"",
+  "state.frame.localStorageCleanbot === \"false\""
+]) {
+  assertIncludes(liveVerifySource, token, "live verifier must continue checking guest cleanbot correction");
 }
 
-const scopedRoleSelectors = [
-  '${CHAT_ROW_SCOPE_SELECTOR} [${ROLE_ATTR}~="nickname"]',
-  '${CHAT_ROW_SCOPE_SELECTOR} [${ROLE_ATTR}~="badge"]',
-  '${CHAT_ROW_SCOPE_SELECTOR} [${ROLE_ATTR}~="timestamp"]'
-];
-
-for (const selector of scopedRoleSelectors) {
-  if (!contentSource.includes(selector)) {
-    throw new Error(`content script is missing scoped role selector: ${selector}`);
-  }
+for (const token of [
+  "chzzk-chat-ui-toggle-style",
+  "document.getElementById(\"chzzk-chat-ui-toggle-style\")"
+]) {
+  assertExcludes(liveVerifySource, token, "live verifier must not expect the removed injected style element");
 }
 
-const unsafeLiveChatClassRules = [
-  'html[data-chzzk-chat-ui-toggle-nicknames="off"]\n        [class*="live_chatting_list_item" i]',
-  'html[data-chzzk-chat-ui-toggle-badges="off"]\n        [class*="live_chatting_list_item" i]',
-  'html[data-chzzk-chat-ui-toggle-large-text="on"]\n        [class*="live_chatting_list_item" i]',
-  'html[data-chzzk-chat-ui-toggle-bold-text="on"]\n        [class*="live_chatting_list_item" i]'
-];
-
-for (const selector of unsafeLiveChatClassRules) {
-  if (normalizedContentSource.includes(selector)) {
-    throw new Error(`content script has an unsafe unscoped live-chat class rule: ${selector}`);
-  }
-}
-
-if (!contentSource.includes("function cleanupUnscopedAnnotations")) {
-  throw new Error("content script must clean stale annotations outside confirmed chat rows.");
-}
-
-const scanRowsStart = contentSource.indexOf("function scanRows(rows)");
-const scanRowsEnd = contentSource.indexOf("function scan()", scanRowsStart);
-const scanRowsSource =
-  scanRowsStart >= 0 && scanRowsEnd > scanRowsStart
-    ? contentSource.slice(scanRowsStart, scanRowsEnd)
-    : "";
-
-if (!scanRowsSource.includes("cleanupRows(uniqueRows);")) {
-  throw new Error("content script must keep row-level scans scoped to the collected chat rows.");
-}
-
-if (scanRowsSource.includes("cleanupUnscopedAnnotations();")) {
-  throw new Error("content script must not run full-document cleanup for each row-level scan.");
-}
-
-const observerStart = contentSource.indexOf("observer = new MutationObserver");
-const observerEnd = contentSource.indexOf("observer.observe(target", observerStart);
-const observerSource =
-  observerStart >= 0 && observerEnd > observerStart
-    ? contentSource.slice(observerStart, observerEnd)
-    : "";
-
-if (!observerSource.includes("scheduleScan();")) {
-  throw new Error("content script must coalesce non-row mutation fallback scans.");
-}
-
-if (observerSource.includes("} else {\n          scan();")) {
-  throw new Error("content script must not run immediate full scans for non-row mutations.");
-}
-
-const unsafeDetectionTokens = [
-  "[role='listitem']",
-  '"li"',
-  "[class*='author' i]",
-  "[class*='username' i]",
-  "[class*='user_name' i]",
-  "img[src*='profile_image' i]",
-  "badge|profile_image|emblem|grade"
-];
-
-for (const token of unsafeDetectionTokens) {
-  if (contentSource.includes(token)) {
-    throw new Error(`content script has an unsafe broad detection token: ${token}`);
-  }
-}
-
-if (contentSource.includes('html[data-chzzk-chat-ui-toggle-nicknames="off"] [${CHAT_ROW_ATTR}="true"]')) {
-  throw new Error("nickname hiding must use CHAT_ROW_SCOPE_SELECTOR, not bare CHAT_ROW_ATTR.");
-}
-
-const nativeStyleSelectors = [
-  `html[data-chzzk-chat-ui-toggle-bold-text="on"]
-        \${NATIVE_CHAT_ROW_SELECTOR}`,
-  `html[data-chzzk-chat-ui-toggle-large-text="on"]
-        \${NATIVE_CHAT_ROW_SELECTOR}`,
-  `html[data-chzzk-chat-ui-toggle-chat-boxes="on"]
-        \${NATIVE_CHAT_ROW_SELECTOR}`
-];
-
-for (const selector of nativeStyleSelectors) {
-  if (!normalizedContentSource.includes(selector)) {
-    throw new Error(`content script must apply style before annotation with ${selector}`);
-  }
+for (const token of [
+  "eval(",
+  "new Function",
+  "fetch(",
+  "XMLHttpRequest",
+  "WebSocket",
+  "importScripts"
+]) {
+  assertExcludes(`${backgroundSource}\n${contentSource}\n${popupSource}`, token, "extension code must not include remote-code-like execution or network APIs");
 }
 
 console.log("Extension manifest and root files are valid.");

@@ -1,5 +1,5 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
-const CONTENT_VERSION = "0.3.16";
+const CONTENT_VERSION = "0.4.1";
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const MINI_CHAT_MIN_WIDTH = 280;
 const MINI_CHAT_MIN_HEIGHT = 28;
@@ -506,52 +506,6 @@ function sendMessageToTab(tabId, message) {
   });
 }
 
-function executeContentScript(tabId) {
-  return new Promise((resolve) => {
-    if (!chrome.scripting?.executeScript) {
-      resolve(false);
-      return;
-    }
-
-    chrome.scripting.executeScript(
-      {
-        target: { tabId, allFrames: true },
-        files: ["content.js"]
-      },
-      () => {
-        resolve(!chrome.runtime.lastError);
-      }
-    );
-  });
-}
-
-function getContentDomStatus(tabId) {
-  return new Promise((resolve) => {
-    if (!chrome.scripting?.executeScript) {
-      resolve(null);
-      return;
-    }
-
-    chrome.scripting.executeScript(
-      {
-        target: { tabId, allFrames: true },
-        func: () => ({
-          version: document.documentElement.dataset.chzzkChatUiToggleVersion || null,
-          styleVersion: document.getElementById("chzzk-chat-ui-toggle-style")?.dataset.chzzkChatUiToggleVersion || null
-        })
-      },
-      (results) => {
-        if (chrome.runtime.lastError) {
-          resolve(null);
-          return;
-        }
-
-        resolve(results?.map((result) => result.result) ?? null);
-      }
-    );
-  });
-}
-
 function getContentStatus(tabId) {
   return sendMessageToTab(tabId, {
     type: "CHZZK_CHAT_UI_TOGGLE_GET_STATUS"
@@ -575,32 +529,20 @@ function isCurrentContentStatus(status) {
   return status?.version === CONTENT_VERSION && status?.styleVersion === CONTENT_VERSION;
 }
 
-async function hasCurrentContentDom(tabId) {
-  const statuses = await getContentDomStatus(tabId);
-
-  return Array.isArray(statuses) && statuses.some(isCurrentContentStatus);
-}
-
 async function ensureCurrentContentScript(tabId) {
   let status = await getContentStatus(tabId);
 
-  if (isCurrentContentStatus(status) || await hasCurrentContentDom(tabId)) {
+  if (isCurrentContentStatus(status)) {
     return true;
   }
 
   if (status?.version === CONTENT_VERSION) {
     status = await refreshContent(tabId);
-    return isCurrentContentStatus(status) || await hasCurrentContentDom(tabId);
+    return isCurrentContentStatus(status);
   }
 
-  const injected = await executeContentScript(tabId);
-
-  if (!injected) {
-    return false;
-  }
-
-  status = await getContentStatus(tabId);
-  return isCurrentContentStatus(status) || await hasCurrentContentDom(tabId);
+  // Manifest content scripts handle Chzzk pages. Existing tabs opened before install/update may need a reload.
+  return false;
 }
 
 async function applyToActiveTab(options) {

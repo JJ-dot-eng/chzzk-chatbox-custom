@@ -53,6 +53,7 @@ $filesToCopy = @(
   "manifest.json",
   "background.js",
   "content.js",
+  "content.css",
   "popup.html",
   "popup.css",
   "popup.js",
@@ -78,7 +79,27 @@ if (-not (Test-Path -LiteralPath $iconsSource)) {
 
 Copy-Item -LiteralPath $iconsSource -Destination $iconsTarget -Recurse
 
-Compress-Archive -Path (Join-Path $resolvedStageRoot "*") -DestinationPath $resolvedZipPath -Force
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+$zip = [System.IO.Compression.ZipFile]::Open($resolvedZipPath, [System.IO.Compression.ZipArchiveMode]::Create)
+$stagePrefix = $resolvedStageRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+
+try {
+  Get-ChildItem -LiteralPath $resolvedStageRoot -Recurse -File |
+    Sort-Object FullName |
+    ForEach-Object {
+      $relativePath = $_.FullName.Substring($stagePrefix.Length).Replace([System.IO.Path]::DirectorySeparatorChar, "/")
+      [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+        $zip,
+        $_.FullName,
+        $relativePath,
+        [System.IO.Compression.CompressionLevel]::Optimal
+      ) | Out-Null
+    }
+} finally {
+  $zip.Dispose()
+}
 
 Write-Host "Created package: $resolvedZipPath"
 Write-Host "Upload this zip in the Chrome Web Store or Microsoft Edge Add-ons dashboard."

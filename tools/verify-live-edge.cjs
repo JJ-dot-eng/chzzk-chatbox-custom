@@ -1,4 +1,4 @@
-const { mkdirSync } = require("node:fs");
+﻿const { mkdirSync } = require("node:fs");
 const path = require("node:path");
 const { chromium } = require("playwright-core");
 
@@ -458,7 +458,7 @@ async function collectFrameStates(page) {
           url: location.href,
           title: document.title,
           readyState: document.readyState,
-          hasStyle: Boolean(document.getElementById("chzzk-chat-ui-toggle-style")),
+          hasStyle: Boolean(document.documentElement.dataset.chzzkChatUiToggleStyleVersion),
           hasRootDataset: document.documentElement.hasAttribute("data-chzzk-chat-ui-toggle-nicknames"),
           rootDataset: {
             nicknames: document.documentElement.dataset.chzzkChatUiToggleNicknames || null,
@@ -644,7 +644,7 @@ async function collectGuestChatState(page) {
           embed: document.documentElement.getAttribute(guestEmbedAttr),
           cleanbotDefault: document.documentElement.getAttribute(guestCleanbotDefaultAttr),
           localStorageCleanbot: window.localStorage?.getItem("cleanbot") || null,
-          hasStyle: Boolean(document.getElementById("chzzk-chat-ui-toggle-style")),
+          hasStyle: Boolean(document.documentElement.dataset.chzzkChatUiToggleStyleVersion),
           visibleHeaderCount: [
             ...new Set([
               ...document.querySelectorAll(

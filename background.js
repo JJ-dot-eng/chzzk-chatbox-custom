@@ -1,13 +1,9 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
-const SET_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_OPTIONS";
 const OPEN_POPUP_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_POPUP";
 const READ_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_GUEST_CHAT_THEME";
 const SET_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_GUEST_CHAT_THEME";
 const APPLY_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_APPLY_GUEST_CHAT_THEME";
-const CONTENT_SCRIPT_FILE = "content.js";
-const CHZZK_HOST_SUFFIX = ".chzzk.naver.com";
-const INJECTION_DELAYS_MS = [0, 250, 1000, 2500, 5000];
 const LIVE_CHANNEL_ID_PATTERN = /^[0-9a-f]{32}$/i;
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const MINI_CHAT_MIN_WIDTH = 280;
@@ -275,78 +271,6 @@ function getStoredOptions(sendResponse) {
   });
 }
 
-function readStoredOptions(callback) {
-  chrome.storage.local.get(STORAGE_KEY, (result) => {
-    const error = chrome.runtime.lastError;
-
-    if (error) {
-      callback(null);
-      return;
-    }
-
-    const found = hasOwn(result, STORAGE_KEY);
-    callback(normalizeOptions(found ? result[STORAGE_KEY] : DEFAULT_OPTIONS));
-  });
-}
-
-function isChzzkUrl(url) {
-  try {
-    const parsedUrl = new URL(url);
-
-    return (
-      parsedUrl.protocol === "https:" &&
-      (parsedUrl.hostname === "chzzk.naver.com" || parsedUrl.hostname.endsWith(CHZZK_HOST_SUFFIX))
-    );
-  } catch (_error) {
-    return false;
-  }
-}
-
-function injectContentScript(tabId) {
-  if (!Number.isInteger(tabId) || tabId < 0 || !chrome.scripting?.executeScript) {
-    return;
-  }
-
-  chrome.scripting.executeScript(
-    {
-      target: { tabId, allFrames: true },
-      files: [CONTENT_SCRIPT_FILE]
-    },
-    () => {
-      // Some subframes can be unavailable or outside granted origins during navigation.
-      // The manifest content script still handles matched frames; this is only a repair pass.
-      void chrome.runtime.lastError;
-      pushStoredOptionsToTab(tabId);
-    }
-  );
-}
-
-function pushStoredOptionsToTab(tabId) {
-  readStoredOptions((options) => {
-    if (!options) {
-      return;
-    }
-
-    chrome.tabs.sendMessage(
-      tabId,
-      {
-        type: SET_OPTIONS_MESSAGE,
-        options
-      },
-      () => {
-        // The content script may not be ready yet. Scheduled retries will try again.
-        void chrome.runtime.lastError;
-      }
-    );
-  });
-}
-
-function scheduleContentScriptInjection(tabId) {
-  for (const delay of INJECTION_DELAYS_MS) {
-    setTimeout(() => injectContentScript(tabId), delay);
-  }
-}
-
 function openExtensionPopup(sendResponse) {
   if (!chrome.action?.openPopup) {
     sendResponse({ ok: false, error: "open-popup-unavailable" });
@@ -377,56 +301,8 @@ chrome.runtime.onInstalled.addListener(() => {
   // Keeps a stable MV3 service worker target available for extension verification.
 });
 
-chrome.runtime.onStartup.addListener(() => {
-  chrome.tabs.query({ url: ["https://chzzk.naver.com/*", "https://*.chzzk.naver.com/*"] }, (tabs) => {
-    if (chrome.runtime.lastError) {
-      return;
-    }
-
-    for (const tab of tabs) {
-      scheduleContentScriptInjection(tab.id);
-    }
-  });
-});
-
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (!isChzzkUrl(changeInfo.url || tab.url || "")) {
-    return;
-  }
-
-  if (changeInfo.status && changeInfo.status !== "loading" && changeInfo.status !== "complete") {
-    return;
-  }
-
-  scheduleContentScriptInjection(tabId);
-});
-
 chrome.tabs.onRemoved.addListener((tabId) => {
   guestChatThemesByTab.delete(tabId);
-});
-
-chrome.webNavigation.onCommitted.addListener((details) => {
-  if (details.frameId !== 0 || !isChzzkUrl(details.url)) {
-    return;
-  }
-
-  scheduleContentScriptInjection(details.tabId);
-});
-
-chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
-  if (details.frameId !== 0 || !isChzzkUrl(details.url)) {
-    return;
-  }
-
-  scheduleContentScriptInjection(details.tabId);
-});
-
-chrome.webNavigation.onCompleted.addListener((details) => {
-  if (details.frameId !== 0 || !isChzzkUrl(details.url)) {
-    return;
-  }
-
-  scheduleContentScriptInjection(details.tabId);
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
