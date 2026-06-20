@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "치지직 채팅 커스텀",
   "short_name": "채팅 커스텀",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "치지직 채팅창의 표시 항목, 글자 크기, 채팅 패널, 비로그인/미니 채팅창을 내 브라우저에서만 조정합니다.",
   "icons": {
     "16": "icons/icon-16.png",
