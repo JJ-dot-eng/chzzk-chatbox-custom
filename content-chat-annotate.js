@@ -38,6 +38,7 @@ function addRole(element, role) {
 function removeAnnotations(element) {
   element.removeAttribute(ROLE_ATTR);
   element.removeAttribute(MESSAGE_PREFIX_ATTR);
+  element.removeAttribute(NICKNAME_COLOR_MESSAGE_ATTR);
   element.removeAttribute(MINI_CHAT_HIDDEN_CONTROL_ATTR);
   element.removeAttribute(NON_CHAT_PANEL_ATTR);
   element.removeAttribute(MINI_CHAT_COMPACT_INPUT_ATTR);
@@ -50,6 +51,7 @@ function removeAnnotations(element) {
   }
 
   if (element instanceof HTMLElement) {
+    element.style.removeProperty("--chzzk-chat-ui-toggle-nickname-color");
     clearLargeTextRowLayout(element);
   }
 
@@ -742,6 +744,66 @@ function getNicknameTextElement(row) {
   return candidates.find((element) => !candidates.some((candidate) => candidate !== element && element.contains(candidate)));
 }
 
+function clearNicknameColorMessage(row) {
+  if (!(row instanceof HTMLElement)) {
+    return;
+  }
+
+  row.removeAttribute(NICKNAME_COLOR_MESSAGE_ATTR);
+  row.style.removeProperty("--chzzk-chat-ui-toggle-nickname-color");
+}
+
+function isUsableCssColor(color) {
+  const normalized = String(color || "").replace(/\s+/g, "").toLowerCase();
+
+  if (!normalized || normalized === "transparent" || normalized === "rgba(0,0,0,0)") {
+    return false;
+  }
+
+  try {
+    return typeof CSS !== "undefined" && CSS.supports("color", color);
+  } catch (_error) {
+    return false;
+  }
+}
+
+function getNicknameTextColor(row) {
+  const nickname = getNicknameTextElement(row);
+
+  if (!(nickname instanceof Element)) {
+    return null;
+  }
+
+  try {
+    const color = getComputedStyle(nickname).color;
+
+    return isUsableCssColor(color) ? color : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function syncNicknameColorMessage(row) {
+  clearNicknameColorMessage(row);
+
+  if (currentOptions.useNicknameColorForMessage !== true) {
+    return;
+  }
+
+  if (!(getMessageTextElement(row) instanceof HTMLElement)) {
+    return;
+  }
+
+  const color = getNicknameTextColor(row);
+
+  if (!color) {
+    return;
+  }
+
+  row.setAttribute(NICKNAME_COLOR_MESSAGE_ATTR, "true");
+  row.style.setProperty("--chzzk-chat-ui-toggle-nickname-color", color);
+}
+
 function getMessagePrefixAnchor(row, nickname) {
   let anchor = nickname;
   let current = nickname;
@@ -840,6 +902,7 @@ function annotateChatRow(row) {
   annotateSelectorTargets(row, "badge");
   annotateLeadingBadges(row);
   annotateSelectorTargets(row, "nickname");
+  syncNicknameColorMessage(row);
 }
 
 function clearLargeTextRowLayout(row) {

@@ -38,6 +38,7 @@ const onOptions = {
   showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: false,
+  useNicknameColorForMessage: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
 
@@ -50,6 +51,7 @@ const offOptions = {
   showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: false,
+  useNicknameColorForMessage: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
 
@@ -62,6 +64,7 @@ const badgeOffOptions = {
   showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: false,
+  useNicknameColorForMessage: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
 
@@ -74,6 +77,7 @@ const nicknameOffOptions = {
   showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: false,
+  useNicknameColorForMessage: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
 
@@ -86,6 +90,7 @@ const chatBoxOffOptions = {
   showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: false,
+  useNicknameColorForMessage: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
 
@@ -99,6 +104,7 @@ const largeTextColorOptions = {
   showLargeText: true,
   chatFontSizePt: 36,
   showBoldText: false,
+  useNicknameColorForMessage: false,
   chatBoxColor: "#4b8bff"
 };
 
@@ -111,6 +117,7 @@ const boldTextOptions = {
   showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: true,
+  useNicknameColorForMessage: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
 
@@ -1325,6 +1332,7 @@ async function setPopupOptions(popup, options) {
     await popup.waitForTimeout(150);
   }
   await popup.locator("#showBoldText").setChecked(options.showBoldText);
+  await popup.locator("#useNicknameColorForMessage").setChecked(options.useNicknameColorForMessage === true);
 
   if (options.chatBoxColor) {
     const hexInput = popup.locator("#chatBoxColorHex");

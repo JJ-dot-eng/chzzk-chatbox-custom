@@ -159,6 +159,7 @@ function normalizeOptions(options) {
     useNicknameFontSize: options?.useNicknameFontSize === true,
     nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt),
     showBoldText: options?.showBoldText === true || legacyBoldText,
+    useNicknameColorForMessage: options?.useNicknameColorForMessage === true,
     chatBoxColor: normalizeHexColor(options?.chatBoxColor)
   };
 }

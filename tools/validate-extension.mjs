@@ -213,7 +213,8 @@ for (const token of [
   '"--chzzk-chat-ui-toggle-chat-font-size"',
   '"--chzzk-chat-ui-toggle-nickname-font-size"',
   '"--chzzk-chat-ui-toggle-chat-emote-size"',
-  '"--chzzk-chat-ui-toggle-mini-chat-scale"'
+  '"--chzzk-chat-ui-toggle-mini-chat-scale"',
+  '"--chzzk-chat-ui-toggle-nickname-color"'
 ]) {
   assertIncludes(contentSource, token, "content script must expose status and runtime CSS variables");
 }
@@ -226,6 +227,7 @@ for (const token of [
   "data-chzzk-chat-ui-toggle-mini-chat-embed",
   "data-chzzk-chat-ui-toggle-chat-row=\"true\"",
   "data-chzzk-chat-ui-toggle-role~=\"nickname\"",
+  "data-chzzk-chat-ui-toggle-nickname-color-message",
   "font-size: var(--chzzk-chat-ui-toggle-chat-font-size, 13pt) !important;",
   "transform: scale(var(--chzzk-chat-ui-toggle-mini-chat-scale, 1)) !important;",
   "#chzzk-chat-ui-toggle-mini-chat-panel",
@@ -258,7 +260,8 @@ for (const token of [
   'id="showNonChatPanels"',
   'id="showHeaderSettingsButton"',
   'id="chatFontSizePt"',
-  'id="nicknameFontSizePt"'
+  'id="nicknameFontSizePt"',
+  'id="useNicknameColorForMessage"'
 ]) {
   assertIncludes(popupMarkup, token, "popup markup must keep expected controls");
 }

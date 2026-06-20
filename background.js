@@ -55,6 +55,7 @@ const DEFAULT_OPTIONS = {
   useNicknameFontSize: false,
   nicknameFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT,
   showBoldText: false,
+  useNicknameColorForMessage: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
 
@@ -112,6 +113,7 @@ function normalizeOptions(options) {
     useNicknameFontSize: options?.useNicknameFontSize === true,
     nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt),
     showBoldText: options?.showBoldText === true || legacyBoldText,
+    useNicknameColorForMessage: options?.useNicknameColorForMessage === true,
     chatBoxColor: normalizeHexColor(options?.chatBoxColor)
   };
 }

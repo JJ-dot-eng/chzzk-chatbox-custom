@@ -890,6 +890,17 @@ html[data-chzzk-chat-ui-toggle-chat-boxes="on"]
   background: var(--chzzk-chat-ui-toggle-box-bg-hover) !important;
 }
 
+html[data-chzzk-chat-ui-toggle-nickname-color-message="on"]
+  :is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i])[data-chzzk-chat-ui-toggle-chat-row="true"][data-chzzk-chat-ui-toggle-nickname-color-message="true"]
+  :where(
+    [class*="live_chatting_message_text" i],
+    [class*="_chatting_message_" i] [class*="_text_" i],
+    [class*="message_text" i],
+    [class*="message" i] [class*="text" i]
+  ) {
+  color: var(--chzzk-chat-ui-toggle-nickname-color) !important;
+}
+
 html[data-chzzk-chat-ui-toggle-large-text="on"]
   :is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i]):has(:is([class*="live_chatting_message_container" i], [class*="_chatting_message_" i])) {
   display: flex !important;

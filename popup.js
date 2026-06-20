@@ -50,6 +50,7 @@ const DEFAULT_OPTIONS = {
   useNicknameFontSize: false,
   nicknameFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT,
   showBoldText: false,
+  useNicknameColorForMessage: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
 
@@ -67,7 +68,8 @@ const controlIds = [
   "showMiniFloatingChatButton",
   "showLargeText",
   "useNicknameFontSize",
-  "showBoldText"
+  "showBoldText",
+  "useNicknameColorForMessage"
 ];
 const controls = Object.fromEntries(controlIds.map((id) => [id, document.getElementById(id)]));
 const tabButtons = [...document.querySelectorAll("[data-tab-target]")];
@@ -329,6 +331,7 @@ function normalizeOptions(options) {
     useNicknameFontSize: options?.useNicknameFontSize === true,
     nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt),
     showBoldText: options?.showBoldText === true || legacyBoldText,
+    useNicknameColorForMessage: options?.useNicknameColorForMessage === true,
     chatBoxColor: normalizeHexColor(options?.chatBoxColor)
   };
 }
@@ -465,6 +468,7 @@ function readControls() {
     useNicknameFontSize: controls.useNicknameFontSize.checked,
     nicknameFontSizePt: nicknameFontSizeSlider.value,
     showBoldText: controls.showBoldText.checked,
+    useNicknameColorForMessage: controls.useNicknameColorForMessage.checked,
     chatBoxColor: currentColor
   });
 }
