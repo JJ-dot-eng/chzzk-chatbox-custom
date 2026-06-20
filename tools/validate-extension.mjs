@@ -36,6 +36,7 @@ const popupStyles = await readText("popup.css");
 const popupSource = await readText("popup.js");
 const readmeSource = await readText("README.md");
 const liveVerifySource = await readText(path.join("tools", "verify-live-edge.cjs"));
+const normalizedContentSource = contentSource.replace(/\r\n/g, "\n");
 const contentSurface = `${contentSource}\n${contentCssSource}`;
 
 const requiredRootFiles = [
@@ -147,7 +148,7 @@ for (const token of [
   "function scanRows(rows)",
   "observer = new MutationObserver"
 ]) {
-  assertIncludes(contentSource, token, "content script must keep core chat and option wiring");
+  assertIncludes(normalizedContentSource, token, "content script must keep core chat and option wiring");
 }
 
 for (const token of [
