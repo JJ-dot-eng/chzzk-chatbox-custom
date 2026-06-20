@@ -6,9 +6,9 @@ function getRuntime() {
   return chrome;
 }
 
-function normalizeHexColor(value) {
+function normalizeHexColor(value, fallback = DEFAULT_OPTIONS.chatBoxColor) {
   if (typeof value !== "string") {
-    return DEFAULT_OPTIONS.chatBoxColor;
+    return fallback;
   }
 
   const mappedValue = NAMED_CHAT_BOX_COLORS[value] || value;
@@ -23,7 +23,7 @@ function normalizeHexColor(value) {
     return hex.toLowerCase();
   }
 
-  return DEFAULT_OPTIONS.chatBoxColor;
+  return fallback;
 }
 
 function hexToRgb(hexColor) {
@@ -159,8 +159,10 @@ function normalizeOptions(options) {
     useNicknameFontSize: options?.useNicknameFontSize === true,
     nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt),
     showBoldText: options?.showBoldText === true || legacyBoldText,
+    useChatTextColor: options?.useChatTextColor === true,
+    chatTextColor: normalizeHexColor(options?.chatTextColor, DEFAULT_OPTIONS.chatTextColor),
     useNicknameColorForMessage: options?.useNicknameColorForMessage === true,
-    chatBoxColor: normalizeHexColor(options?.chatBoxColor)
+    chatBoxColor: normalizeHexColor(options?.chatBoxColor, DEFAULT_OPTIONS.chatBoxColor)
   };
 }
 

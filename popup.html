@@ -102,15 +102,45 @@
             </div>
           </section>
 
-          <label class="toggle-row">
-            <span><strong>굵게</strong></span>
-            <input type="checkbox" id="showBoldText">
-          </label>
+          <div class="toggle-row toggle-row--with-disclosure">
+            <button type="button" id="toggleChatTextStylePanel" class="disclosure-button" aria-label="채팅 글자 스타일 항목 접기" aria-expanded="true" aria-controls="chatTextStylePanel"></button>
+            <span class="toggle-row__label"><strong>채팅 글자 스타일</strong></span>
+          </div>
 
-          <label class="toggle-row">
-            <span><strong>닉네임 색상으로 채팅 표시</strong></span>
-            <input type="checkbox" id="useNicknameColorForMessage">
-          </label>
+          <section id="chatTextStylePanel" class="text-style-control text-style-control--sub" aria-label="채팅 글자 스타일">
+            <label class="text-style-control__toggle">
+              <span><strong>굵게</strong></span>
+              <input type="checkbox" id="showBoldText">
+            </label>
+
+            <div id="chatTextColorControl" class="text-style-control__color">
+              <div class="text-style-control__toggle text-style-control__toggle--with-disclosure">
+                <button type="button" id="toggleChatTextColorPanel" class="disclosure-button" aria-label="글자 색상 항목 펼치기" aria-expanded="false" aria-controls="chatTextColorPanel"></button>
+                <label class="text-style-control__label" for="useChatTextColor"><strong>글자 색상 변경</strong></label>
+                <input type="checkbox" id="useChatTextColor">
+              </div>
+
+              <section id="chatTextColorPanel" class="color-picker color-picker--nested" aria-label="채팅 글자 색상" hidden>
+                <div class="color-picker__controls">
+                  <span id="chatTextColorPreview" class="color-preview" aria-hidden="true"></span>
+                  <input type="text" id="chatTextColorHex" class="hex-input" inputmode="text" maxlength="7" spellcheck="false" aria-label="글자 색상 코드">
+                  <button type="button" id="resetChatTextColor" class="default-button">기본</button>
+                </div>
+
+                <div class="color-picker__body">
+                  <button type="button" id="chatTextColorField" class="color-field" aria-label="글자 색상 영역">
+                    <span id="chatTextColorFieldHandle" class="color-field__handle"></span>
+                  </button>
+                  <input type="range" id="chatTextHueSlider" class="hue-slider" min="0" max="360" value="0" aria-label="글자 색상 범위">
+                </div>
+              </section>
+            </div>
+
+            <label class="text-style-control__toggle">
+              <span><strong>닉네임 색상으로 채팅 표시</strong></span>
+              <input type="checkbox" id="useNicknameColorForMessage">
+            </label>
+          </section>
 
         </div>
       </section>

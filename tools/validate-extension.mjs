@@ -214,6 +214,7 @@ for (const token of [
   '"--chzzk-chat-ui-toggle-nickname-font-size"',
   '"--chzzk-chat-ui-toggle-chat-emote-size"',
   '"--chzzk-chat-ui-toggle-mini-chat-scale"',
+  '"--chzzk-chat-ui-toggle-chat-text-color"',
   '"--chzzk-chat-ui-toggle-nickname-color"'
 ]) {
   assertIncludes(contentSource, token, "content script must expose status and runtime CSS variables");
@@ -227,7 +228,10 @@ for (const token of [
   "data-chzzk-chat-ui-toggle-mini-chat-embed",
   "data-chzzk-chat-ui-toggle-chat-row=\"true\"",
   "data-chzzk-chat-ui-toggle-role~=\"nickname\"",
+  "data-chzzk-chat-ui-toggle-message-text",
+  "data-chzzk-chat-ui-toggle-chat-text-color",
   "data-chzzk-chat-ui-toggle-nickname-color-message",
+  "color: var(--chzzk-chat-ui-toggle-chat-text-color) !important;",
   "font-size: var(--chzzk-chat-ui-toggle-chat-font-size, 13pt) !important;",
   "transform: scale(var(--chzzk-chat-ui-toggle-mini-chat-scale, 1)) !important;",
   "#chzzk-chat-ui-toggle-mini-chat-panel",
@@ -261,6 +265,10 @@ for (const token of [
   'id="showHeaderSettingsButton"',
   'id="chatFontSizePt"',
   'id="nicknameFontSizePt"',
+  'id="toggleChatTextStylePanel"',
+  'id="useChatTextColor"',
+  'id="chatTextColorHex"',
+  'id="toggleChatTextColorPanel"',
   'id="useNicknameColorForMessage"'
 ]) {
   assertIncludes(popupMarkup, token, "popup markup must keep expected controls");
@@ -269,7 +277,9 @@ for (const token of [
 for (const token of [
   "body.is-chat-font-size-panel-expanded",
   "body.is-chat-box-color-panel-expanded",
+  "body.is-chat-text-style-panel-expanded",
   ".disclosure-button",
+  ".text-style-control",
   ".color-picker--sub",
   ".font-size-control__nested"
 ]) {

@@ -890,14 +890,15 @@ html[data-chzzk-chat-ui-toggle-chat-boxes="on"]
   background: var(--chzzk-chat-ui-toggle-box-bg-hover) !important;
 }
 
+html[data-chzzk-chat-ui-toggle-chat-text-color="on"]:not([data-chzzk-chat-ui-toggle-nickname-color-message="on"])
+  :is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i])[data-chzzk-chat-ui-toggle-chat-row="true"]
+  [data-chzzk-chat-ui-toggle-message-text="true"] {
+  color: var(--chzzk-chat-ui-toggle-chat-text-color) !important;
+}
+
 html[data-chzzk-chat-ui-toggle-nickname-color-message="on"]
   :is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i])[data-chzzk-chat-ui-toggle-chat-row="true"][data-chzzk-chat-ui-toggle-nickname-color-message="true"]
-  :where(
-    [class*="live_chatting_message_text" i],
-    [class*="_chatting_message_" i] [class*="_text_" i],
-    [class*="message_text" i],
-    [class*="message" i] [class*="text" i]
-  ) {
+  [data-chzzk-chat-ui-toggle-message-text="true"] {
   color: var(--chzzk-chat-ui-toggle-nickname-color) !important;
 }
 

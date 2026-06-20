@@ -39,7 +39,9 @@ body::-webkit-scrollbar {
 }
 
 body.is-chat-font-size-panel-expanded,
-body.is-chat-box-color-panel-expanded {
+body.is-chat-box-color-panel-expanded,
+body.is-chat-text-style-panel-expanded,
+body.is-chat-text-color-panel-expanded {
   width: 360px;
   min-width: 360px;
 }
@@ -217,6 +219,10 @@ h1 {
   cursor: not-allowed;
 }
 
+.text-style-control__toggle input:disabled {
+  cursor: not-allowed;
+}
+
 .disclosure-button {
   display: grid;
   place-items: center;
@@ -259,7 +265,8 @@ h1 {
   cursor: not-allowed;
 }
 
-.font-size-control {
+.font-size-control,
+.text-style-control {
   display: grid;
   gap: 8px;
   padding: 10px 12px;
@@ -269,7 +276,8 @@ h1 {
   box-shadow: var(--shadow);
 }
 
-.font-size-control--sub {
+.font-size-control--sub,
+.text-style-control--sub {
   margin-left: 28px;
   padding: 9px 12px 10px;
   border-left: 3px solid var(--accent);
@@ -303,7 +311,8 @@ h1 {
   grid-template-columns: 1fr 56px;
 }
 
-.font-size-control__toggle {
+.font-size-control__toggle,
+.text-style-control__toggle {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -314,17 +323,26 @@ h1 {
   cursor: pointer;
 }
 
-.font-size-control__toggle span {
+.font-size-control__toggle span,
+.text-style-control__toggle span,
+.text-style-control__label {
   min-width: 0;
 }
 
-.font-size-control__toggle strong {
+.text-style-control__label {
+  flex: 1 1 auto;
+  cursor: pointer;
+}
+
+.font-size-control__toggle strong,
+.text-style-control__toggle strong {
   color: var(--text);
   font-size: 13px;
   line-height: 1.25;
 }
 
-.font-size-control__toggle input {
+.font-size-control__toggle input,
+.text-style-control__toggle input {
   appearance: none;
   position: relative;
   flex: 0 0 auto;
@@ -338,7 +356,8 @@ h1 {
   transition: background-color 140ms ease, border-color 140ms ease;
 }
 
-.font-size-control__toggle input::after {
+.font-size-control__toggle input::after,
+.text-style-control__toggle input::after {
   content: "";
   position: absolute;
   top: 2px;
@@ -351,32 +370,50 @@ h1 {
   transition: transform 140ms ease;
 }
 
-.font-size-control__toggle input:checked {
+.font-size-control__toggle input:checked,
+.text-style-control__toggle input:checked {
   border-color: var(--accent-strong);
   background: var(--accent);
 }
 
-.font-size-control__toggle input:checked::after {
+.font-size-control__toggle input:checked::after,
+.text-style-control__toggle input:checked::after {
   transform: translateX(18px);
 }
 
-.font-size-control__toggle input:focus-visible {
+.font-size-control__toggle input:focus-visible,
+.text-style-control__toggle input:focus-visible {
   box-shadow: 0 0 0 3px rgba(0, 196, 113, 0.22);
 }
 
-.font-size-control__nested {
+.text-style-control__toggle--with-disclosure {
+  gap: 10px;
+  min-height: 36px;
+  padding-top: 0;
+  border-top: 0;
+  cursor: default;
+}
+
+.font-size-control__nested,
+.text-style-control__color {
   display: grid;
   gap: 8px;
   padding-left: 10px;
   border-left: 2px solid #c8d0d8;
 }
 
-.font-size-control__nested.is-disabled {
+.font-size-control__nested.is-disabled,
+.text-style-control__color.is-disabled {
   opacity: 0.52;
 }
 
 .font-size-control__nested.is-disabled .font-size-slider,
-.font-size-control__nested.is-disabled .default-button {
+.font-size-control__nested.is-disabled .default-button,
+.text-style-control__color.is-disabled .disclosure-button,
+.text-style-control__color.is-disabled .color-field,
+.text-style-control__color.is-disabled .hue-slider,
+.text-style-control__color.is-disabled .hex-input,
+.text-style-control__color.is-disabled .default-button {
   cursor: not-allowed;
 }
 
@@ -404,6 +441,15 @@ h1 {
 }
 
 .color-picker--sub {
+  margin-left: 28px;
+  margin-top: 0;
+  padding: 9px 12px 10px;
+  border-left: 3px solid var(--accent);
+  background: #fbfcfd;
+  box-shadow: none;
+}
+
+.color-picker--nested {
   margin-left: 28px;
   margin-top: 0;
   padding: 9px 12px 10px;
@@ -484,17 +530,30 @@ h1 {
 }
 
 body.is-chat-font-size-panel-expanded .color-picker,
-body.is-chat-box-color-panel-expanded .color-picker {
+body.is-chat-box-color-panel-expanded .color-picker,
+body.is-chat-text-style-panel-expanded .color-picker,
+body.is-chat-text-color-panel-expanded .color-picker {
   gap: 8px;
 }
 
 body.is-chat-font-size-panel-expanded .color-picker:not(.color-picker--sub),
-body.is-chat-box-color-panel-expanded .color-picker:not(.color-picker--sub) {
+body.is-chat-box-color-panel-expanded .color-picker:not(.color-picker--sub),
+body.is-chat-text-style-panel-expanded .color-picker:not(.color-picker--sub),
+body.is-chat-text-color-panel-expanded .color-picker:not(.color-picker--sub) {
   margin-top: 8px;
 }
 
+body.is-chat-font-size-panel-expanded .color-picker--nested,
+body.is-chat-box-color-panel-expanded .color-picker--nested,
+body.is-chat-text-style-panel-expanded .color-picker--nested,
+body.is-chat-text-color-panel-expanded .color-picker--nested {
+  margin-top: 0;
+}
+
 body.is-chat-font-size-panel-expanded .color-picker__body,
-body.is-chat-box-color-panel-expanded .color-picker__body {
+body.is-chat-box-color-panel-expanded .color-picker__body,
+body.is-chat-text-style-panel-expanded .color-picker__body,
+body.is-chat-text-color-panel-expanded .color-picker__body {
   min-height: 132px;
 }
 
@@ -512,7 +571,9 @@ body.is-chat-box-color-panel-expanded .color-picker__body {
 }
 
 body.is-chat-font-size-panel-expanded .color-field,
-body.is-chat-box-color-panel-expanded .color-field {
+body.is-chat-box-color-panel-expanded .color-field,
+body.is-chat-text-style-panel-expanded .color-field,
+body.is-chat-text-color-panel-expanded .color-field {
   min-height: 132px;
 }
 
@@ -544,7 +605,9 @@ body.is-chat-box-color-panel-expanded .color-field {
 }
 
 body.is-chat-font-size-panel-expanded .hue-slider,
-body.is-chat-box-color-panel-expanded .hue-slider {
+body.is-chat-box-color-panel-expanded .hue-slider,
+body.is-chat-text-style-panel-expanded .hue-slider,
+body.is-chat-text-color-panel-expanded .hue-slider {
   height: 132px;
 }
 

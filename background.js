@@ -20,6 +20,7 @@ const MINI_CHAT_SCALE_DEFAULT = 100;
 const CHAT_FONT_SIZE_PT_MIN = 8;
 const CHAT_FONT_SIZE_PT_MAX = 36;
 const CHAT_FONT_SIZE_PT_DEFAULT = 13;
+const DEFAULT_CHAT_TEXT_COLOR = "#101418";
 const NAMED_CHAT_BOX_COLORS = {
   gray: "#808080",
   green: "#00c471",
@@ -55,15 +56,17 @@ const DEFAULT_OPTIONS = {
   useNicknameFontSize: false,
   nicknameFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT,
   showBoldText: false,
+  useChatTextColor: false,
+  chatTextColor: DEFAULT_CHAT_TEXT_COLOR,
   useNicknameColorForMessage: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
 
 const guestChatThemesByTab = new Map();
 
-function normalizeHexColor(value) {
+function normalizeHexColor(value, fallback = DEFAULT_CHAT_BOX_COLOR) {
   if (typeof value !== "string") {
-    return DEFAULT_CHAT_BOX_COLOR;
+    return fallback;
   }
 
   const mappedValue = NAMED_CHAT_BOX_COLORS[value] || value;
@@ -78,7 +81,7 @@ function normalizeHexColor(value) {
     return hex.toLowerCase();
   }
 
-  return DEFAULT_CHAT_BOX_COLOR;
+  return fallback;
 }
 
 function normalizeOptions(options) {
@@ -113,8 +116,10 @@ function normalizeOptions(options) {
     useNicknameFontSize: options?.useNicknameFontSize === true,
     nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt),
     showBoldText: options?.showBoldText === true || legacyBoldText,
+    useChatTextColor: options?.useChatTextColor === true,
+    chatTextColor: normalizeHexColor(options?.chatTextColor, DEFAULT_CHAT_TEXT_COLOR),
     useNicknameColorForMessage: options?.useNicknameColorForMessage === true,
-    chatBoxColor: normalizeHexColor(options?.chatBoxColor)
+    chatBoxColor: normalizeHexColor(options?.chatBoxColor, DEFAULT_CHAT_BOX_COLOR)
   };
 }
 

@@ -11,6 +11,7 @@ const ROLE_ATTR = "data-chzzk-chat-ui-toggle-role";
 const CHAT_ROW_ATTR = "data-chzzk-chat-ui-toggle-chat-row";
 const OUTPUT_DIR = path.join(process.cwd(), "output", "playwright");
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
+const DEFAULT_CHAT_TEXT_COLOR = "#101418";
 const CHAT_FONT_SIZE_PT_DEFAULT = 13;
 const EXTENSION_NAME = "치지직 채팅 커스텀";
 const EXTENSION_BACKGROUND_FILE = "background.js";
@@ -38,6 +39,8 @@ const onOptions = {
   showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: false,
+  useChatTextColor: false,
+  chatTextColor: DEFAULT_CHAT_TEXT_COLOR,
   useNicknameColorForMessage: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
@@ -51,6 +54,8 @@ const offOptions = {
   showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: false,
+  useChatTextColor: false,
+  chatTextColor: DEFAULT_CHAT_TEXT_COLOR,
   useNicknameColorForMessage: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
@@ -64,6 +69,8 @@ const badgeOffOptions = {
   showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: false,
+  useChatTextColor: false,
+  chatTextColor: DEFAULT_CHAT_TEXT_COLOR,
   useNicknameColorForMessage: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
@@ -77,6 +84,8 @@ const nicknameOffOptions = {
   showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: false,
+  useChatTextColor: false,
+  chatTextColor: DEFAULT_CHAT_TEXT_COLOR,
   useNicknameColorForMessage: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
@@ -90,6 +99,8 @@ const chatBoxOffOptions = {
   showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: false,
+  useChatTextColor: false,
+  chatTextColor: DEFAULT_CHAT_TEXT_COLOR,
   useNicknameColorForMessage: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
@@ -104,6 +115,8 @@ const largeTextColorOptions = {
   showLargeText: true,
   chatFontSizePt: 36,
   showBoldText: false,
+  useChatTextColor: false,
+  chatTextColor: DEFAULT_CHAT_TEXT_COLOR,
   useNicknameColorForMessage: false,
   chatBoxColor: "#4b8bff"
 };
@@ -117,6 +130,8 @@ const boldTextOptions = {
   showGuestChatToggleButton: true,
   showLargeText: false,
   showBoldText: true,
+  useChatTextColor: false,
+  chatTextColor: DEFAULT_CHAT_TEXT_COLOR,
   useNicknameColorForMessage: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
@@ -1332,6 +1347,12 @@ async function setPopupOptions(popup, options) {
     await popup.waitForTimeout(150);
   }
   await popup.locator("#showBoldText").setChecked(options.showBoldText);
+  await popup.locator("#useChatTextColor").setChecked(options.useChatTextColor === true);
+  if (options.chatTextColor) {
+    const textHexInput = popup.locator("#chatTextColorHex");
+    await textHexInput.fill(options.chatTextColor);
+    await textHexInput.press("Enter");
+  }
   await popup.locator("#useNicknameColorForMessage").setChecked(options.useNicknameColorForMessage === true);
 
   if (options.chatBoxColor) {

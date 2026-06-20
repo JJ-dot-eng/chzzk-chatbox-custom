@@ -1,6 +1,7 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const CONTENT_VERSION = "0.4.2";
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
+const DEFAULT_CHAT_TEXT_COLOR = "#101418";
 const MINI_CHAT_MIN_WIDTH = 280;
 const MINI_CHAT_MIN_HEIGHT = 28;
 const MINI_CHAT_INPUT_ONLY_HEIGHT = 116;
@@ -50,6 +51,8 @@ const DEFAULT_OPTIONS = {
   useNicknameFontSize: false,
   nicknameFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT,
   showBoldText: false,
+  useChatTextColor: false,
+  chatTextColor: DEFAULT_CHAT_TEXT_COLOR,
   useNicknameColorForMessage: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
@@ -69,6 +72,7 @@ const controlIds = [
   "showLargeText",
   "useNicknameFontSize",
   "showBoldText",
+  "useChatTextColor",
   "useNicknameColorForMessage"
 ];
 const controls = Object.fromEntries(controlIds.map((id) => [id, document.getElementById(id)]));
@@ -82,6 +86,17 @@ const toggleChatBoxColorPanelButton = document.getElementById("toggleChatBoxColo
 const colorField = document.getElementById("colorField");
 const colorFieldHandle = document.getElementById("colorFieldHandle");
 const hueSlider = document.getElementById("hueSlider");
+const chatTextStylePanel = document.getElementById("chatTextStylePanel");
+const toggleChatTextStylePanelButton = document.getElementById("toggleChatTextStylePanel");
+const chatTextColorControl = document.getElementById("chatTextColorControl");
+const chatTextColorPanel = document.getElementById("chatTextColorPanel");
+const toggleChatTextColorPanelButton = document.getElementById("toggleChatTextColorPanel");
+const chatTextColorPreview = document.getElementById("chatTextColorPreview");
+const chatTextHexInput = document.getElementById("chatTextColorHex");
+const resetChatTextColorButton = document.getElementById("resetChatTextColor");
+const chatTextColorField = document.getElementById("chatTextColorField");
+const chatTextColorFieldHandle = document.getElementById("chatTextColorFieldHandle");
+const chatTextHueSlider = document.getElementById("chatTextHueSlider");
 const chatFontSizeSlider = document.getElementById("chatFontSizePt");
 const chatFontSizeValue = document.getElementById("chatFontSizeValue");
 const resetChatFontSizeButton = document.getElementById("resetChatFontSize");
@@ -94,16 +109,21 @@ const resetNicknameFontSizeButton = document.getElementById("resetNicknameFontSi
 const statusElement = document.getElementById("status");
 
 let currentColor = DEFAULT_CHAT_BOX_COLOR;
+let currentChatTextColor = DEFAULT_CHAT_TEXT_COLOR;
 let currentOptions = { ...DEFAULT_OPTIONS };
 let hsv = { hue: 0, saturation: 0, value: 0.5 };
+let chatTextHsv = { hue: 0, saturation: 0, value: 0.07 };
 let colorApplyTimer = 0;
+let chatTextColorApplyTimer = 0;
 let fontSizeApplyTimer = 0;
 let isChatBoxColorPanelExpanded = false;
 let isChatFontSizePanelExpanded = true;
+let isChatTextStylePanelExpanded = true;
+let isChatTextColorPanelExpanded = false;
 
-function normalizeHexColor(value) {
+function normalizeHexColor(value, fallback = DEFAULT_CHAT_BOX_COLOR) {
   if (typeof value !== "string") {
-    return DEFAULT_CHAT_BOX_COLOR;
+    return fallback;
   }
 
   const mappedValue = NAMED_CHAT_BOX_COLORS[value] || value;
@@ -118,7 +138,7 @@ function normalizeHexColor(value) {
     return hex.toLowerCase();
   }
 
-  return DEFAULT_CHAT_BOX_COLOR;
+  return fallback;
 }
 
 function isValidHexInput(value) {
@@ -331,8 +351,10 @@ function normalizeOptions(options) {
     useNicknameFontSize: options?.useNicknameFontSize === true,
     nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt),
     showBoldText: options?.showBoldText === true || legacyBoldText,
+    useChatTextColor: options?.useChatTextColor === true,
+    chatTextColor: normalizeHexColor(options?.chatTextColor, DEFAULT_CHAT_TEXT_COLOR),
     useNicknameColorForMessage: options?.useNicknameColorForMessage === true,
-    chatBoxColor: normalizeHexColor(options?.chatBoxColor)
+    chatBoxColor: normalizeHexColor(options?.chatBoxColor, DEFAULT_CHAT_BOX_COLOR)
   };
 }
 
@@ -355,7 +377,7 @@ function setStatus(message) {
 }
 
 function updateColorUi(hexColor, { syncInput = true } = {}) {
-  currentColor = normalizeHexColor(hexColor);
+  currentColor = normalizeHexColor(hexColor, DEFAULT_CHAT_BOX_COLOR);
   hsv = rgbToHsv(hexToRgb(currentColor));
 
   document.documentElement.style.setProperty("--current-color", currentColor);
@@ -368,6 +390,23 @@ function updateColorUi(hexColor, { syncInput = true } = {}) {
   if (syncInput) {
     hexInput.value = currentColor;
     hexInput.classList.remove("is-invalid");
+  }
+}
+
+function updateChatTextColorUi(hexColor, { syncInput = true } = {}) {
+  currentChatTextColor = normalizeHexColor(hexColor, DEFAULT_CHAT_TEXT_COLOR);
+  chatTextHsv = rgbToHsv(hexToRgb(currentChatTextColor));
+
+  chatTextColorPanel.style.setProperty("--current-color", currentChatTextColor);
+  chatTextColorPanel.style.setProperty("--field-hue", hueToHex(chatTextHsv.hue));
+  chatTextColorField.style.setProperty("--field-x", String(chatTextHsv.saturation));
+  chatTextColorField.style.setProperty("--field-y", String(1 - chatTextHsv.value));
+  chatTextColorPreview.style.backgroundColor = currentChatTextColor;
+  chatTextHueSlider.value = String(chatTextHsv.hue);
+
+  if (syncInput) {
+    chatTextHexInput.value = currentChatTextColor;
+    chatTextHexInput.classList.remove("is-invalid");
   }
 }
 
@@ -415,6 +454,38 @@ function syncChatFontSizePanel() {
   setChatFontSizePanelExpanded(isChatFontSizePanelExpanded);
 }
 
+function setChatTextStylePanelExpanded(expanded) {
+  const shouldExpand = expanded === true;
+  isChatTextStylePanelExpanded = shouldExpand;
+  document.body.classList.toggle("is-chat-text-style-panel-expanded", shouldExpand);
+  chatTextStylePanel.hidden = !shouldExpand;
+  toggleChatTextStylePanelButton.setAttribute("aria-expanded", String(shouldExpand));
+  toggleChatTextStylePanelButton.setAttribute(
+    "aria-label",
+    shouldExpand ? "채팅 글자 스타일 항목 접기" : "채팅 글자 스타일 항목 펼치기"
+  );
+}
+
+function syncChatTextStylePanel() {
+  setChatTextStylePanelExpanded(isChatTextStylePanelExpanded);
+}
+
+function setChatTextColorPanelExpanded(expanded) {
+  const shouldExpand = expanded === true;
+  isChatTextColorPanelExpanded = shouldExpand;
+  document.body.classList.toggle("is-chat-text-color-panel-expanded", shouldExpand);
+  chatTextColorPanel.hidden = !shouldExpand;
+  toggleChatTextColorPanelButton.setAttribute("aria-expanded", String(shouldExpand));
+  toggleChatTextColorPanelButton.setAttribute(
+    "aria-label",
+    shouldExpand ? "글자 색상 항목 접기" : "글자 색상 항목 펼치기"
+  );
+}
+
+function syncChatTextColorPanel() {
+  setChatTextColorPanelExpanded(isChatTextColorPanelExpanded);
+}
+
 function setControls(options) {
   const normalized = normalizeOptions(options);
   currentOptions = normalized;
@@ -425,10 +496,13 @@ function setControls(options) {
 
   isChatBoxColorPanelExpanded = false;
   isChatFontSizePanelExpanded = true;
+  isChatTextStylePanelExpanded = true;
+  isChatTextColorPanelExpanded = false;
   syncDependentControls(normalized);
   updateChatFontSizeUi(normalized.chatFontSizePt);
   updateNicknameFontSizeUi(normalized.nicknameFontSizePt);
   updateColorUi(normalized.chatBoxColor);
+  updateChatTextColorUi(normalized.chatTextColor);
 }
 
 function syncDependentControls(options = currentOptions) {
@@ -443,10 +517,28 @@ function syncDependentControls(options = currentOptions) {
 
   syncChatBoxColorPanel(options);
   syncChatFontSizePanel(options);
+  syncChatTextStylePanel(options);
+  syncChatTextColorPanel(options);
   const isNicknameFontSizeEnabled = options.showLargeText === true && options.useNicknameFontSize === true;
   nicknameFontSizeSlider.disabled = !isNicknameFontSizeEnabled;
   resetNicknameFontSizeButton.disabled = !isNicknameFontSizeEnabled;
   nicknameFontSizeControl.classList.toggle("is-disabled", !isNicknameFontSizeEnabled);
+
+  const shouldDisableChatTextColor = options.useNicknameColorForMessage === true;
+  const chatTextColorControls = [
+    controls.useChatTextColor,
+    toggleChatTextColorPanelButton,
+    chatTextHexInput,
+    resetChatTextColorButton,
+    chatTextColorField,
+    chatTextHueSlider
+  ];
+
+  for (const control of chatTextColorControls) {
+    control.disabled = shouldDisableChatTextColor;
+  }
+
+  chatTextColorControl.classList.toggle("is-disabled", shouldDisableChatTextColor);
 }
 
 function readControls() {
@@ -468,6 +560,8 @@ function readControls() {
     useNicknameFontSize: controls.useNicknameFontSize.checked,
     nicknameFontSizePt: nicknameFontSizeSlider.value,
     showBoldText: controls.showBoldText.checked,
+    useChatTextColor: controls.useChatTextColor.checked,
+    chatTextColor: currentChatTextColor,
     useNicknameColorForMessage: controls.useNicknameColorForMessage.checked,
     chatBoxColor: currentColor
   });
@@ -573,6 +667,11 @@ function scheduleColorApply() {
   colorApplyTimer = window.setTimeout(applyCurrentOptions, 100);
 }
 
+function scheduleChatTextColorApply() {
+  window.clearTimeout(chatTextColorApplyTimer);
+  chatTextColorApplyTimer = window.setTimeout(applyCurrentOptions, 100);
+}
+
 function scheduleFontSizeApply() {
   window.clearTimeout(fontSizeApplyTimer);
   fontSizeApplyTimer = window.setTimeout(applyCurrentOptions, 100);
@@ -603,6 +702,14 @@ function handleChatBoxColorPanelToggle() {
   setChatBoxColorPanelExpanded(!isChatBoxColorPanelExpanded);
 }
 
+function handleChatTextStylePanelToggle() {
+  setChatTextStylePanelExpanded(!isChatTextStylePanelExpanded);
+}
+
+function handleChatTextColorPanelToggle() {
+  setChatTextColorPanelExpanded(!isChatTextColorPanelExpanded);
+}
+
 function setColorFromHsv(nextHsv, { commit = true } = {}) {
   hsv = {
     hue: Math.max(0, Math.min(360, nextHsv.hue)),
@@ -616,6 +723,19 @@ function setColorFromHsv(nextHsv, { commit = true } = {}) {
   }
 }
 
+function setChatTextColorFromHsv(nextHsv, { commit = true } = {}) {
+  chatTextHsv = {
+    hue: Math.max(0, Math.min(360, nextHsv.hue)),
+    saturation: Math.max(0, Math.min(1, nextHsv.saturation)),
+    value: Math.max(0, Math.min(1, nextHsv.value))
+  };
+  updateChatTextColorUi(rgbToHex(hsvToRgb(chatTextHsv)));
+
+  if (commit) {
+    scheduleChatTextColorApply();
+  }
+}
+
 function updateColorFromField(event) {
   const rect = colorField.getBoundingClientRect();
   const x = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
@@ -623,6 +743,18 @@ function updateColorFromField(event) {
 
   setColorFromHsv({
     hue: hsv.hue,
+    saturation: x,
+    value: 1 - y
+  });
+}
+
+function updateChatTextColorFromField(event) {
+  const rect = chatTextColorField.getBoundingClientRect();
+  const x = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+  const y = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
+
+  setChatTextColorFromHsv({
+    hue: chatTextHsv.hue,
     saturation: x,
     value: 1 - y
   });
@@ -639,11 +771,30 @@ function handleColorFieldPointerMove(event) {
   }
 }
 
+function handleChatTextColorFieldPointerDown(event) {
+  chatTextColorField.setPointerCapture(event.pointerId);
+  updateChatTextColorFromField(event);
+}
+
+function handleChatTextColorFieldPointerMove(event) {
+  if (chatTextColorField.hasPointerCapture(event.pointerId)) {
+    updateChatTextColorFromField(event);
+  }
+}
+
 function handleHueChange() {
   setColorFromHsv({
     hue: Number(hueSlider.value),
     saturation: hsv.saturation,
     value: hsv.value
+  });
+}
+
+function handleChatTextHueChange() {
+  setChatTextColorFromHsv({
+    hue: Number(chatTextHueSlider.value),
+    saturation: chatTextHsv.saturation,
+    value: chatTextHsv.value
   });
 }
 
@@ -654,6 +805,16 @@ function commitHexInput() {
   }
 
   updateColorUi(normalizeHexColor(hexInput.value));
+  applyCurrentOptions();
+}
+
+function commitChatTextHexInput() {
+  if (!isValidHexInput(chatTextHexInput.value)) {
+    chatTextHexInput.classList.add("is-invalid");
+    return;
+  }
+
+  updateChatTextColorUi(normalizeHexColor(chatTextHexInput.value, DEFAULT_CHAT_TEXT_COLOR));
   applyCurrentOptions();
 }
 
@@ -673,10 +834,36 @@ function handleHexInput() {
   hexInput.classList.toggle("is-invalid", !isPendingHexInput(hexInput.value));
 }
 
+function handleChatTextHexInput() {
+  if (!chatTextHexInput.value.trim()) {
+    chatTextHexInput.classList.remove("is-invalid");
+    return;
+  }
+
+  if (isCompleteHexInput(chatTextHexInput.value)) {
+    updateChatTextColorUi(
+      normalizeHexColor(chatTextHexInput.value, DEFAULT_CHAT_TEXT_COLOR),
+      { syncInput: false }
+    );
+    chatTextHexInput.classList.remove("is-invalid");
+    scheduleChatTextColorApply();
+    return;
+  }
+
+  chatTextHexInput.classList.toggle("is-invalid", !isPendingHexInput(chatTextHexInput.value));
+}
+
 function handleHexKeyDown(event) {
   if (event.key === "Enter") {
     commitHexInput();
     hexInput.blur();
+  }
+}
+
+function handleChatTextHexKeyDown(event) {
+  if (event.key === "Enter") {
+    commitChatTextHexInput();
+    chatTextHexInput.blur();
   }
 }
 
@@ -689,8 +876,22 @@ function handleHexBlur() {
   updateColorUi(currentColor);
 }
 
+function handleChatTextHexBlur() {
+  if (isValidHexInput(chatTextHexInput.value)) {
+    commitChatTextHexInput();
+    return;
+  }
+
+  updateChatTextColorUi(currentChatTextColor);
+}
+
 async function handleResetColor() {
   updateColorUi(DEFAULT_CHAT_BOX_COLOR);
+  await applyCurrentOptions();
+}
+
+async function handleResetChatTextColor() {
+  updateChatTextColorUi(DEFAULT_CHAT_TEXT_COLOR);
   await applyCurrentOptions();
 }
 
@@ -722,8 +923,13 @@ async function init() {
   colorField.addEventListener("pointerdown", handleColorFieldPointerDown);
   colorField.addEventListener("pointermove", handleColorFieldPointerMove);
   hueSlider.addEventListener("input", handleHueChange);
+  chatTextColorField.addEventListener("pointerdown", handleChatTextColorFieldPointerDown);
+  chatTextColorField.addEventListener("pointermove", handleChatTextColorFieldPointerMove);
+  chatTextHueSlider.addEventListener("input", handleChatTextHueChange);
   toggleChatBoxColorPanelButton.addEventListener("click", handleChatBoxColorPanelToggle);
   toggleChatFontSizePanelButton.addEventListener("click", handleChatFontSizePanelToggle);
+  toggleChatTextStylePanelButton.addEventListener("click", handleChatTextStylePanelToggle);
+  toggleChatTextColorPanelButton.addEventListener("click", handleChatTextColorPanelToggle);
   chatFontSizeSlider.addEventListener("input", handleChatFontSizeInput);
   resetChatFontSizeButton.addEventListener("click", handleResetChatFontSize);
   nicknameFontSizeSlider.addEventListener("input", handleNicknameFontSizeInput);
@@ -731,7 +937,11 @@ async function init() {
   hexInput.addEventListener("input", handleHexInput);
   hexInput.addEventListener("keydown", handleHexKeyDown);
   hexInput.addEventListener("blur", handleHexBlur);
+  chatTextHexInput.addEventListener("input", handleChatTextHexInput);
+  chatTextHexInput.addEventListener("keydown", handleChatTextHexKeyDown);
+  chatTextHexInput.addEventListener("blur", handleChatTextHexBlur);
   resetColorButton.addEventListener("click", handleResetColor);
+  resetChatTextColorButton.addEventListener("click", handleResetChatTextColor);
 }
 
 init().catch(() => {

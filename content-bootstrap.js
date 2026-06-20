@@ -24,6 +24,7 @@ var UI_SYNC_DELAY_MS = 100;
 var THEME_SYNC_INTERVAL_MS = 3000;
 var GENERATED_TIMESTAMP_ATTR = "data-chzzk-chat-ui-toggle-generated-timestamp";
 var MESSAGE_PREFIX_ATTR = "data-chzzk-chat-ui-toggle-prefix";
+var MESSAGE_TEXT_ATTR = "data-chzzk-chat-ui-toggle-message-text";
 var NICKNAME_COLOR_MESSAGE_ATTR = "data-chzzk-chat-ui-toggle-nickname-color-message";
 var GUEST_CHAT_FRAME_CONTAINER_ID = "chzzk-chat-ui-toggle-guest-chat-frame-container";
 var GUEST_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-guest-chat-frame";
@@ -79,6 +80,7 @@ var MINI_CHAT_SCALE_DEFAULT = 100;
 var CHAT_FONT_SIZE_PT_MIN = 8;
 var CHAT_FONT_SIZE_PT_MAX = 36;
 var CHAT_FONT_SIZE_PT_DEFAULT = 13;
+var CHAT_TEXT_COLOR_DEFAULT = "#101418";
 var GUEST_CHAT_NATIVE_THEME_CLASSES = ["light", "dark", "theme_light", "theme_dark"];
 var GUEST_CHAT_TOGGLE_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-toggle";
 var GUEST_CHAT_TOGGLE_BUTTON_ICON_CLASS = "chzzk-chat-ui-toggle-guest-chat-toggle__icon";
@@ -115,6 +117,8 @@ var DEFAULT_OPTIONS = {
   useNicknameFontSize: false,
   nicknameFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT,
   showBoldText: false,
+  useChatTextColor: false,
+  chatTextColor: CHAT_TEXT_COLOR_DEFAULT,
   useNicknameColorForMessage: false,
   chatBoxColor: "#808080"
 };
@@ -135,6 +139,7 @@ var DATASET_KEYS = {
   showLargeText: "chzzkChatUiToggleLargeText",
   useNicknameFontSize: "chzzkChatUiToggleNicknameFontSize",
   showBoldText: "chzzkChatUiToggleBoldText",
+  useChatTextColor: "chzzkChatUiToggleChatTextColor",
   useNicknameColorForMessage: "chzzkChatUiToggleNicknameColorMessage"
 };
 

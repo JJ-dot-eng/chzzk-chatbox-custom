@@ -20,6 +20,7 @@ function applyOptions(options, { markAsReady = true, cache = true, source = "dir
 
   document.documentElement.dataset.chzzkChatUiToggleVersion = SCRIPT_VERSION;
   document.documentElement.dataset.chzzkChatUiToggleChatBoxColor = currentOptions.chatBoxColor;
+  document.documentElement.dataset.chzzkChatUiToggleChatTextColor = currentOptions.chatTextColor;
   document.documentElement.dataset.chzzkChatUiToggleChatFontSizePt =
     String(currentOptions.chatFontSizePt);
   document.documentElement.dataset.chzzkChatUiToggleNicknameFontSizePt =
@@ -34,6 +35,10 @@ function applyOptions(options, { markAsReady = true, cache = true, source = "dir
   document.documentElement.style.setProperty(
     "--chzzk-chat-ui-toggle-box-bg-hover",
     hexToRgba(currentOptions.chatBoxColor, 0.26)
+  );
+  document.documentElement.style.setProperty(
+    "--chzzk-chat-ui-toggle-chat-text-color",
+    currentOptions.chatTextColor
   );
   document.documentElement.style.setProperty(
     "--chzzk-chat-ui-toggle-mini-chat-scale",

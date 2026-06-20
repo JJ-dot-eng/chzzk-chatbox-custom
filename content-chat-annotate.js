@@ -38,6 +38,7 @@ function addRole(element, role) {
 function removeAnnotations(element) {
   element.removeAttribute(ROLE_ATTR);
   element.removeAttribute(MESSAGE_PREFIX_ATTR);
+  element.removeAttribute(MESSAGE_TEXT_ATTR);
   element.removeAttribute(NICKNAME_COLOR_MESSAGE_ATTR);
   element.removeAttribute(MINI_CHAT_HIDDEN_CONTROL_ATTR);
   element.removeAttribute(NON_CHAT_PANEL_ATTR);
@@ -744,6 +745,14 @@ function getNicknameTextElement(row) {
   return candidates.find((element) => !candidates.some((candidate) => candidate !== element && element.contains(candidate)));
 }
 
+function annotateMessageText(row) {
+  const messageText = getMessageTextElement(row);
+
+  if (messageText instanceof HTMLElement) {
+    messageText.setAttribute(MESSAGE_TEXT_ATTR, "true");
+  }
+}
+
 function clearNicknameColorMessage(row) {
   if (!(row instanceof HTMLElement)) {
     return;
@@ -902,6 +911,7 @@ function annotateChatRow(row) {
   annotateSelectorTargets(row, "badge");
   annotateLeadingBadges(row);
   annotateSelectorTargets(row, "nickname");
+  annotateMessageText(row);
   syncNicknameColorMessage(row);
 }
 
@@ -983,6 +993,7 @@ function cleanupUnscopedAnnotations(root = document) {
     `[${CHAT_ROW_ATTR}="true"]`,
     `[${ROLE_ATTR}]`,
     `[${MESSAGE_PREFIX_ATTR}]`,
+    `[${MESSAGE_TEXT_ATTR}]`,
     `[${GENERATED_TIMESTAMP_ATTR}]`
   ]);
 
