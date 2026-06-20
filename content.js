@@ -1,5 +1,5 @@
 (() => {
-  const SCRIPT_VERSION = "0.3.15";
+  const SCRIPT_VERSION = "0.3.16";
   const GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 
   if (window[GLOBAL_KEY]) {
@@ -242,7 +242,9 @@
       "[aria-label*='닉네임' i]",
       "[class*='nickname' i]",
       "[class*='live_chatting_username' i]",
-      "button[class*='live_chatting_message_nickname' i] [class*='name_text' i]"
+      "button[class*='live_chatting_message_nickname' i] [class*='name_text' i]",
+      "button[class*='live_chatting_message_nickname' i] [class*='_text_' i]",
+      "button[class*='nickname' i] [class*='_text_' i]"
     ],
     badge: [
       "[data-testid*='badge' i]",

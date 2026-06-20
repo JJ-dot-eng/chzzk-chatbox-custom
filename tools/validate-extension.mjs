@@ -129,6 +129,7 @@ for (const token of [
   '"[role=\'log\'] [class*=\'_item_\' i]:has([class*=\'_chatting_message_\' i])"',
   "function getMessageContainerElement(row)",
   "function getNicknameButtonElement(row)",
+  "\"button[class*='nickname' i] [class*='_text_' i]\"",
   "function isDonationRankingPanel(element)",
   "function isChatHeaderCandidate(element",
   "function findChatHeaderInHost(host",
