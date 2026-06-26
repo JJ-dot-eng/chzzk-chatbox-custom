@@ -1,4 +1,4 @@
-var SCRIPT_VERSION = "0.4.4";
+var SCRIPT_VERSION = "0.4.5";
 var GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 var CHZZK_CHAT_UI_TOGGLE_SHOULD_START = !window[GLOBAL_KEY];
 
@@ -123,6 +123,7 @@ var DEFAULT_OPTIONS = {
   useNicknameFontSize: false,
   nicknameFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT,
   showBoldText: false,
+  useAutoTextContrast: false,
   useChatTextColor: false,
   chatTextColor: CHAT_TEXT_COLOR_DEFAULT,
   useNicknameColorForMessage: false,
@@ -145,6 +146,7 @@ var DATASET_KEYS = {
   showLargeText: "chzzkChatUiToggleLargeText",
   useNicknameFontSize: "chzzkChatUiToggleNicknameFontSize",
   showBoldText: "chzzkChatUiToggleBoldText",
+  useAutoTextContrast: "chzzkChatUiToggleAutoTextContrast",
   useChatTextColor: "chzzkChatUiToggleChatTextColor",
   useNicknameColorForMessage: "chzzkChatUiToggleNicknameColorMessage"
 };

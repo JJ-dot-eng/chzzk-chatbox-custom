@@ -987,7 +987,7 @@ function syncNicknameColorMessage(row) {
 function syncAutoContrast(row) {
   clearAutoContrast(row);
 
-  if (currentOptions.showChatBoxes !== true) {
+  if (currentOptions.showChatBoxes !== true || currentOptions.useAutoTextContrast !== true) {
     return;
   }
 

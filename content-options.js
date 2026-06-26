@@ -159,6 +159,7 @@ function normalizeOptions(options) {
     useNicknameFontSize: options?.useNicknameFontSize === true,
     nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt),
     showBoldText: options?.showBoldText === true || legacyBoldText,
+    useAutoTextContrast: options?.useAutoTextContrast === true,
     useChatTextColor: options?.useChatTextColor === true,
     chatTextColor: normalizeHexColor(options?.chatTextColor, DEFAULT_OPTIONS.chatTextColor),
     useNicknameColorForMessage: options?.useNicknameColorForMessage === true,

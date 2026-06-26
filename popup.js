@@ -1,5 +1,5 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
-const CONTENT_VERSION = "0.4.4";
+const CONTENT_VERSION = "0.4.5";
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const DEFAULT_CHAT_TEXT_COLOR = "#101418";
 const MINI_CHAT_MIN_WIDTH = 280;
@@ -51,6 +51,7 @@ const DEFAULT_OPTIONS = {
   useNicknameFontSize: false,
   nicknameFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT,
   showBoldText: false,
+  useAutoTextContrast: false,
   useChatTextColor: false,
   chatTextColor: DEFAULT_CHAT_TEXT_COLOR,
   useNicknameColorForMessage: false,
@@ -72,6 +73,7 @@ const controlIds = [
   "showLargeText",
   "useNicknameFontSize",
   "showBoldText",
+  "useAutoTextContrast",
   "useChatTextColor",
   "useNicknameColorForMessage"
 ];
@@ -351,6 +353,7 @@ function normalizeOptions(options) {
     useNicknameFontSize: options?.useNicknameFontSize === true,
     nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt),
     showBoldText: options?.showBoldText === true || legacyBoldText,
+    useAutoTextContrast: options?.useAutoTextContrast === true,
     useChatTextColor: options?.useChatTextColor === true,
     chatTextColor: normalizeHexColor(options?.chatTextColor, DEFAULT_CHAT_TEXT_COLOR),
     useNicknameColorForMessage: options?.useNicknameColorForMessage === true,
@@ -558,6 +561,7 @@ function readControls() {
     useNicknameFontSize: controls.useNicknameFontSize.checked,
     nicknameFontSizePt: nicknameFontSizeSlider.value,
     showBoldText: controls.showBoldText.checked,
+    useAutoTextContrast: controls.useAutoTextContrast.checked,
     useChatTextColor: controls.useChatTextColor.checked,
     chatTextColor: currentChatTextColor,
     useNicknameColorForMessage: controls.useNicknameColorForMessage.checked,
