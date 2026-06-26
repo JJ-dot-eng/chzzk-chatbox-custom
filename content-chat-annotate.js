@@ -40,6 +40,7 @@ function removeAnnotations(element) {
   element.removeAttribute(MESSAGE_PREFIX_ATTR);
   element.removeAttribute(MESSAGE_TEXT_ATTR);
   element.removeAttribute(NICKNAME_COLOR_MESSAGE_ATTR);
+  element.removeAttribute(AUTO_CONTRAST_ATTR);
   element.removeAttribute(MINI_CHAT_HIDDEN_CONTROL_ATTR);
   element.removeAttribute(NON_CHAT_PANEL_ATTR);
   element.removeAttribute(MINI_CHAT_COMPACT_INPUT_ATTR);
@@ -53,6 +54,7 @@ function removeAnnotations(element) {
 
   if (element instanceof HTMLElement) {
     element.style.removeProperty("--chzzk-chat-ui-toggle-nickname-color");
+    clearAutoContrast(element);
     clearLargeTextRowLayout(element);
   }
 
@@ -762,6 +764,173 @@ function clearNicknameColorMessage(row) {
   row.style.removeProperty("--chzzk-chat-ui-toggle-nickname-color");
 }
 
+var autoContrastCache = new Map();
+
+function clearAutoContrast(row) {
+  if (!(row instanceof HTMLElement)) {
+    return;
+  }
+
+  row.removeAttribute(AUTO_CONTRAST_ATTR);
+  row.style.removeProperty("--chzzk-chat-ui-toggle-auto-nickname-color");
+  row.style.removeProperty("--chzzk-chat-ui-toggle-auto-message-color");
+}
+
+function parseCssRgbColorForContrast(color) {
+  const normalizedColor = String(color || "").trim();
+
+  if (/^#?[0-9a-f]{3}$/i.test(normalizedColor) || /^#?[0-9a-f]{6}$/i.test(normalizedColor)) {
+    return {
+      ...hexToRgb(normalizedColor),
+      alpha: 1
+    };
+  }
+
+  const match = normalizedColor.match(/rgba?\(([^)]+)\)/i);
+
+  if (!match) {
+    return null;
+  }
+
+  const parts = match[1].split(",").map((part) => Number.parseFloat(part.trim()));
+
+  if (parts.length < 3 || parts.slice(0, 3).some((part) => !Number.isFinite(part))) {
+    return null;
+  }
+
+  const alpha = parts.length >= 4 && Number.isFinite(parts[3]) ? parts[3] : 1;
+
+  if (alpha <= 0.05) {
+    return null;
+  }
+
+  return {
+    red: Math.max(0, Math.min(255, parts[0])),
+    green: Math.max(0, Math.min(255, parts[1])),
+    blue: Math.max(0, Math.min(255, parts[2])),
+    alpha: Math.max(0, Math.min(1, alpha))
+  };
+}
+
+function blendRgb(foreground, background, alpha = 1) {
+  const clampedAlpha = Math.max(0, Math.min(1, alpha));
+
+  return {
+    red: foreground.red * clampedAlpha + background.red * (1 - clampedAlpha),
+    green: foreground.green * clampedAlpha + background.green * (1 - clampedAlpha),
+    blue: foreground.blue * clampedAlpha + background.blue * (1 - clampedAlpha)
+  };
+}
+
+function getContrastRatio(foreground, background) {
+  const foregroundLuminance = getRelativeLuminance(foreground);
+  const backgroundLuminance = getRelativeLuminance(background);
+  const lighter = Math.max(foregroundLuminance, backgroundLuminance);
+  const darker = Math.min(foregroundLuminance, backgroundLuminance);
+
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function getRgbDistance(first, second) {
+  return Math.hypot(
+    first.red - second.red,
+    first.green - second.green,
+    first.blue - second.blue
+  );
+}
+
+function isNearNeutralRgb(color) {
+  return Math.max(color.red, color.green, color.blue) - Math.min(color.red, color.green, color.blue) <=
+    AUTO_CONTRAST_NEUTRAL_CHANNEL_DELTA;
+}
+
+function getChatBoxContrastBackgroundRgb() {
+  const boxColor = hexToRgb(currentOptions.chatBoxColor);
+  const detectedTheme = document.documentElement.dataset.chzzkChatUiToggleDetectedTheme;
+  const backdrop = detectedTheme === "dark"
+    ? { red: 16, green: 20, blue: 24 }
+    : { red: 255, green: 255, blue: 255 };
+
+  return blendRgb(boxColor, backdrop, CHAT_BOX_ALPHA);
+}
+
+function getAutoContrastCacheKey(textRgb, backgroundRgb) {
+  return [
+    Math.round(textRgb.red),
+    Math.round(textRgb.green),
+    Math.round(textRgb.blue),
+    Math.round(backgroundRgb.red),
+    Math.round(backgroundRgb.green),
+    Math.round(backgroundRgb.blue)
+  ].join(",");
+}
+
+function rememberAutoContrastResult(key, value) {
+  autoContrastCache.set(key, value);
+
+  if (autoContrastCache.size <= AUTO_CONTRAST_CACHE_LIMIT) {
+    return;
+  }
+
+  const oldestKey = autoContrastCache.keys().next().value;
+
+  if (oldestKey) {
+    autoContrastCache.delete(oldestKey);
+  }
+}
+
+function getReadableContrastColor(backgroundRgb) {
+  const black = { red: 0, green: 0, blue: 0 };
+  const white = { red: 255, green: 255, blue: 255 };
+
+  return getContrastRatio(black, backgroundRgb) >= getContrastRatio(white, backgroundRgb)
+    ? "#000000"
+    : "#ffffff";
+}
+
+function getAutoContrastColor(color, backgroundRgb) {
+  const parsedColor = parseCssRgbColorForContrast(color);
+
+  if (!parsedColor) {
+    return null;
+  }
+
+  const textRgb = parsedColor.alpha < 1
+    ? blendRgb(parsedColor, backgroundRgb, parsedColor.alpha)
+    : parsedColor;
+  const cacheKey = getAutoContrastCacheKey(textRgb, backgroundRgb);
+
+  if (autoContrastCache.has(cacheKey)) {
+    return autoContrastCache.get(cacheKey);
+  }
+
+  const currentContrast = getContrastRatio(textRgb, backgroundRgb);
+  const shouldCorrect =
+    currentContrast < AUTO_CONTRAST_MIN_RATIO &&
+    (
+      isNearNeutralRgb(textRgb) ||
+      getRgbDistance(textRgb, backgroundRgb) <= AUTO_CONTRAST_NEAR_COLOR_DISTANCE
+    );
+  const result = shouldCorrect ? getReadableContrastColor(backgroundRgb) : null;
+
+  rememberAutoContrastResult(cacheKey, result);
+  return result;
+}
+
+function getElementTextColor(element) {
+  if (!(element instanceof Element)) {
+    return null;
+  }
+
+  try {
+    const color = getComputedStyle(element).color;
+
+    return isUsableCssColor(color) ? color : null;
+  } catch (_error) {
+    return null;
+  }
+}
+
 function isUsableCssColor(color) {
   const normalized = String(color || "").replace(/\s+/g, "").toLowerCase();
 
@@ -779,17 +948,19 @@ function isUsableCssColor(color) {
 function getNicknameTextColor(row) {
   const nickname = getNicknameTextElement(row);
 
-  if (!(nickname instanceof Element)) {
-    return null;
+  return getElementTextColor(nickname);
+}
+
+function getMessageBaseTextColor(row) {
+  if (currentOptions.useNicknameColorForMessage === true) {
+    return getNicknameTextColor(row);
   }
 
-  try {
-    const color = getComputedStyle(nickname).color;
-
-    return isUsableCssColor(color) ? color : null;
-  } catch (_error) {
-    return null;
+  if (currentOptions.useChatTextColor === true) {
+    return currentOptions.chatTextColor;
   }
+
+  return getElementTextColor(getMessageTextElement(row));
 }
 
 function syncNicknameColorMessage(row) {
@@ -811,6 +982,37 @@ function syncNicknameColorMessage(row) {
 
   row.setAttribute(NICKNAME_COLOR_MESSAGE_ATTR, "true");
   row.style.setProperty("--chzzk-chat-ui-toggle-nickname-color", color);
+}
+
+function syncAutoContrast(row) {
+  clearAutoContrast(row);
+
+  if (currentOptions.showChatBoxes !== true) {
+    return;
+  }
+
+  const backgroundRgb = getChatBoxContrastBackgroundRgb();
+  const contrastRoles = [];
+  const nicknameColor = getNicknameTextColor(row);
+  const autoNicknameColor = getAutoContrastColor(nicknameColor, backgroundRgb);
+
+  if (autoNicknameColor) {
+    contrastRoles.push("nickname");
+    row.style.setProperty("--chzzk-chat-ui-toggle-auto-nickname-color", autoNicknameColor);
+  }
+
+  const messageText = getMessageTextElement(row);
+  const messageColor = messageText instanceof HTMLElement ? getMessageBaseTextColor(row) : null;
+  const autoMessageColor = getAutoContrastColor(messageColor, backgroundRgb);
+
+  if (autoMessageColor) {
+    contrastRoles.push("message");
+    row.style.setProperty("--chzzk-chat-ui-toggle-auto-message-color", autoMessageColor);
+  }
+
+  if (contrastRoles.length > 0) {
+    row.setAttribute(AUTO_CONTRAST_ATTR, contrastRoles.join(" "));
+  }
 }
 
 function getMessagePrefixAnchor(row, nickname) {
@@ -913,6 +1115,7 @@ function annotateChatRow(row) {
   annotateSelectorTargets(row, "nickname");
   annotateMessageText(row);
   syncNicknameColorMessage(row);
+  syncAutoContrast(row);
 }
 
 function clearLargeTextRowLayout(row) {
@@ -994,6 +1197,7 @@ function cleanupUnscopedAnnotations(root = document) {
     `[${ROLE_ATTR}]`,
     `[${MESSAGE_PREFIX_ATTR}]`,
     `[${MESSAGE_TEXT_ATTR}]`,
+    `[${AUTO_CONTRAST_ATTR}]`,
     `[${GENERATED_TIMESTAMP_ATTR}]`
   ]);
 

@@ -30,7 +30,7 @@ function applyOptions(options, { markAsReady = true, cache = true, source = "dir
 
   document.documentElement.style.setProperty(
     "--chzzk-chat-ui-toggle-box-bg",
-    hexToRgba(currentOptions.chatBoxColor, 0.18)
+    hexToRgba(currentOptions.chatBoxColor, CHAT_BOX_ALPHA)
   );
   document.documentElement.style.setProperty(
     "--chzzk-chat-ui-toggle-box-bg-hover",

@@ -1,4 +1,4 @@
-var SCRIPT_VERSION = "0.4.3";
+var SCRIPT_VERSION = "0.4.4";
 var GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 var CHZZK_CHAT_UI_TOGGLE_SHOULD_START = !window[GLOBAL_KEY];
 
@@ -26,6 +26,7 @@ var GENERATED_TIMESTAMP_ATTR = "data-chzzk-chat-ui-toggle-generated-timestamp";
 var MESSAGE_PREFIX_ATTR = "data-chzzk-chat-ui-toggle-prefix";
 var MESSAGE_TEXT_ATTR = "data-chzzk-chat-ui-toggle-message-text";
 var NICKNAME_COLOR_MESSAGE_ATTR = "data-chzzk-chat-ui-toggle-nickname-color-message";
+var AUTO_CONTRAST_ATTR = "data-chzzk-chat-ui-toggle-auto-contrast";
 var GUEST_CHAT_FRAME_CONTAINER_ID = "chzzk-chat-ui-toggle-guest-chat-frame-container";
 var GUEST_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-guest-chat-frame";
 var MINI_CHAT_PANEL_ID = "chzzk-chat-ui-toggle-mini-chat-panel";
@@ -81,6 +82,11 @@ var CHAT_FONT_SIZE_PT_MIN = 8;
 var CHAT_FONT_SIZE_PT_MAX = 36;
 var CHAT_FONT_SIZE_PT_DEFAULT = 13;
 var CHAT_TEXT_COLOR_DEFAULT = "#101418";
+var CHAT_BOX_ALPHA = 0.18;
+var AUTO_CONTRAST_MIN_RATIO = 3;
+var AUTO_CONTRAST_NEAR_COLOR_DISTANCE = 96;
+var AUTO_CONTRAST_NEUTRAL_CHANNEL_DELTA = 32;
+var AUTO_CONTRAST_CACHE_LIMIT = 180;
 var GUEST_CHAT_NATIVE_THEME_CLASSES = ["light", "dark", "theme_light", "theme_dark"];
 var GUEST_CHAT_TOGGLE_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-toggle";
 var GUEST_CHAT_TOGGLE_BUTTON_ICON_CLASS = "chzzk-chat-ui-toggle-guest-chat-toggle__icon";

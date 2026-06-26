@@ -215,7 +215,14 @@ for (const token of [
   '"--chzzk-chat-ui-toggle-chat-emote-size"',
   '"--chzzk-chat-ui-toggle-mini-chat-scale"',
   '"--chzzk-chat-ui-toggle-chat-text-color"',
-  '"--chzzk-chat-ui-toggle-nickname-color"'
+  '"--chzzk-chat-ui-toggle-nickname-color"',
+  '"--chzzk-chat-ui-toggle-auto-nickname-color"',
+  '"--chzzk-chat-ui-toggle-auto-message-color"',
+  "function syncAutoContrast(row)",
+  "var autoContrastCache = new Map();",
+  "AUTO_CONTRAST_CACHE_LIMIT",
+  "getAutoContrastColor(",
+  "getReadableContrastColor("
 ]) {
   assertIncludes(contentSource, token, "content script must expose status and runtime CSS variables");
 }
@@ -231,7 +238,10 @@ for (const token of [
   "data-chzzk-chat-ui-toggle-message-text",
   "data-chzzk-chat-ui-toggle-chat-text-color",
   "data-chzzk-chat-ui-toggle-nickname-color-message",
+  "data-chzzk-chat-ui-toggle-auto-contrast",
   "color: var(--chzzk-chat-ui-toggle-chat-text-color) !important;",
+  "color: var(--chzzk-chat-ui-toggle-auto-nickname-color) !important;",
+  "color: var(--chzzk-chat-ui-toggle-auto-message-color) !important;",
   "font-size: var(--chzzk-chat-ui-toggle-chat-font-size, 13pt) !important;",
   "transform: scale(var(--chzzk-chat-ui-toggle-mini-chat-scale, 1)) !important;",
   "#chzzk-chat-ui-toggle-mini-chat-panel",

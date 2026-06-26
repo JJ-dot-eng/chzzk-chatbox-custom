@@ -902,6 +902,18 @@ html[data-chzzk-chat-ui-toggle-nickname-color-message="on"]
   color: var(--chzzk-chat-ui-toggle-nickname-color) !important;
 }
 
+html[data-chzzk-chat-ui-toggle-chat-boxes="on"]
+  :is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i])[data-chzzk-chat-ui-toggle-chat-row="true"][data-chzzk-chat-ui-toggle-auto-contrast~="nickname"]
+  :where([data-chzzk-chat-ui-toggle-role~="nickname"], [data-chzzk-chat-ui-toggle-role~="nickname"] *) {
+  color: var(--chzzk-chat-ui-toggle-auto-nickname-color) !important;
+}
+
+html[data-chzzk-chat-ui-toggle-chat-boxes="on"]
+  :is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i])[data-chzzk-chat-ui-toggle-chat-row="true"][data-chzzk-chat-ui-toggle-auto-contrast~="message"]
+  [data-chzzk-chat-ui-toggle-message-text="true"] {
+  color: var(--chzzk-chat-ui-toggle-auto-message-color) !important;
+}
+
 html[data-chzzk-chat-ui-toggle-large-text="on"]
   :is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i]):has(:is([class*="live_chatting_message_container" i], [class*="_chatting_message_" i])) {
   display: flex !important;
