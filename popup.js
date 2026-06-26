@@ -99,6 +99,9 @@ const resetChatTextColorButton = document.getElementById("resetChatTextColor");
 const chatTextColorField = document.getElementById("chatTextColorField");
 const chatTextColorFieldHandle = document.getElementById("chatTextColorFieldHandle");
 const chatTextHueSlider = document.getElementById("chatTextHueSlider");
+const nicknameColorMessageToggleRow = controls.useNicknameColorForMessage.closest(
+  ".text-style-control__toggle"
+);
 const chatFontSizeSlider = document.getElementById("chatFontSizePt");
 const chatFontSizeValue = document.getElementById("chatFontSizeValue");
 const resetChatFontSizeButton = document.getElementById("resetChatFontSize");
@@ -324,6 +327,7 @@ function normalizeChatFontSizePt(value) {
 function normalizeOptions(options) {
   const legacyBoldText = options?.showBoldText === undefined && options?.showLargeText === true;
   const miniFloatingChatInputOnly = options?.miniFloatingChatInputOnly === true;
+  const useChatTextColor = options?.useChatTextColor === true;
   const showNonChatPanels =
     options?.showNonChatPanels !== undefined
       ? options.showNonChatPanels !== false
@@ -354,9 +358,9 @@ function normalizeOptions(options) {
     nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt),
     showBoldText: options?.showBoldText === true || legacyBoldText,
     useAutoTextContrast: options?.useAutoTextContrast === true,
-    useChatTextColor: options?.useChatTextColor === true,
+    useChatTextColor,
     chatTextColor: normalizeHexColor(options?.chatTextColor, DEFAULT_CHAT_TEXT_COLOR),
-    useNicknameColorForMessage: options?.useNicknameColorForMessage === true,
+    useNicknameColorForMessage: useChatTextColor && options?.useNicknameColorForMessage === true,
     chatBoxColor: normalizeHexColor(options?.chatBoxColor, DEFAULT_CHAT_BOX_COLOR)
   };
 }
@@ -527,7 +531,9 @@ function syncDependentControls(options = currentOptions) {
   resetNicknameFontSizeButton.disabled = !isNicknameFontSizeEnabled;
   nicknameFontSizeControl.classList.toggle("is-disabled", !isNicknameFontSizeEnabled);
 
-  const shouldDisableChatTextColor = options.useNicknameColorForMessage === true;
+  const isChatTextColorEnabled = options.useChatTextColor === true;
+  const shouldDisableChatTextColor =
+    !isChatTextColorEnabled || options.useNicknameColorForMessage === true;
   const chatTextColorControls = [
     chatTextHexInput,
     resetChatTextColorButton,
@@ -539,6 +545,12 @@ function syncDependentControls(options = currentOptions) {
     control.disabled = shouldDisableChatTextColor;
   }
 
+  if (!isChatTextColorEnabled) {
+    controls.useNicknameColorForMessage.checked = false;
+  }
+
+  controls.useNicknameColorForMessage.disabled = !isChatTextColorEnabled;
+  nicknameColorMessageToggleRow?.classList.toggle("is-disabled", !isChatTextColorEnabled);
   chatTextColorPanel.classList.toggle("is-disabled", shouldDisableChatTextColor);
 }
 
@@ -564,7 +576,8 @@ function readControls() {
     useAutoTextContrast: controls.useAutoTextContrast.checked,
     useChatTextColor: controls.useChatTextColor.checked,
     chatTextColor: currentChatTextColor,
-    useNicknameColorForMessage: controls.useNicknameColorForMessage.checked,
+    useNicknameColorForMessage:
+      controls.useChatTextColor.checked && controls.useNicknameColorForMessage.checked,
     chatBoxColor: currentColor
   });
 }

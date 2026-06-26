@@ -130,6 +130,7 @@ function normalizeChatFontSizePt(value) {
 function normalizeOptions(options) {
   const legacyBoldText = options?.showBoldText === undefined && options?.showLargeText === true;
   const miniFloatingChatInputOnly = options?.miniFloatingChatInputOnly === true;
+  const useChatTextColor = options?.useChatTextColor === true;
   const showNonChatPanels =
     options?.showNonChatPanels !== undefined
       ? options.showNonChatPanels !== false
@@ -160,9 +161,9 @@ function normalizeOptions(options) {
     nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt),
     showBoldText: options?.showBoldText === true || legacyBoldText,
     useAutoTextContrast: options?.useAutoTextContrast === true,
-    useChatTextColor: options?.useChatTextColor === true,
+    useChatTextColor,
     chatTextColor: normalizeHexColor(options?.chatTextColor, DEFAULT_OPTIONS.chatTextColor),
-    useNicknameColorForMessage: options?.useNicknameColorForMessage === true,
+    useNicknameColorForMessage: useChatTextColor && options?.useNicknameColorForMessage === true,
     chatBoxColor: normalizeHexColor(options?.chatBoxColor, DEFAULT_OPTIONS.chatBoxColor)
   };
 }

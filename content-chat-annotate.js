@@ -952,7 +952,10 @@ function getNicknameTextColor(row) {
 }
 
 function getMessageBaseTextColor(row) {
-  if (currentOptions.useNicknameColorForMessage === true) {
+  if (
+    currentOptions.useChatTextColor === true &&
+    currentOptions.useNicknameColorForMessage === true
+  ) {
     return getNicknameTextColor(row);
   }
 
@@ -966,7 +969,10 @@ function getMessageBaseTextColor(row) {
 function syncNicknameColorMessage(row) {
   clearNicknameColorMessage(row);
 
-  if (currentOptions.useNicknameColorForMessage !== true) {
+  if (
+    currentOptions.useChatTextColor !== true ||
+    currentOptions.useNicknameColorForMessage !== true
+  ) {
     return;
   }
 

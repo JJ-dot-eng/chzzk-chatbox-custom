@@ -88,6 +88,7 @@ function normalizeHexColor(value, fallback = DEFAULT_CHAT_BOX_COLOR) {
 function normalizeOptions(options) {
   const legacyBoldText = options?.showBoldText === undefined && options?.showLargeText === true;
   const miniFloatingChatInputOnly = options?.miniFloatingChatInputOnly === true;
+  const useChatTextColor = options?.useChatTextColor === true;
   const showNonChatPanels =
     options?.showNonChatPanels !== undefined
       ? options.showNonChatPanels !== false
@@ -118,9 +119,9 @@ function normalizeOptions(options) {
     nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt),
     showBoldText: options?.showBoldText === true || legacyBoldText,
     useAutoTextContrast: options?.useAutoTextContrast === true,
-    useChatTextColor: options?.useChatTextColor === true,
+    useChatTextColor,
     chatTextColor: normalizeHexColor(options?.chatTextColor, DEFAULT_CHAT_TEXT_COLOR),
-    useNicknameColorForMessage: options?.useNicknameColorForMessage === true,
+    useNicknameColorForMessage: useChatTextColor && options?.useNicknameColorForMessage === true,
     chatBoxColor: normalizeHexColor(options?.chatBoxColor, DEFAULT_CHAT_BOX_COLOR)
   };
 }

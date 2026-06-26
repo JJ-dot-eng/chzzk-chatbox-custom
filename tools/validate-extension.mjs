@@ -218,6 +218,8 @@ for (const token of [
   '"--chzzk-chat-ui-toggle-nickname-color"',
   '"--chzzk-chat-ui-toggle-auto-nickname-color"',
   '"--chzzk-chat-ui-toggle-auto-message-color"',
+  "const useChatTextColor = options?.useChatTextColor === true;",
+  "useNicknameColorForMessage: useChatTextColor && options?.useNicknameColorForMessage === true",
   'useAutoTextContrast: options?.useAutoTextContrast === true',
   "function syncAutoContrast(row)",
   "var autoContrastCache = new Map();",
@@ -284,6 +286,14 @@ for (const token of [
   'id="useNicknameColorForMessage"'
 ]) {
   assertIncludes(popupMarkup, token, "popup markup must keep expected controls");
+}
+
+for (const token of [
+  "controls.useNicknameColorForMessage.disabled = !isChatTextColorEnabled;",
+  "controls.useNicknameColorForMessage.checked = false;",
+  "nicknameColorMessageToggleRow?.classList.toggle(\"is-disabled\", !isChatTextColorEnabled);"
+]) {
+  assertIncludes(popupSource, token, "popup must keep nickname-color message as a child of text color changes");
 }
 
 for (const token of [

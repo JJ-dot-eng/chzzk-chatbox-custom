@@ -171,7 +171,8 @@ h1 {
   cursor: default;
 }
 
-.toggle-row.is-disabled {
+.toggle-row.is-disabled,
+.text-style-control__toggle.is-disabled {
   opacity: 0.55;
   cursor: default;
 }
