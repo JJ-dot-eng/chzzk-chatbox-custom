@@ -283,29 +283,44 @@ for (const token of [
   'id="useChatTextColor"',
   'id="chatTextColorHex"',
   'id="toggleChatTextColorPanel"',
-  'id="useNicknameColorForMessage"'
+  'id="useNicknameColorForMessage"',
+  'data-view="home"',
+  'data-view="visibility"',
+  'data-view="style"',
+  'data-view="chat-mode"',
+  'id="chatPreview"'
 ]) {
   assertIncludes(popupMarkup, token, "popup markup must keep expected controls");
 }
 
 for (const token of [
-  "controls.useNicknameColorForMessage.disabled = !isChatTextColorEnabled;",
-  "controls.useNicknameColorForMessage.checked = false;",
-  "nicknameColorMessageToggleRow?.classList.toggle(\"is-disabled\", !isChatTextColorEnabled);"
+  "nicknameColorOption.disabled = !isChatTextColorEnabled;",
+  "nicknameColorOption.checked = currentOptions.useNicknameColorForMessage === true;",
+  'nicknameColorRow?.classList.toggle("is-disabled", !isChatTextColorEnabled);'
 ]) {
   assertIncludes(popupSource, token, "popup must keep nickname-color message as a child of text color changes");
 }
 
 for (const token of [
-  "body.is-chat-font-size-panel-expanded",
-  "body.is-chat-box-color-panel-expanded",
-  "body.is-chat-text-style-panel-expanded",
-  ".disclosure-button",
-  ".text-style-control",
-  ".color-picker--sub",
-  ".font-size-control__nested"
+  ".preview-card",
+  ".preset-chip",
+  ".nav-tile",
+  ".mode-card",
+  ".color-chip",
+  ".view.view--active",
+  ".quick-toggle"
 ]) {
-  assertIncludes(popupStyles, token, "popup styles must keep the adaptive settings layout");
+  assertIncludes(popupStyles, token, "popup styles must keep the redesigned settings layout");
+}
+
+for (const token of [
+  'data-option="showNicknames"',
+  "function navigate(viewName",
+  "PRESET_DEFINITIONS",
+  "function syncPreview()"
+]) {
+  const popupUiSource = `${popupMarkup}\n${popupSource}`;
+  assertIncludes(popupUiSource, token, "popup must keep the redesigned settings controller");
 }
 
 for (const token of [

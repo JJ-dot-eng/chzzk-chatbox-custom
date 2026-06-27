@@ -1,5 +1,7 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
+const PRESET_STORAGE_KEY = "chzzkChatUiToggleCustomPreset";
 const CONTENT_VERSION = "0.4.5";
+
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const DEFAULT_CHAT_TEXT_COLOR = "#101418";
 const MINI_CHAT_MIN_WIDTH = 280;
@@ -16,6 +18,17 @@ const MINI_CHAT_SCALE_DEFAULT = 100;
 const CHAT_FONT_SIZE_PT_MIN = 8;
 const CHAT_FONT_SIZE_PT_MAX = 36;
 const CHAT_FONT_SIZE_PT_DEFAULT = 13;
+
+const COLOR_CHIPS = [
+  { id: "gray", hex: "#808080" },
+  { id: "green", hex: "#00c471" },
+  { id: "blue", hex: "#4b8bff" },
+  { id: "purple", hex: "#8b5cf6" },
+  { id: "yellow", hex: "#f5bd23" },
+  { id: "white", hex: "#eef2f7" },
+  { id: "dark", hex: "#101418" }
+];
+
 const NAMED_CHAT_BOX_COLORS = {
   gray: "#808080",
   green: "#00c471",
@@ -58,73 +71,71 @@ const DEFAULT_OPTIONS = {
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR
 };
 
-const controlIds = [
-  "showNicknames",
-  "showBadges",
-  "showTimestamps",
-  "showNonChatPanels",
-  "showChatBoxes",
-  "useGuestChatFrame",
-  "useMiniFloatingChat",
-  "miniFloatingChatFullscreenOnly",
-  "showGuestChatToggleButton",
-  "showHeaderSettingsButton",
-  "showMiniFloatingChatButton",
-  "showLargeText",
-  "useNicknameFontSize",
-  "showBoldText",
-  "useAutoTextContrast",
-  "useChatTextColor",
-  "useNicknameColorForMessage"
-];
-const controls = Object.fromEntries(controlIds.map((id) => [id, document.getElementById(id)]));
-const tabButtons = [...document.querySelectorAll("[data-tab-target]")];
-const tabPanels = [...document.querySelectorAll(".tab-panel")];
-const colorPreview = document.getElementById("colorPreview");
-const hexInput = document.getElementById("chatBoxColorHex");
-const resetColorButton = document.getElementById("resetChatBoxColor");
-const chatBoxColorPanel = document.getElementById("chatBoxColorPanel");
-const toggleChatBoxColorPanelButton = document.getElementById("toggleChatBoxColorPanel");
-const colorField = document.getElementById("colorField");
-const colorFieldHandle = document.getElementById("colorFieldHandle");
-const hueSlider = document.getElementById("hueSlider");
-const chatTextStylePanel = document.getElementById("chatTextStylePanel");
-const toggleChatTextStylePanelButton = document.getElementById("toggleChatTextStylePanel");
-const chatTextColorControl = document.getElementById("chatTextColorControl");
-const chatTextColorPanel = document.getElementById("chatTextColorPanel");
-const toggleChatTextColorPanelButton = document.getElementById("toggleChatTextColorPanel");
-const chatTextColorPreview = document.getElementById("chatTextColorPreview");
-const chatTextHexInput = document.getElementById("chatTextColorHex");
-const resetChatTextColorButton = document.getElementById("resetChatTextColor");
-const chatTextColorField = document.getElementById("chatTextColorField");
-const chatTextColorFieldHandle = document.getElementById("chatTextColorFieldHandle");
-const chatTextHueSlider = document.getElementById("chatTextHueSlider");
-const nicknameColorMessageToggleRow = controls.useNicknameColorForMessage.closest(
-  ".text-style-control__toggle"
-);
-const chatFontSizeSlider = document.getElementById("chatFontSizePt");
-const chatFontSizeValue = document.getElementById("chatFontSizeValue");
-const resetChatFontSizeButton = document.getElementById("resetChatFontSize");
-const chatFontSizePanel = document.getElementById("chatFontSizePanel");
-const toggleChatFontSizePanelButton = document.getElementById("toggleChatFontSizePanel");
-const nicknameFontSizeControl = document.getElementById("nicknameFontSizeControl");
-const nicknameFontSizeSlider = document.getElementById("nicknameFontSizePt");
-const nicknameFontSizeValue = document.getElementById("nicknameFontSizeValue");
-const resetNicknameFontSizeButton = document.getElementById("resetNicknameFontSize");
-const statusElement = document.getElementById("status");
+const PRESET_DEFINITIONS = {
+  default: {},
+  clean: {
+    showNicknames: false,
+    showBadges: false,
+    showChatBoxes: true,
+    showNonChatPanels: true
+  },
+  minimal: {
+    showBadges: false,
+    showTimestamps: false,
+    showNonChatPanels: false,
+    showChatBoxes: false,
+    showLargeText: false,
+    useChatTextColor: false,
+    useNicknameColorForMessage: false
+  }
+};
 
-let currentColor = DEFAULT_CHAT_BOX_COLOR;
-let currentChatTextColor = DEFAULT_CHAT_TEXT_COLOR;
-let currentOptions = { ...DEFAULT_OPTIONS };
-let hsv = { hue: 0, saturation: 0, value: 0.5 };
-let chatTextHsv = { hue: 0, saturation: 0, value: 0.07 };
-let colorApplyTimer = 0;
-let chatTextColorApplyTimer = 0;
-let fontSizeApplyTimer = 0;
-let isChatBoxColorPanelExpanded = false;
-let isChatFontSizePanelExpanded = true;
-let isChatTextStylePanelExpanded = true;
-let isChatTextColorPanelExpanded = false;
+const app = document.getElementById("app");
+const statusDot = document.getElementById("statusDot");
+const statusLabel = document.getElementById("statusLabel");
+const chatPreview = document.getElementById("chatPreview");
+const previewModeLabel = document.getElementById("previewModeLabel");
+const presetRow = document.getElementById("presetRow");
+const customPresetButton = document.getElementById("customPresetButton");
+const menuButton = document.getElementById("menuButton");
+const appMenu = document.getElementById("appMenu");
+const resetDefaultsButton = document.getElementById("resetDefaultsButton");
+const boxColorChips = document.getElementById("boxColorChips");
+const textColorChips = document.getElementById("textColorChips");
+const nicknameColorRow = document.getElementById("nicknameColorRow");
+const nicknameColorOption = document.getElementById("useNicknameColorForMessage");
+const chatFontSizeValue = document.getElementById("chatFontSizePtValue");
+const nicknameFontSizeValue = document.getElementById("nicknameFontSizePtValue");
+const colorPickerTitle = document.getElementById("colorPickerTitle");
+const colorPickerSwatch = document.getElementById("colorPickerSwatch");
+const colorPickerHex = document.getElementById("chatTextColorHex");
+const colorPickerField = document.getElementById("colorPickerField");
+const colorPickerHandle = document.getElementById("colorPickerHandle");
+const colorPickerHue = document.getElementById("colorPickerHue");
+const colorPickerReset = document.getElementById("colorPickerReset");
+
+const views = [...document.querySelectorAll("[data-view]")];
+const optionInputs = [...document.querySelectorAll("[data-option]")];
+const chatModeRadios = [...document.querySelectorAll('input[name="chatMode"]')];
+
+let currentOptions = normalizeOptions(DEFAULT_OPTIONS);
+let activePreset = "default";
+let activeView = "home";
+let colorPickerTarget = null;
+let colorPickerHsv = { hue: 0, saturation: 0, value: 0.5 };
+let commitTimer = 0;
+let returnViewAfterColor = "style";
+let customPresetSnapshot = null;
+
+function clampNumber(value, min, max, fallback) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return fallback;
+  }
+
+  return Math.max(min, Math.min(max, number));
+}
 
 function normalizeHexColor(value, fallback = DEFAULT_CHAT_BOX_COLOR) {
   if (typeof value !== "string") {
@@ -146,18 +157,98 @@ function normalizeHexColor(value, fallback = DEFAULT_CHAT_BOX_COLOR) {
   return fallback;
 }
 
-function isValidHexInput(value) {
-  const trimmed = value.trim();
+function normalizeOptionalCoordinate(value) {
+  const number = Number(value);
 
-  return /^#?[0-9a-f]{3}$/i.test(trimmed) || /^#?[0-9a-f]{6}$/i.test(trimmed);
+  return Number.isFinite(number) ? number : null;
 }
 
-function isCompleteHexInput(value) {
-  return /^#?[0-9a-f]{6}$/i.test(value.trim());
+function getMiniChatMinHeight(inputOnly = false) {
+  return inputOnly ? MINI_CHAT_INPUT_ONLY_HEIGHT : MINI_CHAT_MIN_HEIGHT;
 }
 
-function isPendingHexInput(value) {
-  return /^#?[0-9a-f]{0,6}$/i.test(value.trim());
+function normalizeMiniChatBounds(bounds, { inputOnly = false } = {}) {
+  const minHeight = getMiniChatMinHeight(inputOnly);
+  const fallbackHeight = inputOnly ? MINI_CHAT_INPUT_ONLY_HEIGHT : MINI_CHAT_DEFAULT_HEIGHT;
+
+  return {
+    left: normalizeOptionalCoordinate(bounds?.left),
+    top: normalizeOptionalCoordinate(bounds?.top),
+    width: clampNumber(bounds?.width, MINI_CHAT_MIN_WIDTH, MINI_CHAT_MAX_WIDTH, MINI_CHAT_DEFAULT_WIDTH),
+    height: clampNumber(bounds?.height, minHeight, MINI_CHAT_MAX_HEIGHT, fallbackHeight)
+  };
+}
+
+function normalizeOptionalMiniChatBounds(bounds) {
+  if (!bounds || typeof bounds !== "object") {
+    return null;
+  }
+
+  return normalizeMiniChatBounds(bounds);
+}
+
+function normalizeMiniChatScale(value) {
+  const clampedScale = clampNumber(value, MINI_CHAT_SCALE_MIN, MINI_CHAT_SCALE_MAX, MINI_CHAT_SCALE_DEFAULT);
+  const steppedScale = Math.round(clampedScale / MINI_CHAT_SCALE_STEP) * MINI_CHAT_SCALE_STEP;
+
+  return clampNumber(steppedScale, MINI_CHAT_SCALE_MIN, MINI_CHAT_SCALE_MAX, MINI_CHAT_SCALE_DEFAULT);
+}
+
+function normalizeChatFontSizePt(value) {
+  const clampedFontSize = clampNumber(
+    value,
+    CHAT_FONT_SIZE_PT_MIN,
+    CHAT_FONT_SIZE_PT_MAX,
+    CHAT_FONT_SIZE_PT_DEFAULT
+  );
+
+  return clampNumber(
+    Math.round(clampedFontSize),
+    CHAT_FONT_SIZE_PT_MIN,
+    CHAT_FONT_SIZE_PT_MAX,
+    CHAT_FONT_SIZE_PT_DEFAULT
+  );
+}
+
+function normalizeOptions(options) {
+  const legacyBoldText = options?.showBoldText === undefined && options?.showLargeText === true;
+  const miniFloatingChatInputOnly = options?.miniFloatingChatInputOnly === true;
+  const useChatTextColor = options?.useChatTextColor === true;
+  const showNonChatPanels =
+    options?.showNonChatPanels !== undefined
+      ? options.showNonChatPanels !== false
+      : options?.showDonationRanking !== false;
+
+  return {
+    showNicknames: options?.showNicknames !== false,
+    showBadges: options?.showBadges !== false,
+    showTimestamps: options?.showTimestamps !== false,
+    showNonChatPanels,
+    showChatBoxes: options?.showChatBoxes !== false,
+    useGuestChatFrame: options?.useGuestChatFrame === true,
+    useMiniFloatingChat: options?.useMiniFloatingChat === true,
+    miniFloatingChatFullscreenOnly: options?.miniFloatingChatFullscreenOnly === true,
+    showGuestChatToggleButton: options?.showGuestChatToggleButton !== false,
+    showHeaderSettingsButton: options?.showHeaderSettingsButton !== false,
+    showMiniFloatingChatButton: options?.showMiniFloatingChatButton !== false,
+    miniFloatingChatCollapsed: false,
+    miniFloatingChatInputOnly,
+    miniFloatingChatBounds: normalizeMiniChatBounds(options?.miniFloatingChatBounds, {
+      inputOnly: miniFloatingChatInputOnly
+    }),
+    miniFloatingChatExpandedBounds: normalizeOptionalMiniChatBounds(options?.miniFloatingChatExpandedBounds),
+    miniFloatingChatScale: normalizeMiniChatScale(options?.miniFloatingChatScale),
+    showLargeText: options?.showLargeText === true,
+    chatFontSizePt: normalizeChatFontSizePt(options?.chatFontSizePt),
+    useNicknameFontSize: options?.useNicknameFontSize === true,
+    nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt),
+    showBoldText: options?.showBoldText === true || legacyBoldText,
+    useAutoTextContrast: options?.useAutoTextContrast === true,
+    useChatTextColor,
+    chatTextColor: normalizeHexColor(options?.chatTextColor, DEFAULT_CHAT_TEXT_COLOR),
+    useNicknameColorForMessage: useChatTextColor && options?.useNicknameColorForMessage === true,
+    chatBoxColor: normalizeHexColor(options?.chatBoxColor, DEFAULT_CHAT_BOX_COLOR)
+  };
 }
 
 function hexToRgb(hexColor) {
@@ -241,360 +332,268 @@ function hueToHex(hue) {
   return rgbToHex(hsvToRgb({ hue, saturation: 1, value: 1 }));
 }
 
-function clampNumber(value, min, max, fallback) {
-  const number = Number(value);
-
-  if (!Number.isFinite(number)) {
-    return fallback;
+function getChatMode(options = currentOptions) {
+  if (options.useMiniFloatingChat) {
+    return "mini";
   }
 
-  return Math.max(min, Math.min(max, number));
-}
-
-function normalizeOptionalCoordinate(value) {
-  const number = Number(value);
-
-  return Number.isFinite(number) ? number : null;
-}
-
-function getMiniChatMinHeight(inputOnly = false) {
-  return inputOnly ? MINI_CHAT_INPUT_ONLY_HEIGHT : MINI_CHAT_MIN_HEIGHT;
-}
-
-function normalizeMiniChatBounds(bounds, { inputOnly = false } = {}) {
-  const minHeight = getMiniChatMinHeight(inputOnly);
-  const fallbackHeight = inputOnly ? MINI_CHAT_INPUT_ONLY_HEIGHT : MINI_CHAT_DEFAULT_HEIGHT;
-
-  return {
-    left: normalizeOptionalCoordinate(bounds?.left),
-    top: normalizeOptionalCoordinate(bounds?.top),
-    width: clampNumber(
-      bounds?.width,
-      MINI_CHAT_MIN_WIDTH,
-      MINI_CHAT_MAX_WIDTH,
-      MINI_CHAT_DEFAULT_WIDTH
-    ),
-    height: clampNumber(
-      bounds?.height,
-      minHeight,
-      MINI_CHAT_MAX_HEIGHT,
-      fallbackHeight
-    )
-  };
-}
-
-function normalizeOptionalMiniChatBounds(bounds) {
-  if (!bounds || typeof bounds !== "object") {
-    return null;
+  if (options.useGuestChatFrame) {
+    return "guest";
   }
 
-  return normalizeMiniChatBounds(bounds);
+  return "default";
 }
 
-function normalizeMiniChatScale(value) {
-  const clampedScale = clampNumber(
-    value,
-    MINI_CHAT_SCALE_MIN,
-    MINI_CHAT_SCALE_MAX,
-    MINI_CHAT_SCALE_DEFAULT
-  );
-  const steppedScale = Math.round(clampedScale / MINI_CHAT_SCALE_STEP) * MINI_CHAT_SCALE_STEP;
-
-  return clampNumber(
-    steppedScale,
-    MINI_CHAT_SCALE_MIN,
-    MINI_CHAT_SCALE_MAX,
-    MINI_CHAT_SCALE_DEFAULT
-  );
+function setChatMode(mode) {
+  currentOptions.useGuestChatFrame = mode === "guest";
+  currentOptions.useMiniFloatingChat = mode === "mini";
 }
 
-function normalizeChatFontSizePt(value) {
-  const clampedFontSize = clampNumber(
-    value,
-    CHAT_FONT_SIZE_PT_MIN,
-    CHAT_FONT_SIZE_PT_MAX,
-    CHAT_FONT_SIZE_PT_DEFAULT
-  );
+function setStatus(message, tone = "idle") {
+  statusLabel.textContent = message;
+  statusDot.classList.remove("is-ok", "is-warn");
 
-  return clampNumber(
-    Math.round(clampedFontSize),
-    CHAT_FONT_SIZE_PT_MIN,
-    CHAT_FONT_SIZE_PT_MAX,
-    CHAT_FONT_SIZE_PT_DEFAULT
-  );
-}
-
-function normalizeOptions(options) {
-  const legacyBoldText = options?.showBoldText === undefined && options?.showLargeText === true;
-  const miniFloatingChatInputOnly = options?.miniFloatingChatInputOnly === true;
-  const useChatTextColor = options?.useChatTextColor === true;
-  const showNonChatPanels =
-    options?.showNonChatPanels !== undefined
-      ? options.showNonChatPanels !== false
-      : options?.showDonationRanking !== false;
-
-  return {
-    showNicknames: options?.showNicknames !== false,
-    showBadges: options?.showBadges !== false,
-    showTimestamps: options?.showTimestamps !== false,
-    showNonChatPanels,
-    showChatBoxes: options?.showChatBoxes !== false,
-    useGuestChatFrame: options?.useGuestChatFrame === true,
-    useMiniFloatingChat: options?.useMiniFloatingChat === true,
-    miniFloatingChatFullscreenOnly: options?.miniFloatingChatFullscreenOnly === true,
-    showGuestChatToggleButton: options?.showGuestChatToggleButton !== false,
-    showHeaderSettingsButton: options?.showHeaderSettingsButton !== false,
-    showMiniFloatingChatButton: options?.showMiniFloatingChatButton !== false,
-    miniFloatingChatCollapsed: false,
-    miniFloatingChatInputOnly,
-    miniFloatingChatBounds: normalizeMiniChatBounds(options?.miniFloatingChatBounds, {
-      inputOnly: miniFloatingChatInputOnly
-    }),
-    miniFloatingChatExpandedBounds: normalizeOptionalMiniChatBounds(options?.miniFloatingChatExpandedBounds),
-    miniFloatingChatScale: normalizeMiniChatScale(options?.miniFloatingChatScale),
-    showLargeText: options?.showLargeText === true,
-    chatFontSizePt: normalizeChatFontSizePt(options?.chatFontSizePt),
-    useNicknameFontSize: options?.useNicknameFontSize === true,
-    nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt),
-    showBoldText: options?.showBoldText === true || legacyBoldText,
-    useAutoTextContrast: options?.useAutoTextContrast === true,
-    useChatTextColor,
-    chatTextColor: normalizeHexColor(options?.chatTextColor, DEFAULT_CHAT_TEXT_COLOR),
-    useNicknameColorForMessage: useChatTextColor && options?.useNicknameColorForMessage === true,
-    chatBoxColor: normalizeHexColor(options?.chatBoxColor, DEFAULT_CHAT_BOX_COLOR)
-  };
-}
-
-function selectTab(targetId) {
-  for (const button of tabButtons) {
-    const isSelected = button.dataset.tabTarget === targetId;
-    button.classList.toggle("is-active", isSelected);
-    button.setAttribute("aria-selected", String(isSelected));
-  }
-
-  for (const panel of tabPanels) {
-    const isSelected = panel.id === targetId;
-    panel.classList.toggle("is-active", isSelected);
-    panel.hidden = !isSelected;
+  if (tone === "ok") {
+    statusDot.classList.add("is-ok");
+  } else if (tone === "warn") {
+    statusDot.classList.add("is-warn");
   }
 }
 
-function setStatus(message) {
-  statusElement.textContent = message;
-}
+function navigate(viewName, { rememberColorReturn = false } = {}) {
+  if (viewName !== "color-picker" && !rememberColorReturn) {
+    returnViewAfterColor = viewName === "home" ? "style" : viewName;
+  }
 
-function updateColorUi(hexColor, { syncInput = true } = {}) {
-  currentColor = normalizeHexColor(hexColor, DEFAULT_CHAT_BOX_COLOR);
-  hsv = rgbToHsv(hexToRgb(currentColor));
+  activeView = viewName;
 
-  document.documentElement.style.setProperty("--current-color", currentColor);
-  document.documentElement.style.setProperty("--field-hue", hueToHex(hsv.hue));
-  colorField.style.setProperty("--field-x", String(hsv.saturation));
-  colorField.style.setProperty("--field-y", String(1 - hsv.value));
-  colorPreview.style.backgroundColor = currentColor;
-  hueSlider.value = String(hsv.hue);
-
-  if (syncInput) {
-    hexInput.value = currentColor;
-    hexInput.classList.remove("is-invalid");
+  for (const view of views) {
+    const isActive = view.dataset.view === viewName;
+    view.classList.toggle("view--active", isActive);
+    view.hidden = !isActive;
   }
 }
 
-function updateChatTextColorUi(hexColor, { syncInput = true } = {}) {
-  currentChatTextColor = normalizeHexColor(hexColor, DEFAULT_CHAT_TEXT_COLOR);
-  chatTextHsv = rgbToHsv(hexToRgb(currentChatTextColor));
-
-  chatTextColorPanel.style.setProperty("--current-color", currentChatTextColor);
-  chatTextColorPanel.style.setProperty("--field-hue", hueToHex(chatTextHsv.hue));
-  chatTextColorField.style.setProperty("--field-x", String(chatTextHsv.saturation));
-  chatTextColorField.style.setProperty("--field-y", String(1 - chatTextHsv.value));
-  chatTextColorPreview.style.backgroundColor = currentChatTextColor;
-  chatTextHueSlider.value = String(chatTextHsv.hue);
-
-  if (syncInput) {
-    chatTextHexInput.value = currentChatTextColor;
-    chatTextHexInput.classList.remove("is-invalid");
-  }
-}
-
-function updateChatFontSizeUi(fontSizePt) {
-  const normalizedFontSize = normalizeChatFontSizePt(fontSizePt);
-  chatFontSizeSlider.value = String(normalizedFontSize);
-  chatFontSizeValue.textContent = `${normalizedFontSize}pt`;
-}
-
-function updateNicknameFontSizeUi(fontSizePt) {
-  const normalizedFontSize = normalizeChatFontSizePt(fontSizePt);
-  nicknameFontSizeSlider.value = String(normalizedFontSize);
-  nicknameFontSizeValue.textContent = `${normalizedFontSize}pt`;
-}
-
-function setChatBoxColorPanelExpanded(expanded) {
-  const shouldExpand = expanded === true;
-  isChatBoxColorPanelExpanded = shouldExpand;
-  document.body.classList.toggle("is-chat-box-color-panel-expanded", shouldExpand);
-  chatBoxColorPanel.hidden = !shouldExpand;
-  toggleChatBoxColorPanelButton.setAttribute("aria-expanded", String(shouldExpand));
-  toggleChatBoxColorPanelButton.setAttribute(
-    "aria-label",
-    shouldExpand ? "박스 색상 항목 접기" : "박스 색상 항목 펼치기"
-  );
-}
-
-function syncChatBoxColorPanel() {
-  setChatBoxColorPanelExpanded(isChatBoxColorPanelExpanded);
-}
-
-function setChatFontSizePanelExpanded(expanded) {
-  const shouldExpand = expanded === true;
-  isChatFontSizePanelExpanded = shouldExpand;
-  document.body.classList.toggle("is-chat-font-size-panel-expanded", shouldExpand);
-  chatFontSizePanel.hidden = !shouldExpand;
-  toggleChatFontSizePanelButton.setAttribute("aria-expanded", String(shouldExpand));
-  toggleChatFontSizePanelButton.setAttribute(
-    "aria-label",
-    shouldExpand ? "글씨 크기 항목 접기" : "글씨 크기 항목 펼치기"
-  );
-}
-
-function syncChatFontSizePanel() {
-  setChatFontSizePanelExpanded(isChatFontSizePanelExpanded);
-}
-
-function setChatTextStylePanelExpanded(expanded) {
-  const shouldExpand = expanded === true;
-  isChatTextStylePanelExpanded = shouldExpand;
-  document.body.classList.toggle("is-chat-text-style-panel-expanded", shouldExpand);
-  chatTextStylePanel.hidden = !shouldExpand;
-  toggleChatTextStylePanelButton.setAttribute("aria-expanded", String(shouldExpand));
-  toggleChatTextStylePanelButton.setAttribute(
-    "aria-label",
-    shouldExpand ? "채팅 글자 스타일 항목 접기" : "채팅 글자 스타일 항목 펼치기"
-  );
-}
-
-function syncChatTextStylePanel() {
-  setChatTextStylePanelExpanded(isChatTextStylePanelExpanded);
-}
-
-function setChatTextColorPanelExpanded(expanded) {
-  const shouldExpand = expanded === true;
-  isChatTextColorPanelExpanded = shouldExpand;
-  document.body.classList.toggle("is-chat-text-color-panel-expanded", shouldExpand);
-  chatTextColorPanel.hidden = !shouldExpand;
-  toggleChatTextColorPanelButton.setAttribute("aria-expanded", String(shouldExpand));
-  toggleChatTextColorPanelButton.setAttribute(
-    "aria-label",
-    shouldExpand ? "글자 색상 항목 접기" : "글자 색상 항목 펼치기"
-  );
-}
-
-function syncChatTextColorPanel() {
-  setChatTextColorPanelExpanded(isChatTextColorPanelExpanded);
-}
-
-function setControls(options) {
-  const normalized = normalizeOptions(options);
-  currentOptions = normalized;
-
-  for (const id of controlIds) {
-    controls[id].checked = normalized[id];
+function getOptionValue(key) {
+  if (key === "chatFontSizePt" || key === "nicknameFontSizePt") {
+    return currentOptions[key];
   }
 
-  isChatBoxColorPanelExpanded = false;
-  isChatFontSizePanelExpanded = true;
-  isChatTextStylePanelExpanded = true;
-  isChatTextColorPanelExpanded = false;
-  syncDependentControls(normalized);
-  updateChatFontSizeUi(normalized.chatFontSizePt);
-  updateNicknameFontSizeUi(normalized.nicknameFontSizePt);
-  updateColorUi(normalized.chatBoxColor);
-  updateChatTextColorUi(normalized.chatTextColor);
+  return currentOptions[key];
 }
 
-function syncDependentControls(options = currentOptions) {
-  const fullscreenOnlyControl = controls.miniFloatingChatFullscreenOnly;
-  const fullscreenOnlyRow = fullscreenOnlyControl?.closest(".toggle-row");
-  const isMiniChatEnabled = options.useMiniFloatingChat === true;
+function setOptionValue(key, value) {
+  currentOptions[key] = value;
+}
 
-  if (fullscreenOnlyControl) {
-    fullscreenOnlyControl.disabled = !isMiniChatEnabled;
-    fullscreenOnlyRow?.classList.toggle("is-disabled", !isMiniChatEnabled);
-  }
-
-  syncChatBoxColorPanel(options);
-  syncChatFontSizePanel(options);
-  syncChatTextStylePanel(options);
-  syncChatTextColorPanel(options);
-  const isNicknameFontSizeEnabled = options.showLargeText === true && options.useNicknameFontSize === true;
-  nicknameFontSizeSlider.disabled = !isNicknameFontSizeEnabled;
-  resetNicknameFontSizeButton.disabled = !isNicknameFontSizeEnabled;
-  nicknameFontSizeControl.classList.toggle("is-disabled", !isNicknameFontSizeEnabled);
-
-  const isChatTextColorEnabled = options.useChatTextColor === true;
-  const shouldDisableChatTextColor =
-    !isChatTextColorEnabled || options.useNicknameColorForMessage === true;
-  const chatTextColorControls = [
-    chatTextHexInput,
-    resetChatTextColorButton,
-    chatTextColorField,
-    chatTextHueSlider
-  ];
-
-  for (const control of chatTextColorControls) {
-    control.disabled = shouldDisableChatTextColor;
-  }
+function syncNicknameColorDependencies() {
+  const isChatTextColorEnabled = currentOptions.useChatTextColor === true;
 
   if (!isChatTextColorEnabled) {
-    controls.useNicknameColorForMessage.checked = false;
+    currentOptions.useNicknameColorForMessage = false;
   }
 
-  controls.useNicknameColorForMessage.disabled = !isChatTextColorEnabled;
-  nicknameColorMessageToggleRow?.classList.toggle("is-disabled", !isChatTextColorEnabled);
-  chatTextColorPanel.classList.toggle("is-disabled", shouldDisableChatTextColor);
+  if (nicknameColorOption) {
+    nicknameColorOption.disabled = !isChatTextColorEnabled;
+    nicknameColorOption.checked = currentOptions.useNicknameColorForMessage === true;
+  }
+
+  nicknameColorRow?.classList.toggle("is-disabled", !isChatTextColorEnabled);
 }
 
-function readControls() {
-  return normalizeOptions({
-    ...currentOptions,
-    showNicknames: controls.showNicknames.checked,
-    showBadges: controls.showBadges.checked,
-    showTimestamps: controls.showTimestamps.checked,
-    showNonChatPanels: controls.showNonChatPanels.checked,
-    showChatBoxes: controls.showChatBoxes.checked,
-    useGuestChatFrame: controls.useGuestChatFrame.checked,
-    useMiniFloatingChat: controls.useMiniFloatingChat.checked,
-    miniFloatingChatFullscreenOnly: controls.miniFloatingChatFullscreenOnly.checked,
-    showGuestChatToggleButton: controls.showGuestChatToggleButton.checked,
-    showHeaderSettingsButton: controls.showHeaderSettingsButton.checked,
-    showMiniFloatingChatButton: controls.showMiniFloatingChatButton.checked,
-    showLargeText: controls.showLargeText.checked,
-    chatFontSizePt: chatFontSizeSlider.value,
-    useNicknameFontSize: controls.useNicknameFontSize.checked,
-    nicknameFontSizePt: nicknameFontSizeSlider.value,
-    showBoldText: controls.showBoldText.checked,
-    useAutoTextContrast: controls.useAutoTextContrast.checked,
-    useChatTextColor: controls.useChatTextColor.checked,
-    chatTextColor: currentChatTextColor,
-    useNicknameColorForMessage:
-      controls.useChatTextColor.checked && controls.useNicknameColorForMessage.checked,
-    chatBoxColor: currentColor
-  });
+function syncConditionalBlocks() {
+  for (const block of document.querySelectorAll("[data-when]")) {
+    const key = block.dataset.when;
+    const enabled = currentOptions[key] === true;
+    block.classList.toggle("is-visible", enabled);
+  }
+
+  const chatMode = getChatMode();
+
+  for (const block of document.querySelectorAll("[data-when-chat-mode]")) {
+    block.classList.toggle("is-visible", block.dataset.whenChatMode === chatMode);
+  }
+}
+
+function syncControlsFromOptions() {
+  for (const input of optionInputs) {
+    const key = input.dataset.option;
+
+    if (!key) {
+      continue;
+    }
+
+    if (input.type === "checkbox") {
+      input.checked = currentOptions[key] === true;
+      continue;
+    }
+
+    if (input.type === "range") {
+      input.value = String(currentOptions[key]);
+    }
+  }
+
+  for (const radio of chatModeRadios) {
+    radio.checked = radio.value === getChatMode();
+  }
+
+  chatFontSizeValue.textContent = `${currentOptions.chatFontSizePt}pt`;
+  nicknameFontSizeValue.textContent = `${currentOptions.nicknameFontSizePt}pt`;
+  syncNicknameColorDependencies();
+  syncConditionalBlocks();
+  renderColorChips();
+  syncPresetButtons();
+}
+
+function syncPreview() {
+  chatPreview.dataset.showNicknames = currentOptions.showNicknames ? "on" : "off";
+  chatPreview.dataset.showBadges = currentOptions.showBadges ? "on" : "off";
+  chatPreview.dataset.showTimestamps = currentOptions.showTimestamps ? "on" : "off";
+  chatPreview.dataset.showBoxes = currentOptions.showChatBoxes ? "on" : "off";
+
+  const fontSize = currentOptions.showLargeText
+    ? currentOptions.chatFontSizePt
+    : CHAT_FONT_SIZE_PT_DEFAULT;
+  chatPreview.style.setProperty("--preview-font", `${fontSize}px`);
+  chatPreview.style.setProperty("--preview-weight", currentOptions.showBoldText ? "700" : "400");
+  chatPreview.style.setProperty(
+    "--preview-box",
+    currentOptions.showChatBoxes ? `${hexToRgba(currentOptions.chatBoxColor, 0.22)}` : "transparent"
+  );
+
+  const textColor = currentOptions.useChatTextColor
+    ? currentOptions.chatTextColor
+    : DEFAULT_CHAT_TEXT_COLOR;
+  chatPreview.style.setProperty("--preview-text", textColor);
+  chatPreview.style.setProperty("--preview-nick", currentOptions.useNicknameColorForMessage ? textColor : "#00c471");
+
+  const modeLabels = {
+    default: "기본 채팅",
+    guest: "비로그인 채팅",
+    mini: "미니 플로팅"
+  };
+  previewModeLabel.textContent = modeLabels[getChatMode()] || modeLabels.default;
+}
+
+function hexToRgba(hexColor, alpha) {
+  const { red, green, blue } = hexToRgb(hexColor);
+
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
+function renderColorChips() {
+  renderChipGroup(boxColorChips, currentOptions.chatBoxColor, "box");
+  renderChipGroup(textColorChips, currentOptions.chatTextColor, "text");
+}
+
+function renderChipGroup(container, activeHex, target) {
+  if (!container) {
+    return;
+  }
+
+  container.replaceChildren();
+
+  for (const chip of COLOR_CHIPS) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "color-chip";
+    button.style.backgroundColor = chip.hex;
+    button.title = chip.hex;
+    button.setAttribute("aria-label", chip.hex);
+    button.classList.toggle("is-active", normalizeHexColor(activeHex) === chip.hex);
+
+    button.addEventListener("click", () => {
+      if (target === "box") {
+        currentOptions.chatBoxColor = chip.hex;
+      } else {
+        currentOptions.chatTextColor = chip.hex;
+      }
+
+      renderColorChips();
+      syncPreview();
+      scheduleCommit();
+    });
+
+    container.append(button);
+  }
+}
+
+function syncPresetButtons() {
+  for (const button of presetRow.querySelectorAll("[data-preset]")) {
+    button.classList.toggle("is-active", button.dataset.preset === activePreset);
+  }
+
+  if (customPresetSnapshot) {
+    customPresetButton.textContent = "나만의";
+  }
+}
+
+function detectPreset(options) {
+  const normalized = normalizeOptions(options);
+
+  if (customPresetSnapshot && JSON.stringify(normalized) === JSON.stringify(customPresetSnapshot)) {
+    return "custom";
+  }
+
+  for (const [presetId, patch] of Object.entries(PRESET_DEFINITIONS)) {
+    const candidate = normalizeOptions({ ...DEFAULT_OPTIONS, ...patch });
+
+    if (JSON.stringify(normalized) === JSON.stringify(candidate)) {
+      return presetId;
+    }
+  }
+
+  return "custom";
+}
+
+function applyPreset(presetId) {
+  if (presetId === "custom") {
+    if (!customPresetSnapshot) {
+      return;
+    }
+
+    currentOptions = normalizeOptions(customPresetSnapshot);
+  } else {
+    currentOptions = normalizeOptions({ ...DEFAULT_OPTIONS, ...PRESET_DEFINITIONS[presetId] });
+  }
+
+  activePreset = presetId;
+  syncControlsFromOptions();
+  syncPreview();
+  scheduleCommit();
+}
+
+function saveCustomPreset() {
+  customPresetSnapshot = normalizeOptions(currentOptions);
+  chrome.storage.local.set({ [PRESET_STORAGE_KEY]: customPresetSnapshot });
+  activePreset = "custom";
+  syncPresetButtons();
+  setStatus("나만의 프리셋 저장됨", "ok");
+}
+
+function scheduleCommit() {
+  window.clearTimeout(commitTimer);
+  commitTimer = window.setTimeout(() => {
+    commitOptions();
+  }, 120);
 }
 
 function getStoredOptions() {
   return new Promise((resolve) => {
-    chrome.storage.local.get(STORAGE_KEY, (result) => {
-      resolve(normalizeOptions(result?.[STORAGE_KEY] ?? DEFAULT_OPTIONS));
+    chrome.storage.local.get([STORAGE_KEY, PRESET_STORAGE_KEY], (result) => {
+      resolve({
+        options: normalizeOptions(result?.[STORAGE_KEY] ?? DEFAULT_OPTIONS),
+        customPreset: result?.[PRESET_STORAGE_KEY]
+          ? normalizeOptions(result[PRESET_STORAGE_KEY])
+          : null
+      });
     });
   });
 }
 
 function setStoredOptions(options) {
   return new Promise((resolve) => {
-    const normalized = normalizeOptions(options);
-    currentOptions = normalized;
-    chrome.storage.local.set({ [STORAGE_KEY]: normalized }, resolve);
+    chrome.storage.local.set({ [STORAGE_KEY]: normalizeOptions(options) }, resolve);
   });
 }
 
@@ -662,304 +661,276 @@ async function applyToActiveTab(options) {
   const tab = await queryActiveTab();
 
   if (!tab?.id || !tab.url?.startsWith("https://chzzk.naver.com/")) {
-    setStatus("치지직 탭 아님");
-    return;
+    setStatus("치지직 탭 아님", "warn");
+    return false;
   }
 
   const ready = await ensureCurrentContentScript(tab.id);
   const applied = await sendOptionsToTab(tab.id, options);
-  setStatus(ready && applied?.ok ? "적용됨" : "새로고침 필요");
+
+  if (ready && applied?.ok) {
+    setStatus("적용됨", "ok");
+    return true;
+  }
+
+  setStatus("새로고침 필요", "warn");
+  return false;
 }
 
-async function applyCurrentOptions() {
-  const options = readControls();
-  await setStoredOptions(options);
-  await applyToActiveTab(options);
+async function commitOptions() {
+  currentOptions = normalizeOptions(currentOptions);
+  syncNicknameColorDependencies();
+  activePreset = detectPreset(currentOptions);
+  syncPresetButtons();
+  syncPreview();
+  await setStoredOptions(currentOptions);
+  await applyToActiveTab(currentOptions);
 }
 
-function scheduleColorApply() {
-  window.clearTimeout(colorApplyTimer);
-  colorApplyTimer = window.setTimeout(applyCurrentOptions, 100);
+function openColorPicker(target) {
+  colorPickerTarget = target;
+  const currentColor = target === "box" ? currentOptions.chatBoxColor : currentOptions.chatTextColor;
+  colorPickerTitle.textContent = target === "box" ? "박스 색상" : "글자 색상";
+  updateColorPickerUi(currentColor);
+  navigate("color-picker", { rememberColorReturn: true });
 }
 
-function scheduleChatTextColorApply() {
-  window.clearTimeout(chatTextColorApplyTimer);
-  chatTextColorApplyTimer = window.setTimeout(applyCurrentOptions, 100);
+function updateColorPickerUi(hexColor) {
+  const normalized = normalizeHexColor(hexColor, colorPickerTarget === "box" ? DEFAULT_CHAT_BOX_COLOR : DEFAULT_CHAT_TEXT_COLOR);
+  colorPickerHsv = rgbToHsv(hexToRgb(normalized));
+  colorPickerSwatch.style.backgroundColor = normalized;
+  colorPickerHex.value = normalized;
+  colorPickerHex.classList.remove("is-invalid");
+  colorPickerHue.value = String(colorPickerHsv.hue);
+  colorPickerField.style.setProperty("--field-hue", hueToHex(colorPickerHsv.hue));
+  colorPickerField.style.setProperty("--field-x", String(colorPickerHsv.saturation));
+  colorPickerField.style.setProperty("--field-y", String(1 - colorPickerHsv.value));
 }
 
-function scheduleFontSizeApply() {
-  window.clearTimeout(fontSizeApplyTimer);
-  fontSizeApplyTimer = window.setTimeout(applyCurrentOptions, 100);
-}
+function applyColorPickerValue(hexColor, { commit = true } = {}) {
+  const normalized = normalizeHexColor(
+    hexColor,
+    colorPickerTarget === "box" ? DEFAULT_CHAT_BOX_COLOR : DEFAULT_CHAT_TEXT_COLOR
+  );
 
-async function handleControlChange() {
-  const options = readControls();
+  if (colorPickerTarget === "box") {
+    currentOptions.chatBoxColor = normalized;
+  } else {
+    currentOptions.chatTextColor = normalized;
+  }
 
-  syncDependentControls(options);
-  await applyCurrentOptions();
-}
-
-function handleChatFontSizeInput() {
-  updateChatFontSizeUi(chatFontSizeSlider.value);
-  scheduleFontSizeApply();
-}
-
-function handleNicknameFontSizeInput() {
-  updateNicknameFontSizeUi(nicknameFontSizeSlider.value);
-  scheduleFontSizeApply();
-}
-
-function handleChatFontSizePanelToggle() {
-  setChatFontSizePanelExpanded(!isChatFontSizePanelExpanded);
-}
-
-function handleChatBoxColorPanelToggle() {
-  setChatBoxColorPanelExpanded(!isChatBoxColorPanelExpanded);
-}
-
-function handleChatTextStylePanelToggle() {
-  setChatTextStylePanelExpanded(!isChatTextStylePanelExpanded);
-}
-
-function handleChatTextColorPanelToggle() {
-  setChatTextColorPanelExpanded(!isChatTextColorPanelExpanded);
-}
-
-function setColorFromHsv(nextHsv, { commit = true } = {}) {
-  hsv = {
-    hue: Math.max(0, Math.min(360, nextHsv.hue)),
-    saturation: Math.max(0, Math.min(1, nextHsv.saturation)),
-    value: Math.max(0, Math.min(1, nextHsv.value))
-  };
-  updateColorUi(rgbToHex(hsvToRgb(hsv)));
+  updateColorPickerUi(normalized);
+  renderColorChips();
+  syncPreview();
 
   if (commit) {
-    scheduleColorApply();
+    scheduleCommit();
   }
 }
 
-function setChatTextColorFromHsv(nextHsv, { commit = true } = {}) {
-  chatTextHsv = {
-    hue: Math.max(0, Math.min(360, nextHsv.hue)),
-    saturation: Math.max(0, Math.min(1, nextHsv.saturation)),
-    value: Math.max(0, Math.min(1, nextHsv.value))
+function setColorPickerFromHsv(nextHsv, { commit = true } = {}) {
+  colorPickerHsv = {
+    hue: clampNumber(nextHsv.hue, 0, 360, colorPickerHsv.hue),
+    saturation: clampNumber(nextHsv.saturation, 0, 1, colorPickerHsv.saturation),
+    value: clampNumber(nextHsv.value, 0, 1, colorPickerHsv.value)
   };
-  updateChatTextColorUi(rgbToHex(hsvToRgb(chatTextHsv)));
 
-  if (commit) {
-    scheduleChatTextColorApply();
-  }
+  applyColorPickerValue(rgbToHex(hsvToRgb(colorPickerHsv)), { commit });
 }
 
-function updateColorFromField(event) {
-  const rect = colorField.getBoundingClientRect();
+function updateColorPickerFromField(event) {
+  const rect = colorPickerField.getBoundingClientRect();
   const x = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
   const y = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
 
-  setColorFromHsv({
-    hue: hsv.hue,
+  setColorPickerFromHsv({
+    hue: colorPickerHsv.hue,
     saturation: x,
     value: 1 - y
   });
 }
 
-function updateChatTextColorFromField(event) {
-  const rect = chatTextColorField.getBoundingClientRect();
-  const x = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
-  const y = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
+function handleOptionInput(event) {
+  const input = event.target.closest("[data-option]");
 
-  setChatTextColorFromHsv({
-    hue: chatTextHsv.hue,
-    saturation: x,
-    value: 1 - y
+  if (!input) {
+    return;
+  }
+
+  const key = input.dataset.option;
+
+  if (input.type === "checkbox") {
+    setOptionValue(key, input.checked);
+  } else if (input.type === "range") {
+    setOptionValue(key, normalizeChatFontSizePt(input.value));
+
+    if (key === "chatFontSizePt") {
+      chatFontSizeValue.textContent = `${currentOptions.chatFontSizePt}pt`;
+    }
+
+    if (key === "nicknameFontSizePt") {
+      nicknameFontSizeValue.textContent = `${currentOptions.nicknameFontSizePt}pt`;
+    }
+  }
+
+  syncNicknameColorDependencies();
+  syncConditionalBlocks();
+  syncControlsFromOptions();
+  syncPreview();
+  scheduleCommit();
+}
+
+function handleChatModeChange(event) {
+  const radio = event.target;
+
+  if (!(radio instanceof HTMLInputElement) || radio.name !== "chatMode") {
+    return;
+  }
+
+  setChatMode(radio.value);
+  syncConditionalBlocks();
+  syncPreview();
+  scheduleCommit();
+}
+
+function bindEvents() {
+  app.addEventListener("change", (event) => {
+    if (event.target.matches("[data-option]")) {
+      handleOptionInput(event);
+      return;
+    }
+
+    if (event.target.matches('input[name="chatMode"]')) {
+      handleChatModeChange(event);
+    }
   });
-}
 
-function handleColorFieldPointerDown(event) {
-  colorField.setPointerCapture(event.pointerId);
-  updateColorFromField(event);
-}
-
-function handleColorFieldPointerMove(event) {
-  if (colorField.hasPointerCapture(event.pointerId)) {
-    updateColorFromField(event);
-  }
-}
-
-function handleChatTextColorFieldPointerDown(event) {
-  chatTextColorField.setPointerCapture(event.pointerId);
-  updateChatTextColorFromField(event);
-}
-
-function handleChatTextColorFieldPointerMove(event) {
-  if (chatTextColorField.hasPointerCapture(event.pointerId)) {
-    updateChatTextColorFromField(event);
-  }
-}
-
-function handleHueChange() {
-  setColorFromHsv({
-    hue: Number(hueSlider.value),
-    saturation: hsv.saturation,
-    value: hsv.value
+  app.addEventListener("input", (event) => {
+    if (event.target.matches('[data-option="chatFontSizePt"], [data-option="nicknameFontSizePt"]')) {
+      handleOptionInput(event);
+    }
   });
-}
 
-function handleChatTextHueChange() {
-  setChatTextColorFromHsv({
-    hue: Number(chatTextHueSlider.value),
-    saturation: chatTextHsv.saturation,
-    value: chatTextHsv.value
+  app.addEventListener("click", (event) => {
+    const goto = event.target.closest("[data-goto]");
+
+    if (goto) {
+      navigate(goto.dataset.goto);
+      return;
+    }
+
+    const back = event.target.closest("[data-back]");
+
+    if (back) {
+      navigate("home");
+      return;
+    }
+
+    const colorBack = event.target.closest("[data-color-back]");
+
+    if (colorBack) {
+      navigate(returnViewAfterColor);
+      return;
+    }
+
+    const openColor = event.target.closest("[data-open-color]");
+
+    if (openColor) {
+      openColorPicker(openColor.dataset.openColor);
+      return;
+    }
+
+    const presetButton = event.target.closest("[data-preset]");
+
+    if (presetButton) {
+      if (presetButton.dataset.preset === "custom" && event.detail === 2) {
+        saveCustomPreset();
+        return;
+      }
+
+      applyPreset(presetButton.dataset.preset);
+    }
   });
-}
 
-function commitHexInput() {
-  if (!isValidHexInput(hexInput.value)) {
-    hexInput.classList.add("is-invalid");
-    return;
-  }
+  customPresetButton.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+    saveCustomPreset();
+  });
 
-  updateColorUi(normalizeHexColor(hexInput.value));
-  applyCurrentOptions();
-}
+  menuButton.addEventListener("click", () => {
+    const expanded = appMenu.hidden;
+    appMenu.hidden = !expanded;
+    menuButton.setAttribute("aria-expanded", String(expanded));
+  });
 
-function commitChatTextHexInput() {
-  if (!isValidHexInput(chatTextHexInput.value)) {
-    chatTextHexInput.classList.add("is-invalid");
-    return;
-  }
+  document.addEventListener("click", (event) => {
+    if (!app.contains(event.target)) {
+      appMenu.hidden = true;
+      menuButton.setAttribute("aria-expanded", "false");
+    }
+  });
 
-  updateChatTextColorUi(normalizeHexColor(chatTextHexInput.value, DEFAULT_CHAT_TEXT_COLOR));
-  applyCurrentOptions();
-}
+  resetDefaultsButton.addEventListener("click", async () => {
+    currentOptions = normalizeOptions(DEFAULT_OPTIONS);
+    activePreset = "default";
+    appMenu.hidden = true;
+    syncControlsFromOptions();
+    syncPreview();
+    await commitOptions();
+  });
 
-function handleHexInput() {
-  if (!hexInput.value.trim()) {
-    hexInput.classList.remove("is-invalid");
-    return;
-  }
+  colorPickerField.addEventListener("pointerdown", (event) => {
+    colorPickerField.setPointerCapture(event.pointerId);
+    updateColorPickerFromField(event);
+  });
 
-  if (isCompleteHexInput(hexInput.value)) {
-    updateColorUi(normalizeHexColor(hexInput.value), { syncInput: false });
-    hexInput.classList.remove("is-invalid");
-    scheduleColorApply();
-    return;
-  }
+  colorPickerField.addEventListener("pointermove", (event) => {
+    if (colorPickerField.hasPointerCapture(event.pointerId)) {
+      updateColorPickerFromField(event);
+    }
+  });
 
-  hexInput.classList.toggle("is-invalid", !isPendingHexInput(hexInput.value));
-}
+  colorPickerHue.addEventListener("input", () => {
+    setColorPickerFromHsv({
+      hue: Number(colorPickerHue.value),
+      saturation: colorPickerHsv.saturation,
+      value: colorPickerHsv.value
+    });
+  });
 
-function handleChatTextHexInput() {
-  if (!chatTextHexInput.value.trim()) {
-    chatTextHexInput.classList.remove("is-invalid");
-    return;
-  }
+  colorPickerHex.addEventListener("change", () => {
+    const value = colorPickerHex.value.trim();
 
-  if (isCompleteHexInput(chatTextHexInput.value)) {
-    updateChatTextColorUi(
-      normalizeHexColor(chatTextHexInput.value, DEFAULT_CHAT_TEXT_COLOR),
-      { syncInput: false }
-    );
-    chatTextHexInput.classList.remove("is-invalid");
-    scheduleChatTextColorApply();
-    return;
-  }
+    if (!/^#?[0-9a-f]{3}$/i.test(value) && !/^#?[0-9a-f]{6}$/i.test(value)) {
+      colorPickerHex.classList.add("is-invalid");
+      return;
+    }
 
-  chatTextHexInput.classList.toggle("is-invalid", !isPendingHexInput(chatTextHexInput.value));
-}
+    applyColorPickerValue(value);
+  });
 
-function handleHexKeyDown(event) {
-  if (event.key === "Enter") {
-    commitHexInput();
-    hexInput.blur();
-  }
-}
-
-function handleChatTextHexKeyDown(event) {
-  if (event.key === "Enter") {
-    commitChatTextHexInput();
-    chatTextHexInput.blur();
-  }
-}
-
-function handleHexBlur() {
-  if (isValidHexInput(hexInput.value)) {
-    commitHexInput();
-    return;
-  }
-
-  updateColorUi(currentColor);
-}
-
-function handleChatTextHexBlur() {
-  if (isValidHexInput(chatTextHexInput.value)) {
-    commitChatTextHexInput();
-    return;
-  }
-
-  updateChatTextColorUi(currentChatTextColor);
-}
-
-async function handleResetColor() {
-  updateColorUi(DEFAULT_CHAT_BOX_COLOR);
-  await applyCurrentOptions();
-}
-
-async function handleResetChatTextColor() {
-  updateChatTextColorUi(DEFAULT_CHAT_TEXT_COLOR);
-  await applyCurrentOptions();
-}
-
-async function handleResetChatFontSize() {
-  updateChatFontSizeUi(CHAT_FONT_SIZE_PT_DEFAULT);
-  await applyCurrentOptions();
-}
-
-async function handleResetNicknameFontSize() {
-  updateNicknameFontSizeUi(CHAT_FONT_SIZE_PT_DEFAULT);
-  await applyCurrentOptions();
+  colorPickerReset.addEventListener("click", () => {
+    applyColorPickerValue(colorPickerTarget === "box" ? DEFAULT_CHAT_BOX_COLOR : DEFAULT_CHAT_TEXT_COLOR);
+  });
 }
 
 async function init() {
-  const options = await getStoredOptions();
-  setControls(options);
-  await applyToActiveTab(options);
+  bindEvents();
 
-  for (const id of controlIds) {
-    controls[id].addEventListener("change", handleControlChange);
-  }
+  const stored = await getStoredOptions();
+  currentOptions = stored.options;
+  customPresetSnapshot = stored.customPreset;
+  activePreset = detectPreset(currentOptions);
 
-  for (const button of tabButtons) {
-    button.addEventListener("click", () => {
-      selectTab(button.dataset.tabTarget);
-    });
-  }
-
-  colorField.addEventListener("pointerdown", handleColorFieldPointerDown);
-  colorField.addEventListener("pointermove", handleColorFieldPointerMove);
-  hueSlider.addEventListener("input", handleHueChange);
-  chatTextColorField.addEventListener("pointerdown", handleChatTextColorFieldPointerDown);
-  chatTextColorField.addEventListener("pointermove", handleChatTextColorFieldPointerMove);
-  chatTextHueSlider.addEventListener("input", handleChatTextHueChange);
-  toggleChatBoxColorPanelButton.addEventListener("click", handleChatBoxColorPanelToggle);
-  toggleChatFontSizePanelButton.addEventListener("click", handleChatFontSizePanelToggle);
-  toggleChatTextStylePanelButton.addEventListener("click", handleChatTextStylePanelToggle);
-  toggleChatTextColorPanelButton.addEventListener("click", handleChatTextColorPanelToggle);
-  chatFontSizeSlider.addEventListener("input", handleChatFontSizeInput);
-  resetChatFontSizeButton.addEventListener("click", handleResetChatFontSize);
-  nicknameFontSizeSlider.addEventListener("input", handleNicknameFontSizeInput);
-  resetNicknameFontSizeButton.addEventListener("click", handleResetNicknameFontSize);
-  hexInput.addEventListener("input", handleHexInput);
-  hexInput.addEventListener("keydown", handleHexKeyDown);
-  hexInput.addEventListener("blur", handleHexBlur);
-  chatTextHexInput.addEventListener("input", handleChatTextHexInput);
-  chatTextHexInput.addEventListener("keydown", handleChatTextHexKeyDown);
-  chatTextHexInput.addEventListener("blur", handleChatTextHexBlur);
-  resetColorButton.addEventListener("click", handleResetColor);
-  resetChatTextColorButton.addEventListener("click", handleResetChatTextColor);
+  syncControlsFromOptions();
+  syncPreview();
+  navigate("home");
+  await applyToActiveTab(currentOptions);
 }
 
 init().catch(() => {
-  setControls(DEFAULT_OPTIONS);
-  setStatus("초기화 실패");
+  currentOptions = normalizeOptions(DEFAULT_OPTIONS);
+  syncControlsFromOptions();
+  syncPreview();
+  setStatus("초기화 실패", "warn");
 });

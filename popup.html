@@ -7,179 +7,277 @@
     <link rel="stylesheet" href="popup.css">
   </head>
   <body>
-    <main class="popup">
-      <header class="popup__header">
-        <h1>채팅 설정</h1>
-        <p id="status" class="status" aria-live="polite">대기 중</p>
+    <div id="app" class="app">
+      <header class="topbar">
+        <div class="topbar__brand">
+          <span class="topbar__title">채팅 커스텀</span>
+          <div class="topbar__status">
+            <span class="status-dot" id="statusDot" aria-hidden="true"></span>
+            <span id="statusLabel" class="status-label" aria-live="polite">준비 중</span>
+          </div>
+        </div>
+        <button type="button" class="icon-btn" id="menuButton" aria-label="메뉴 열기" aria-haspopup="menu" aria-expanded="false">⋯</button>
       </header>
 
-      <nav class="tabs" role="tablist" aria-label="설정 분류">
-        <button type="button" id="textTab" class="tab is-active" role="tab" aria-selected="true" aria-controls="textPanel" data-tab-target="textPanel">표시</button>
-        <button type="button" id="styleTab" class="tab" role="tab" aria-selected="false" aria-controls="stylePanel" data-tab-target="stylePanel">꾸미기</button>
-        <button type="button" id="settingsTab" class="tab" role="tab" aria-selected="false" aria-controls="settingsPanel" data-tab-target="settingsPanel">설정</button>
-      </nav>
+      <menu class="menu" id="appMenu" hidden>
+        <button type="button" class="menu__item" id="resetDefaultsButton">기본값으로 초기화</button>
+      </menu>
 
-      <section id="textPanel" class="tab-panel is-active" role="tabpanel" aria-labelledby="textTab">
-        <div class="toggles" aria-label="표시 옵션">
-          <label class="toggle-row">
-            <span><strong>닉네임</strong></span>
-            <input type="checkbox" id="showNicknames">
-          </label>
-
-          <label class="toggle-row">
-            <span><strong>배지</strong></span>
-            <input type="checkbox" id="showBadges">
-          </label>
-
-          <label class="toggle-row">
-            <span><strong>타임스탬프</strong></span>
-            <input type="checkbox" id="showTimestamps">
-          </label>
-
-          <label class="toggle-row">
-            <span><strong>채팅 외 패널</strong></span>
-            <input type="checkbox" id="showNonChatPanels">
-          </label>
-
-          <label class="toggle-row">
-            <span><strong>비로그인 채팅창</strong></span>
-            <input type="checkbox" id="useGuestChatFrame">
-          </label>
-
-          <label class="toggle-row">
-            <span><strong>미니 채팅창</strong></span>
-            <input type="checkbox" id="useMiniFloatingChat">
-          </label>
-
-          <label class="toggle-row toggle-row--sub" data-parent-control="useMiniFloatingChat">
-            <span><strong>전체화면에서만 표시</strong></span>
-            <input type="checkbox" id="miniFloatingChatFullscreenOnly">
-          </label>
-
-        </div>
-      </section>
-
-      <section id="stylePanel" class="tab-panel" role="tabpanel" aria-labelledby="styleTab" hidden>
-        <div class="toggles" aria-label="꾸미기 옵션">
-          <div class="toggle-row toggle-row--with-disclosure">
-            <button type="button" id="toggleChatBoxColorPanel" class="disclosure-button" aria-label="박스 색상 항목 펼치기" aria-expanded="false" aria-controls="chatBoxColorPanel"></button>
-            <label class="toggle-row__label" for="showChatBoxes"><strong>채팅 박스</strong></label>
-            <input type="checkbox" id="showChatBoxes">
+      <main class="viewport">
+        <section class="view view--active" data-view="home" aria-label="홈">
+          <div class="preview-card" id="chatPreview" aria-label="채팅 미리보기">
+            <div class="preview-card__chrome">
+              <span class="preview-card__label">미리보기</span>
+              <span class="preview-card__mode" id="previewModeLabel">기본 채팅</span>
+            </div>
+            <div class="preview-card__chat">
+              <article class="preview-row">
+                <span class="preview-row__time">12:34</span>
+                <span class="preview-row__nick" data-preview-nick>치지직유저</span>
+                <span class="preview-row__badge" data-preview-badge aria-hidden="true">◆</span>
+                <span class="preview-row__text" data-preview-text>안녕하세요!</span>
+              </article>
+              <article class="preview-row">
+                <span class="preview-row__time">12:35</span>
+                <span class="preview-row__nick" data-preview-nick>구독자</span>
+                <span class="preview-row__badge" data-preview-badge aria-hidden="true">★</span>
+                <span class="preview-row__text" data-preview-text>반갑습니다</span>
+              </article>
+              <article class="preview-row">
+                <span class="preview-row__time">12:36</span>
+                <span class="preview-row__nick" data-preview-nick>시청자123</span>
+                <span class="preview-row__badge" data-preview-badge aria-hidden="true">●</span>
+                <span class="preview-row__text" data-preview-text>오늘 방송 재밌어요</span>
+              </article>
+            </div>
           </div>
 
-          <section id="chatBoxColorPanel" class="color-picker color-picker--sub" aria-label="채팅 박스 색상" hidden>
-            <div class="color-picker__controls">
-              <span id="colorPreview" class="color-preview" aria-hidden="true"></span>
-              <input type="text" id="chatBoxColorHex" class="hex-input" inputmode="text" maxlength="7" spellcheck="false" aria-label="색상 코드">
-              <button type="button" id="resetChatBoxColor" class="default-button">기본</button>
+          <div class="section">
+            <h2 class="section__title">스타일 프리셋</h2>
+            <div class="preset-row" id="presetRow" role="group" aria-label="프리셋">
+              <button type="button" class="preset-chip is-active" data-preset="default">기본</button>
+              <button type="button" class="preset-chip" data-preset="clean">깔끔</button>
+              <button type="button" class="preset-chip" data-preset="minimal">미니멀</button>
+              <button type="button" class="preset-chip" data-preset="custom" id="customPresetButton" title="클릭: 적용 · 우클릭: 현재 설정 저장">나만의</button>
             </div>
-
-            <div class="color-picker__body">
-              <button type="button" id="colorField" class="color-field" aria-label="색상 영역">
-                <span id="colorFieldHandle" class="color-field__handle"></span>
-              </button>
-              <input type="range" id="hueSlider" class="hue-slider" min="0" max="360" value="0" aria-label="색상 범위">
-            </div>
-          </section>
-
-          <div class="toggle-row toggle-row--with-disclosure">
-            <button type="button" id="toggleChatTextStylePanel" class="disclosure-button" aria-label="채팅 글자 스타일 항목 접기" aria-expanded="true" aria-controls="chatTextStylePanel"></button>
-            <span class="toggle-row__label"><strong>채팅 글자 스타일</strong></span>
           </div>
 
-          <section id="chatTextStylePanel" class="text-style-control text-style-control--sub" aria-label="채팅 글자 스타일">
-            <div id="chatFontSizeControl" class="text-style-control__font-size">
-              <div class="text-style-control__toggle text-style-control__toggle--with-disclosure">
-                <label class="text-style-control__label" for="showLargeText"><strong>글씨 크기 조정</strong></label>
-                <button type="button" id="toggleChatFontSizePanel" class="disclosure-button disclosure-button--trailing" aria-label="글씨 크기 항목 접기" aria-expanded="true" aria-controls="chatFontSizePanel"></button>
-                <input type="checkbox" id="showLargeText">
-              </div>
-
-              <section id="chatFontSizePanel" class="font-size-control font-size-control--nested" aria-label="글씨 크기">
-                <div class="font-size-control__header">
-                  <strong>글씨 크기</strong>
-                  <output id="chatFontSizeValue" class="font-size-value" for="chatFontSizePt">13pt</output>
-                </div>
-                <div class="font-size-control__controls">
-                  <input type="range" id="chatFontSizePt" class="font-size-slider" min="8" max="36" step="1" value="13" aria-label="글씨 크기 pt">
-                  <button type="button" id="resetChatFontSize" class="default-button">기본</button>
-                </div>
-                <label class="font-size-control__toggle">
-                  <span><strong>닉네임 크기 따로 조정</strong></span>
-                  <input type="checkbox" id="useNicknameFontSize">
-                </label>
-                <div id="nicknameFontSizeControl" class="font-size-control__nested">
-                  <div class="font-size-control__header">
-                    <strong>닉네임 크기</strong>
-                    <output id="nicknameFontSizeValue" class="font-size-value" for="nicknameFontSizePt">13pt</output>
-                  </div>
-                  <div class="font-size-control__controls">
-                    <input type="range" id="nicknameFontSizePt" class="font-size-slider" min="8" max="36" step="1" value="13" aria-label="닉네임 크기 pt">
-                    <button type="button" id="resetNicknameFontSize" class="default-button">기본</button>
-                  </div>
-                </div>
-              </section>
-            </div>
-
-            <label class="text-style-control__toggle">
-              <span><strong>굵게</strong></span>
-              <input type="checkbox" id="showBoldText">
-            </label>
-
-            <label class="text-style-control__toggle">
-              <span><strong>글자색 자동 보정</strong></span>
-              <input type="checkbox" id="useAutoTextContrast">
-            </label>
-
-            <div id="chatTextColorControl" class="text-style-control__color">
-              <div class="text-style-control__toggle text-style-control__toggle--with-disclosure">
-                <label class="text-style-control__label" for="useChatTextColor"><strong>글자 색상 변경</strong></label>
-                <button type="button" id="toggleChatTextColorPanel" class="disclosure-button disclosure-button--trailing" aria-label="글자 색상 항목 펼치기" aria-expanded="false" aria-controls="chatTextColorPanel"></button>
-                <input type="checkbox" id="useChatTextColor">
-              </div>
-
-              <section id="chatTextColorPanel" class="color-picker color-picker--nested" aria-label="채팅 글자 색상" hidden>
-                <div class="color-picker__controls">
-                  <span id="chatTextColorPreview" class="color-preview" aria-hidden="true"></span>
-                  <input type="text" id="chatTextColorHex" class="hex-input" inputmode="text" maxlength="7" spellcheck="false" aria-label="글자 색상 코드">
-                  <button type="button" id="resetChatTextColor" class="default-button">기본</button>
-                </div>
-
-                <div class="color-picker__body">
-                  <button type="button" id="chatTextColorField" class="color-field" aria-label="글자 색상 영역">
-                    <span id="chatTextColorFieldHandle" class="color-field__handle"></span>
-                  </button>
-                  <input type="range" id="chatTextHueSlider" class="hue-slider" min="0" max="360" value="0" aria-label="글자 색상 범위">
-                </div>
-              </section>
-
-              <label class="text-style-control__toggle text-style-control__toggle--nested-option">
-                <span><strong>닉네임 색상으로 채팅 표시</strong></span>
-                <input type="checkbox" id="useNicknameColorForMessage">
+          <div class="section">
+            <h2 class="section__title">빠른 조절</h2>
+            <div class="quick-grid" id="quickGrid">
+              <label class="quick-toggle">
+                <span>닉네임</span>
+                <input type="checkbox" data-option="showNicknames">
+              </label>
+              <label class="quick-toggle">
+                <span>배지</span>
+                <input type="checkbox" data-option="showBadges">
+              </label>
+              <label class="quick-toggle">
+                <span>시간</span>
+                <input type="checkbox" data-option="showTimestamps">
+              </label>
+              <label class="quick-toggle">
+                <span>박스</span>
+                <input type="checkbox" data-option="showChatBoxes">
               </label>
             </div>
-          </section>
+          </div>
 
-        </div>
-      </section>
+          <div class="section">
+            <h2 class="section__title">세부 설정</h2>
+            <div class="nav-grid">
+              <button type="button" class="nav-tile" data-goto="visibility">
+                <span class="nav-tile__label">보이기</span>
+                <span class="nav-tile__hint">닉네임·패널</span>
+              </button>
+              <button type="button" class="nav-tile" data-goto="style">
+                <span class="nav-tile__label">스타일</span>
+                <span class="nav-tile__hint">색·글자</span>
+              </button>
+              <button type="button" class="nav-tile" data-goto="chat-mode">
+                <span class="nav-tile__label">채팅창</span>
+                <span class="nav-tile__hint">기본·비로그인·미니</span>
+              </button>
+              <button type="button" class="nav-tile" data-goto="buttons">
+                <span class="nav-tile__label">버튼</span>
+                <span class="nav-tile__hint">헤더 아이콘</span>
+              </button>
+            </div>
+          </div>
+        </section>
 
-      <section id="settingsPanel" class="tab-panel" role="tabpanel" aria-labelledby="settingsTab" hidden>
-        <div class="toggles" aria-label="설정 옵션">
-          <label class="toggle-row">
-            <span><strong>비로그인 버튼 표시</strong></span>
-            <input type="checkbox" id="showGuestChatToggleButton">
-          </label>
-          <label class="toggle-row">
-            <span><strong>미니 채팅 버튼 표시</strong></span>
-            <input type="checkbox" id="showMiniFloatingChatButton">
-          </label>
-          <label class="toggle-row">
-            <span><strong>설정 아이콘 표시</strong></span>
-            <input type="checkbox" id="showHeaderSettingsButton">
-          </label>
-        </div>
-      </section>
-    </main>
+        <section class="view" data-view="visibility" hidden aria-label="보이기 설정">
+          <header class="view-header">
+            <button type="button" class="back-btn" data-back aria-label="뒤로">‹</button>
+            <h2 class="view-header__title">보이기</h2>
+          </header>
+          <div class="mini-preview" id="miniPreviewVisibility" aria-hidden="true"></div>
+          <div class="card-list">
+            <label class="setting-row">
+              <span class="setting-row__text"><strong>닉네임</strong><small>채팅 옆 이름 표시</small></span>
+              <input type="checkbox" data-option="showNicknames">
+            </label>
+            <label class="setting-row">
+              <span class="setting-row__text"><strong>배지</strong><small>구독·팬 배지 표시</small></span>
+              <input type="checkbox" data-option="showBadges">
+            </label>
+            <label class="setting-row">
+              <span class="setting-row__text"><strong>타임스탬프</strong><small>메시지 시간 표시</small></span>
+              <input type="checkbox" data-option="showTimestamps">
+            </label>
+            <label class="setting-row">
+              <span class="setting-row__text"><strong>채팅 외 패널</strong><small>랭킹·승부예측 등</small></span>
+              <input type="checkbox" data-option="showNonChatPanels" id="showNonChatPanels">
+            </label>
+          </div>
+        </section>
+
+        <section class="view" data-view="style" hidden aria-label="스타일 설정">
+          <header class="view-header">
+            <button type="button" class="back-btn" data-back aria-label="뒤로">‹</button>
+            <h2 class="view-header__title">스타일</h2>
+          </header>
+          <div class="card-list">
+            <div class="setting-block">
+              <label class="setting-row">
+                <span class="setting-row__text"><strong>채팅 박스</strong><small>메시지 배경 박스</small></span>
+                <input type="checkbox" data-option="showChatBoxes">
+              </label>
+              <div class="color-strip" data-color-target="box">
+                <div class="color-strip__chips" id="boxColorChips"></div>
+                <button type="button" class="color-strip__custom" data-open-color="box">직접 고르기</button>
+              </div>
+            </div>
+
+            <div class="setting-block">
+              <label class="setting-row">
+                <span class="setting-row__text"><strong>글씨 크기 조정</strong><small>채팅·이모티콘 크기</small></span>
+                <input type="checkbox" data-option="showLargeText" id="toggleChatTextStylePanel">
+              </label>
+              <div class="slider-block" data-when="showLargeText">
+                <div class="slider-block__head">
+                  <span>글씨 크기</span>
+                  <output id="chatFontSizePtValue" for="chatFontSizePt">13pt</output>
+                </div>
+                <input type="range" id="chatFontSizePt" data-option="chatFontSizePt" min="8" max="36" step="1" value="13">
+                <label class="setting-row setting-row--nested">
+                  <span class="setting-row__text"><strong>닉네임 크기 따로</strong></span>
+                  <input type="checkbox" data-option="useNicknameFontSize">
+                </label>
+                <div class="slider-block slider-block--nested" data-when="useNicknameFontSize">
+                  <div class="slider-block__head">
+                    <span>닉네임 크기</span>
+                    <output id="nicknameFontSizePtValue" for="nicknameFontSizePt">13pt</output>
+                  </div>
+                  <input type="range" id="nicknameFontSizePt" data-option="nicknameFontSizePt" min="8" max="36" step="1" value="13">
+                </div>
+              </div>
+            </div>
+
+            <label class="setting-row">
+              <span class="setting-row__text"><strong>굵게</strong></span>
+              <input type="checkbox" data-option="showBoldText">
+            </label>
+
+            <label class="setting-row">
+              <span class="setting-row__text"><strong>글자색 자동 보정</strong><small>배경에 맞게 대비 조정</small></span>
+              <input type="checkbox" data-option="useAutoTextContrast" id="useAutoTextContrast">
+            </label>
+
+            <div class="setting-block">
+              <label class="setting-row">
+                <span class="setting-row__text"><strong>글자 색상 변경</strong></span>
+                <input type="checkbox" data-option="useChatTextColor" id="useChatTextColor">
+              </label>
+              <div class="color-strip" data-color-target="text" data-when="useChatTextColor">
+                <div class="color-strip__chips" id="textColorChips"></div>
+                <button type="button" class="color-strip__custom" data-open-color="text" id="toggleChatTextColorPanel">직접 고르기</button>
+              </div>
+              <label class="setting-row setting-row--nested" id="nicknameColorRow" data-when="useChatTextColor">
+                <span class="setting-row__text"><strong>닉네임 색으로 채팅 표시</strong></span>
+                <input type="checkbox" data-option="useNicknameColorForMessage" id="useNicknameColorForMessage">
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" data-view="chat-mode" hidden aria-label="채팅창 설정">
+          <header class="view-header">
+            <button type="button" class="back-btn" data-back aria-label="뒤로">‹</button>
+            <h2 class="view-header__title">채팅창</h2>
+          </header>
+          <div class="card-list" role="radiogroup" aria-label="채팅창 모드">
+            <label class="mode-card">
+              <input type="radio" name="chatMode" value="default" checked>
+              <span class="mode-card__body">
+                <strong>치지직 기본</strong>
+                <small>지금 쓰는 채팅창 그대로</small>
+              </span>
+            </label>
+            <label class="mode-card">
+              <input type="radio" name="chatMode" value="guest" id="useGuestChatFrame">
+              <span class="mode-card__body">
+                <strong>비로그인 채팅</strong>
+                <small>로그인 없이 읽기 전용 채팅</small>
+              </span>
+            </label>
+            <label class="mode-card">
+              <input type="radio" name="chatMode" value="mini" id="useMiniFloatingChat">
+              <span class="mode-card__body">
+                <strong>미니 플로팅</strong>
+                <small>작은 창으로 띄우기</small>
+              </span>
+            </label>
+            <label class="setting-row setting-row--nested" data-when-chat-mode="mini">
+              <span class="setting-row__text"><strong>전체화면에서만 표시</strong></span>
+              <input type="checkbox" data-option="miniFloatingChatFullscreenOnly">
+            </label>
+          </div>
+        </section>
+
+        <section class="view" data-view="buttons" hidden aria-label="버튼 표시 설정">
+          <header class="view-header">
+            <button type="button" class="back-btn" data-back aria-label="뒤로">‹</button>
+            <h2 class="view-header__title">헤더 버튼</h2>
+          </header>
+          <div class="card-list">
+            <label class="setting-row">
+              <span class="setting-row__text"><strong>비로그인 전환 버튼</strong></span>
+              <input type="checkbox" data-option="showGuestChatToggleButton">
+            </label>
+            <label class="setting-row">
+              <span class="setting-row__text"><strong>미니 채팅 버튼</strong></span>
+              <input type="checkbox" data-option="showMiniFloatingChatButton" id="showMiniFloatingChatButton">
+            </label>
+            <label class="setting-row">
+              <span class="setting-row__text"><strong>설정 아이콘</strong></span>
+              <input type="checkbox" data-option="showHeaderSettingsButton" id="showHeaderSettingsButton">
+            </label>
+          </div>
+        </section>
+
+        <section class="view" data-view="color-picker" hidden aria-label="색상 선택">
+          <header class="view-header">
+            <button type="button" class="back-btn" data-color-back aria-label="뒤로">‹</button>
+            <h2 class="view-header__title" id="colorPickerTitle">색상 선택</h2>
+          </header>
+          <div class="color-picker">
+            <div class="color-picker__preview-row">
+              <span class="color-picker__swatch" id="colorPickerSwatch"></span>
+              <input type="text" class="color-picker__hex" id="chatTextColorHex" maxlength="7" spellcheck="false" aria-label="색상 코드">
+              <button type="button" class="ghost-btn" id="colorPickerReset">기본</button>
+            </div>
+            <div class="color-picker__surface">
+              <button type="button" class="color-picker__field" id="colorPickerField" aria-label="채도와 명도">
+                <span class="color-picker__handle" id="colorPickerHandle"></span>
+              </button>
+              <input type="range" class="color-picker__hue" id="colorPickerHue" min="0" max="360" value="0" aria-label="색상">
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
 
     <script src="popup.js"></script>
   </body>
