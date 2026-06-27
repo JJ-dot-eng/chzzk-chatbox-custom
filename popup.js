@@ -76,8 +76,10 @@ const PRESET_DEFINITIONS = {
   clean: {
     showNicknames: false,
     showBadges: false,
+    showTimestamps: false,
+    showNonChatPanels: false,
     showChatBoxes: true,
-    showNonChatPanels: true
+    showBoldText: true
   },
   minimal: {
     showBadges: false,
