@@ -60,7 +60,20 @@
               <button type="button" class="preset-chip" data-preset="minimal">미니멀</button>
               <div class="preset-custom-group">
                 <button type="button" class="preset-chip preset-chip--custom is-empty" data-preset="custom" id="customPresetButton">나만의</button>
-                <button type="button" class="preset-save-btn" id="saveCustomPresetButton">저장</button>
+                <button
+                  type="button"
+                  class="preset-save-btn"
+                  id="saveCustomPresetButton"
+                  aria-label="나만의 프리셋으로 저장"
+                  title="나만의 프리셋으로 저장"
+                >
+                  <svg class="preset-save-btn__icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path
+                      fill="currentColor"
+                      d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 16a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm3-10H5V5h10v4z"
+                    />
+                  </svg>
+                </button>
               </div>
             </div>
           </div>

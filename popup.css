@@ -333,19 +333,26 @@ label {
 }
 
 .preset-save-btn {
-  padding: 8px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--surface);
   color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
   cursor: pointer;
+}
+
+.preset-save-btn__icon {
+  display: block;
 }
 
 .preset-save-btn:hover {
   background: var(--hover-bg);
-  color: var(--text);
+  color: var(--accent);
 }
 
 .preset-save-btn:focus-visible {
