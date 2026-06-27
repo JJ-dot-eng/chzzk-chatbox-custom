@@ -72,7 +72,9 @@ const DEFAULT_OPTIONS = {
 };
 
 const PRESET_DEFINITIONS = {
-  default: {},
+  default: {
+    showNonChatPanels: false
+  },
   clean: {
     showNicknames: false,
     showBadges: false,
