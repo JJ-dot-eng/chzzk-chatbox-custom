@@ -65,13 +65,9 @@
           <div class="section">
             <h2 class="section__title">빠른 조절</h2>
             <div class="quick-grid" id="quickGrid">
-              <label class="quick-toggle">
-                <span>닉네임</span>
-                <input type="checkbox" data-option="showNicknames">
-              </label>
-              <label class="quick-toggle">
-                <span>배지</span>
-                <input type="checkbox" data-option="showBadges">
+              <label class="quick-toggle" title="닉네임과 배지를 함께 켜거나 끕니다">
+                <span>닉네임·배지</span>
+                <input type="checkbox" data-quick-bundle="identity">
               </label>
               <label class="quick-toggle">
                 <span>시간</span>
@@ -80,6 +76,10 @@
               <label class="quick-toggle">
                 <span>박스</span>
                 <input type="checkbox" data-option="showChatBoxes">
+              </label>
+              <label class="quick-toggle" title="굵게, 글자색 자동보정, 글자색 변경, 닉네임 색 채팅 적용">
+                <span>가독성 강화</span>
+                <input type="checkbox" data-quick-bundle="readability">
               </label>
             </div>
           </div>

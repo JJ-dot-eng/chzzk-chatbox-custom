@@ -116,6 +116,7 @@ const colorPickerReset = document.getElementById("colorPickerReset");
 
 const views = [...document.querySelectorAll("[data-view]")];
 const optionInputs = [...document.querySelectorAll("[data-option]")];
+const quickBundleInputs = [...document.querySelectorAll("[data-quick-bundle]")];
 const chatModeRadios = [...document.querySelectorAll('input[name="chatMode"]')];
 
 let currentOptions = normalizeOptions(DEFAULT_OPTIONS);
@@ -401,6 +402,47 @@ function syncNicknameColorDependencies() {
   nicknameColorRow?.classList.toggle("is-disabled", !isChatTextColorEnabled);
 }
 
+function isIdentityBundleActive() {
+  return currentOptions.showNicknames === true && currentOptions.showBadges === true;
+}
+
+function isReadabilityBundleActive() {
+  return (
+    currentOptions.showBoldText === true &&
+    currentOptions.useAutoTextContrast === true &&
+    currentOptions.useChatTextColor === true &&
+    currentOptions.useNicknameColorForMessage === true
+  );
+}
+
+function syncQuickBundles() {
+  for (const input of quickBundleInputs) {
+    if (input.dataset.quickBundle === "identity") {
+      input.checked = isIdentityBundleActive();
+      continue;
+    }
+
+    if (input.dataset.quickBundle === "readability") {
+      input.checked = isReadabilityBundleActive();
+    }
+  }
+}
+
+function applyQuickBundle(bundleId, enabled) {
+  if (bundleId === "identity") {
+    currentOptions.showNicknames = enabled;
+    currentOptions.showBadges = enabled;
+    return;
+  }
+
+  if (bundleId === "readability") {
+    currentOptions.showBoldText = enabled;
+    currentOptions.useAutoTextContrast = enabled;
+    currentOptions.useChatTextColor = enabled;
+    currentOptions.useNicknameColorForMessage = enabled;
+  }
+}
+
 function syncConditionalBlocks() {
   for (const block of document.querySelectorAll("[data-when]")) {
     const key = block.dataset.when;
@@ -443,6 +485,7 @@ function syncControlsFromOptions() {
   syncConditionalBlocks();
   renderColorChips();
   syncPresetButtons();
+  syncQuickBundles();
 }
 
 function syncPreview() {
@@ -750,6 +793,21 @@ function updateColorPickerFromField(event) {
   });
 }
 
+function handleQuickBundleInput(event) {
+  const input = event.target.closest("[data-quick-bundle]");
+
+  if (!input) {
+    return;
+  }
+
+  applyQuickBundle(input.dataset.quickBundle, input.checked);
+  syncNicknameColorDependencies();
+  syncConditionalBlocks();
+  syncControlsFromOptions();
+  syncPreview();
+  scheduleCommit();
+}
+
 function handleOptionInput(event) {
   const input = event.target.closest("[data-option]");
 
@@ -795,6 +853,11 @@ function handleChatModeChange(event) {
 
 function bindEvents() {
   app.addEventListener("change", (event) => {
+    if (event.target.matches("[data-quick-bundle]")) {
+      handleQuickBundleInput(event);
+      return;
+    }
+
     if (event.target.matches("[data-option]")) {
       handleOptionInput(event);
       return;

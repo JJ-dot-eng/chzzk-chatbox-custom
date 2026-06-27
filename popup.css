@@ -326,6 +326,11 @@ label {
   font-weight: 700;
 }
 
+.quick-toggle span {
+  font-size: 11px;
+  line-height: 1.25;
+}
+
 .nav-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
