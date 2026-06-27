@@ -1,6 +1,6 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const PRESET_STORAGE_KEY = "chzzkChatUiToggleCustomPreset";
-const CONTENT_VERSION = "0.4.5";
+const CONTENT_VERSION = "0.5.1";
 const POPUP_THEME_FALLBACK = "light";
 
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
