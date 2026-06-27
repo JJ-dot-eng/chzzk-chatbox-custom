@@ -20,7 +20,6 @@
       </header>
 
       <menu class="menu" id="appMenu" hidden>
-        <button type="button" class="menu__item" id="saveCustomPresetButton">나만의 프리셋으로 저장</button>
         <button type="button" class="menu__item" id="resetDefaultsButton">기본값으로 초기화</button>
       </menu>
 
@@ -59,7 +58,10 @@
               <button type="button" class="preset-chip is-active" data-preset="default">기본</button>
               <button type="button" class="preset-chip" data-preset="clean">깔끔</button>
               <button type="button" class="preset-chip" data-preset="minimal">미니멀</button>
-              <button type="button" class="preset-chip preset-chip--custom is-empty" data-preset="custom" id="customPresetButton">나만의</button>
+              <div class="preset-custom-group">
+                <button type="button" class="preset-chip preset-chip--custom is-empty" data-preset="custom" id="customPresetButton">나만의</button>
+                <button type="button" class="preset-save-btn" id="saveCustomPresetButton">저장</button>
+              </div>
             </div>
           </div>
 

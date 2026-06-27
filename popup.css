@@ -326,6 +326,33 @@ label {
   gap: 6px;
 }
 
+.preset-custom-group {
+  display: inline-flex;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.preset-save-btn {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.preset-save-btn:hover {
+  background: var(--hover-bg);
+  color: var(--text);
+}
+
+.preset-save-btn:focus-visible {
+  outline: 2px solid rgba(0, 196, 113, 0.55);
+  outline-offset: 2px;
+}
+
 .preset-chip {
   padding: 8px 12px;
   border: 1px solid var(--line);
@@ -349,11 +376,6 @@ label {
 
 .preset-chip--custom.is-saved:not(.is-active) {
   border-color: rgba(0, 196, 113, 0.28);
-}
-
-.preset-chip--custom.is-pressing {
-  transform: scale(0.97);
-  background: var(--accent-dim);
 }
 
 .quick-grid {
