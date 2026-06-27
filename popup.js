@@ -30,6 +30,8 @@ const COLOR_CHIPS = [
   { id: "dark", hex: "#101418" }
 ];
 
+const PREVIEW_NICKNAME_COLORS = ["#00c471", "#4b8bff", "#e85d8f"];
+
 const NAMED_CHAT_BOX_COLORS = {
   gray: "#808080",
   green: "#00c471",
@@ -541,11 +543,44 @@ function syncPreview() {
     currentOptions.showChatBoxes ? `${hexToRgba(currentOptions.chatBoxColor, 0.22)}` : "transparent"
   );
 
-  const textColor = currentOptions.useChatTextColor
-    ? currentOptions.chatTextColor
-    : DEFAULT_CHAT_TEXT_COLOR;
-  chatPreview.style.setProperty("--preview-text", textColor);
-  chatPreview.style.setProperty("--preview-nick", currentOptions.useNicknameColorForMessage ? textColor : "#00c471");
+  const useCustomTextColor = currentOptions.useChatTextColor === true;
+  const useNicknameMessageColor =
+    useCustomTextColor && currentOptions.useNicknameColorForMessage === true;
+  const customTextColor = currentOptions.chatTextColor;
+
+  if (useCustomTextColor && !useNicknameMessageColor) {
+    chatPreview.style.setProperty("--preview-text", customTextColor);
+  } else {
+    chatPreview.style.removeProperty("--preview-text");
+  }
+
+  const previewRows = chatPreview.querySelectorAll(".preview-row");
+
+  previewRows.forEach((row, index) => {
+    const nickColor = PREVIEW_NICKNAME_COLORS[index % PREVIEW_NICKNAME_COLORS.length];
+    const nick = row.querySelector("[data-preview-nick]");
+    const text = row.querySelector("[data-preview-text]");
+
+    if (nick) {
+      nick.style.color = nickColor;
+    }
+
+    if (!text) {
+      return;
+    }
+
+    if (useNicknameMessageColor) {
+      text.style.color = nickColor;
+      return;
+    }
+
+    if (useCustomTextColor) {
+      text.style.color = customTextColor;
+      return;
+    }
+
+    text.style.removeProperty("color");
+  });
 
   const modeLabels = {
     default: "기본 채팅",
