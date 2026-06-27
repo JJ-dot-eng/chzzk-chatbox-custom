@@ -1,6 +1,7 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const PRESET_STORAGE_KEY = "chzzkChatUiToggleCustomPreset";
 const CONTENT_VERSION = "0.4.5";
+const POPUP_THEME_FALLBACK = "light";
 
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const DEFAULT_CHAT_TEXT_COLOR = "#101418";
@@ -365,6 +366,34 @@ function setStatus(message, tone = "idle") {
   }
 }
 
+function normalizePopupTheme(value) {
+  return value === "dark" ? "dark" : "light";
+}
+
+function applyPopupTheme(theme) {
+  document.documentElement.dataset.popupTheme = normalizePopupTheme(theme);
+}
+
+async function resolvePopupThemeFromActiveTab() {
+  const tab = await queryActiveTab();
+
+  if (!tab?.id || !tab.url?.startsWith("https://chzzk.naver.com/")) {
+    return POPUP_THEME_FALLBACK;
+  }
+
+  const status = await getContentStatus(tab.id);
+
+  if (status?.detectedTheme) {
+    return normalizePopupTheme(status.detectedTheme);
+  }
+
+  return POPUP_THEME_FALLBACK;
+}
+
+async function syncPopupTheme() {
+  applyPopupTheme(await resolvePopupThemeFromActiveTab());
+}
+
 function navigate(viewName, { rememberColorReturn = false } = {}) {
   if (viewName !== "color-picker" && !rememberColorReturn) {
     returnViewAfterColor = viewName === "home" ? "style" : viewName;
@@ -712,11 +741,18 @@ async function applyToActiveTab(options) {
   const tab = await queryActiveTab();
 
   if (!tab?.id || !tab.url?.startsWith("https://chzzk.naver.com/")) {
+    applyPopupTheme(POPUP_THEME_FALLBACK);
     setStatus("치지직 탭 아님", "warn");
     return false;
   }
 
   const ready = await ensureCurrentContentScript(tab.id);
+  const status = await getContentStatus(tab.id);
+
+  if (status?.detectedTheme) {
+    applyPopupTheme(status.detectedTheme);
+  }
+
   const applied = await sendOptionsToTab(tab.id, options);
 
   if (ready && applied?.ok) {
@@ -987,6 +1023,8 @@ function bindEvents() {
 
 async function init() {
   bindEvents();
+  applyPopupTheme(POPUP_THEME_FALLBACK);
+  await syncPopupTheme();
 
   const stored = await getStoredOptions();
   currentOptions = stored.options;

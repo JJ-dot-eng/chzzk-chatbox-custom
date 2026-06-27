@@ -302,6 +302,8 @@ for (const token of [
 }
 
 for (const token of [
+  'data-popup-theme="light"',
+  "html[data-popup-theme=\"dark\"]",
   ".preview-card",
   ".preset-chip",
   ".nav-tile",
@@ -317,7 +319,9 @@ for (const token of [
   'data-option="showNicknames"',
   "function navigate(viewName",
   "PRESET_DEFINITIONS",
-  "function syncPreview()"
+  "function syncPreview()",
+  "function syncPopupTheme()",
+  "function applyPopupTheme(theme)"
 ]) {
   const popupUiSource = `${popupMarkup}\n${popupSource}`;
   assertIncludes(popupUiSource, token, "popup must keep the redesigned settings controller");

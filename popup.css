@@ -1,4 +1,37 @@
-:root {
+:root,
+html[data-popup-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f6f8;
+  --surface: #ffffff;
+  --surface-2: #f8fafb;
+  --line: #dfe4ea;
+  --text: #101418;
+  --muted: #66707c;
+  --accent: #00c471;
+  --accent-strong: #009f5b;
+  --accent-dim: rgba(0, 196, 113, 0.14);
+  --danger: #e03131;
+  --shadow: 0 8px 24px rgba(10, 18, 28, 0.08);
+  --topbar-gradient-start: #ffffff;
+  --hover-bg: rgba(10, 18, 28, 0.06);
+  --preview-glow: rgba(0, 196, 113, 0.08);
+  --preview-chrome: rgba(10, 18, 28, 0.03);
+  --switch-off-bg: #d9dee4;
+  --switch-off-border: #c8d0d8;
+  --switch-thumb: #ffffff;
+  --switch-thumb-shadow: 0 1px 4px rgba(10, 18, 28, 0.2);
+  --status-idle-ring: rgba(102, 112, 124, 0.16);
+  --chip-ring: rgba(255, 255, 255, 0.85);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --preview-box: rgba(128, 128, 128, 0.18);
+  --preview-text: #101418;
+  --preview-nick: #00c471;
+  --preview-font: 13px;
+}
+
+html[data-popup-theme="dark"] {
   color-scheme: dark;
   --bg: #0f1218;
   --surface: #181d26;
@@ -7,16 +40,23 @@
   --text: #eef2f7;
   --muted: #8b97a8;
   --accent: #00c471;
+  --accent-strong: #009f5b;
   --accent-dim: rgba(0, 196, 113, 0.16);
   --danger: #ff6b6b;
   --shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
-  --radius: 12px;
-  --radius-sm: 8px;
-  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --topbar-gradient-start: #141922;
+  --hover-bg: rgba(255, 255, 255, 0.06);
+  --preview-glow: rgba(0, 196, 113, 0.08);
+  --preview-chrome: rgba(255, 255, 255, 0.02);
+  --switch-off-bg: #2a3340;
+  --switch-off-border: #3a4656;
+  --switch-thumb: #ffffff;
+  --switch-thumb-shadow: 0 1px 4px rgba(0, 0, 0, 0.28);
+  --status-idle-ring: rgba(139, 151, 168, 0.14);
+  --chip-ring: #ffffff;
   --preview-box: rgba(128, 128, 128, 0.22);
   --preview-text: #eef2f7;
   --preview-nick: #00c471;
-  --preview-font: 13px;
 }
 
 *,
@@ -55,7 +95,7 @@ label {
   gap: 10px;
   padding: 12px 12px 8px;
   border-bottom: 1px solid var(--line);
-  background: linear-gradient(180deg, #141922 0%, var(--bg) 100%);
+  background: linear-gradient(180deg, var(--topbar-gradient-start) 0%, var(--bg) 100%);
 }
 
 .topbar__brand {
@@ -80,7 +120,7 @@ label {
   height: 8px;
   border-radius: 50%;
   background: var(--muted);
-  box-shadow: 0 0 0 3px rgba(139, 151, 168, 0.14);
+  box-shadow: 0 0 0 3px var(--status-idle-ring);
 }
 
 .status-dot.is-ok {
@@ -128,7 +168,7 @@ label {
 .nav-tile:hover,
 .color-strip__custom:hover,
 .menu__item:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--hover-bg);
 }
 
 .menu {
@@ -200,7 +240,7 @@ label {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background:
-    radial-gradient(circle at top right, rgba(0, 196, 113, 0.08), transparent 42%),
+    radial-gradient(circle at top right, var(--preview-glow), transparent 42%),
     var(--surface);
   box-shadow: var(--shadow);
 }
@@ -212,7 +252,7 @@ label {
   gap: 8px;
   padding: 8px 10px;
   border-bottom: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--preview-chrome);
 }
 
 .preview-card__label,
@@ -439,9 +479,9 @@ input[type="radio"] {
   width: 40px;
   height: 22px;
   margin: 0;
-  border: 1px solid #3a4656;
+  border: 1px solid var(--switch-off-border);
   border-radius: 999px;
-  background: #2a3340;
+  background: var(--switch-off-bg);
   cursor: pointer;
   transition: background-color 140ms ease, border-color 140ms ease;
 }
@@ -459,13 +499,13 @@ input[type="checkbox"]::after {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.28);
+  background: var(--switch-thumb);
+  box-shadow: var(--switch-thumb-shadow);
   transition: transform 140ms ease;
 }
 
 input[type="checkbox"]:checked {
-  border-color: #009f5b;
+  border-color: var(--accent-strong);
   background: var(--accent);
 }
 
@@ -563,7 +603,7 @@ input[type="range"] {
 }
 
 .color-chip.is-active {
-  border-color: #ffffff;
+  border-color: var(--chip-ring);
   box-shadow: 0 0 0 2px var(--accent-dim);
 }
 
