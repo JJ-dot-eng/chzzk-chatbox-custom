@@ -408,6 +408,8 @@ function isIdentityBundleActive() {
 
 function isReadabilityBundleActive() {
   return (
+    currentOptions.showChatBoxes === true &&
+    currentOptions.showLargeText === true &&
     currentOptions.showBoldText === true &&
     currentOptions.useAutoTextContrast === true &&
     currentOptions.useChatTextColor === true &&
@@ -436,6 +438,8 @@ function applyQuickBundle(bundleId, enabled) {
   }
 
   if (bundleId === "readability") {
+    currentOptions.showChatBoxes = enabled;
+    currentOptions.showLargeText = enabled;
     currentOptions.showBoldText = enabled;
     currentOptions.useAutoTextContrast = enabled;
     currentOptions.useChatTextColor = enabled;
