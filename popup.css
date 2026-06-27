@@ -342,6 +342,20 @@ label {
   color: var(--text);
 }
 
+.preset-chip--custom.is-empty {
+  border-style: dashed;
+  color: var(--muted);
+}
+
+.preset-chip--custom.is-saved:not(.is-active) {
+  border-color: rgba(0, 196, 113, 0.28);
+}
+
+.preset-chip--custom.is-pressing {
+  transform: scale(0.97);
+  background: var(--accent-dim);
+}
+
 .quick-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

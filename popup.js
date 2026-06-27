@@ -104,6 +104,7 @@ const chatPreview = document.getElementById("chatPreview");
 const previewModeLabel = document.getElementById("previewModeLabel");
 const presetRow = document.getElementById("presetRow");
 const customPresetButton = document.getElementById("customPresetButton");
+const saveCustomPresetButton = document.getElementById("saveCustomPresetButton");
 const menuButton = document.getElementById("menuButton");
 const appMenu = document.getElementById("appMenu");
 const resetDefaultsButton = document.getElementById("resetDefaultsButton");
@@ -134,6 +135,8 @@ let colorPickerHsv = { hue: 0, saturation: 0, value: 0.5 };
 let commitTimer = 0;
 let returnViewAfterColor = "style";
 let customPresetSnapshot = null;
+let customPresetPressTimer = 0;
+let customPresetLongPressHandled = false;
 
 function clampNumber(value, min, max, fallback) {
   const number = Number(value);
@@ -635,12 +638,22 @@ function renderChipGroup(container, activeHex, target) {
 
 function syncPresetButtons() {
   for (const button of presetRow.querySelectorAll("[data-preset]")) {
-    button.classList.toggle("is-active", button.dataset.preset === activePreset);
+    const isActive = activePreset !== "" && button.dataset.preset === activePreset;
+    button.classList.toggle("is-active", isActive);
   }
 
-  if (customPresetSnapshot) {
-    customPresetButton.textContent = "나만의";
-  }
+  const hasCustomPreset = Boolean(customPresetSnapshot);
+  customPresetButton.classList.toggle("is-empty", !hasCustomPreset);
+  customPresetButton.classList.toggle("is-saved", hasCustomPreset);
+  customPresetButton.title = hasCustomPreset
+    ? "클릭: 저장한 나만의 프리셋 불러오기 · 길게 누르기: 다시 저장"
+    : "길게 눌러 지금 설정을 나만의 프리셋으로 저장";
+  customPresetButton.setAttribute(
+    "aria-label",
+    hasCustomPreset
+      ? "나만의 프리셋 불러오기. 길게 누르면 현재 설정을 다시 저장합니다."
+      : "나만의 프리셋이 비어 있습니다. 길게 눌러 현재 설정을 저장하세요."
+  );
 }
 
 function detectPreset(options) {
@@ -658,7 +671,17 @@ function detectPreset(options) {
     }
   }
 
-  return "custom";
+  return "";
+}
+
+function loadCustomPreset() {
+  if (!customPresetSnapshot) {
+    setStatus("저장된 나만의 프리셋 없음 · 길게 눌러 저장", "warn");
+    return;
+  }
+
+  applyPreset("custom");
+  setStatus("나만의 프리셋 불러옴", "ok");
 }
 
 function applyPreset(presetId) {
@@ -680,10 +703,29 @@ function applyPreset(presetId) {
 
 function saveCustomPreset() {
   customPresetSnapshot = normalizeOptions(currentOptions);
-  chrome.storage.local.set({ [PRESET_STORAGE_KEY]: customPresetSnapshot });
-  activePreset = "custom";
-  syncPresetButtons();
-  setStatus("나만의 프리셋 저장됨", "ok");
+
+  chrome.storage.local.set({ [PRESET_STORAGE_KEY]: customPresetSnapshot }, () => {
+    activePreset = "custom";
+    syncPresetButtons();
+    setStatus("나만의 프리셋 저장됨", "ok");
+  });
+}
+
+function beginCustomPresetPress() {
+  window.clearTimeout(customPresetPressTimer);
+  customPresetLongPressHandled = false;
+  customPresetButton.classList.add("is-pressing");
+
+  customPresetPressTimer = window.setTimeout(() => {
+    customPresetLongPressHandled = true;
+    saveCustomPreset();
+    customPresetButton.classList.remove("is-pressing");
+  }, 480);
+}
+
+function endCustomPresetPress() {
+  window.clearTimeout(customPresetPressTimer);
+  customPresetButton.classList.remove("is-pressing");
 }
 
 function scheduleCommit() {
@@ -985,8 +1027,13 @@ function bindEvents() {
     const presetButton = event.target.closest("[data-preset]");
 
     if (presetButton) {
-      if (presetButton.dataset.preset === "custom" && event.detail === 2) {
-        saveCustomPreset();
+      if (presetButton.dataset.preset === "custom") {
+        if (customPresetLongPressHandled) {
+          customPresetLongPressHandled = false;
+          return;
+        }
+
+        loadCustomPreset();
         return;
       }
 
@@ -994,8 +1041,26 @@ function bindEvents() {
     }
   });
 
+  customPresetButton.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) {
+      return;
+    }
+
+    beginCustomPresetPress();
+  });
+
+  customPresetButton.addEventListener("pointerup", endCustomPresetPress);
+  customPresetButton.addEventListener("pointercancel", endCustomPresetPress);
+  customPresetButton.addEventListener("pointerleave", endCustomPresetPress);
+
   customPresetButton.addEventListener("contextmenu", (event) => {
     event.preventDefault();
+    saveCustomPreset();
+  });
+
+  saveCustomPresetButton.addEventListener("click", () => {
+    appMenu.hidden = true;
+    menuButton.setAttribute("aria-expanded", "false");
     saveCustomPreset();
   });
 
