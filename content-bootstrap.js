@@ -1,4 +1,4 @@
-var SCRIPT_VERSION = "0.5.2";
+var SCRIPT_VERSION = "0.5.3";
 var GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 var CHZZK_CHAT_UI_TOGGLE_SHOULD_START = !window[GLOBAL_KEY];
 

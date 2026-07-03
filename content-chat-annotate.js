@@ -844,6 +844,141 @@ function isNearNeutralRgb(color) {
     AUTO_CONTRAST_NEUTRAL_CHANNEL_DELTA;
 }
 
+function clampRgbChannel(value) {
+  return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function rgbToCssColor(color) {
+  return `rgb(${clampRgbChannel(color.red)}, ${clampRgbChannel(color.green)}, ${clampRgbChannel(color.blue)})`;
+}
+
+function rgbToHsl(color) {
+  const red = color.red / 255;
+  const green = color.green / 255;
+  const blue = color.blue / 255;
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  const lightness = (max + min) / 2;
+  const delta = max - min;
+
+  if (delta === 0) {
+    return { hue: 0, saturation: 0, lightness };
+  }
+
+  const saturation = lightness > 0.5
+    ? delta / (2 - max - min)
+    : delta / (max + min);
+  let hue;
+
+  if (max === red) {
+    hue = (green - blue) / delta + (green < blue ? 6 : 0);
+  } else if (max === green) {
+    hue = (blue - red) / delta + 2;
+  } else {
+    hue = (red - green) / delta + 4;
+  }
+
+  return {
+    hue: hue * 60,
+    saturation,
+    lightness
+  };
+}
+
+function hueToRgb(p, q, t) {
+  let normalizedT = t;
+
+  if (normalizedT < 0) {
+    normalizedT += 1;
+  }
+
+  if (normalizedT > 1) {
+    normalizedT -= 1;
+  }
+
+  if (normalizedT < 1 / 6) {
+    return p + (q - p) * 6 * normalizedT;
+  }
+
+  if (normalizedT < 1 / 2) {
+    return q;
+  }
+
+  if (normalizedT < 2 / 3) {
+    return p + (q - p) * (2 / 3 - normalizedT) * 6;
+  }
+
+  return p;
+}
+
+function hslToRgb(color) {
+  const hue = (((color.hue % 360) + 360) % 360) / 360;
+  const saturation = Math.max(0, Math.min(1, color.saturation));
+  const lightness = Math.max(0, Math.min(1, color.lightness));
+
+  if (saturation === 0) {
+    const channel = lightness * 255;
+
+    return { red: channel, green: channel, blue: channel };
+  }
+
+  const q = lightness < 0.5
+    ? lightness * (1 + saturation)
+    : lightness + saturation - lightness * saturation;
+  const p = 2 * lightness - q;
+
+  return {
+    red: hueToRgb(p, q, hue + 1 / 3) * 255,
+    green: hueToRgb(p, q, hue) * 255,
+    blue: hueToRgb(p, q, hue - 1 / 3) * 255
+  };
+}
+
+function getHuePreservingContrastColor(textRgb, backgroundRgb) {
+  if (!textRgb || isNearNeutralRgb(textRgb)) {
+    return null;
+  }
+
+  const hsl = rgbToHsl(textRgb);
+
+  if (hsl.saturation < 0.08) {
+    return null;
+  }
+
+  const saturationCandidates = [
+    hsl.saturation,
+    Math.max(hsl.saturation, 0.52)
+  ];
+  let bestColor = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  let bestContrast = 0;
+
+  for (let lightnessStep = 8; lightnessStep <= 92; lightnessStep += 2) {
+    for (const saturation of saturationCandidates) {
+      const candidate = hslToRgb({
+        hue: hsl.hue,
+        saturation,
+        lightness: lightnessStep / 100
+      });
+      const contrast = getContrastRatio(candidate, backgroundRgb);
+
+      if (contrast < AUTO_CONTRAST_MIN_RATIO) {
+        continue;
+      }
+
+      const distance = getRgbDistance(candidate, textRgb);
+
+      if (distance < bestDistance || (distance === bestDistance && contrast > bestContrast)) {
+        bestColor = candidate;
+        bestDistance = distance;
+        bestContrast = contrast;
+      }
+    }
+  }
+
+  return bestColor ? rgbToCssColor(bestColor) : null;
+}
+
 function getChatBoxContrastBackgroundRgb() {
   const boxColor = hexToRgb(currentOptions.chatBoxColor);
   const backdrop = getThemeBackdropRgb();
@@ -882,7 +1017,7 @@ function getContrastBackgroundRgb(row) {
     : getAmbientContrastBackgroundRgb(row);
 }
 
-function getAutoContrastCacheKey(textRgb, backgroundRgb, { preferAccent = false } = {}) {
+function getAutoContrastCacheKey(textRgb, backgroundRgb, { preferAccent = false, neutralOnly = false } = {}) {
   return [
     Math.round(textRgb.red),
     Math.round(textRgb.green),
@@ -890,7 +1025,8 @@ function getAutoContrastCacheKey(textRgb, backgroundRgb, { preferAccent = false 
     Math.round(backgroundRgb.red),
     Math.round(backgroundRgb.green),
     Math.round(backgroundRgb.blue),
-    preferAccent ? "accent" : "plain"
+    preferAccent ? "accent" : "plain",
+    neutralOnly ? "neutral" : "wide"
   ].join(",");
 }
 
@@ -908,9 +1044,17 @@ function rememberAutoContrastResult(key, value) {
   }
 }
 
-function getReadableContrastColor(backgroundRgb, { preferAccent = false } = {}) {
+function getReadableContrastColor(backgroundRgb, { preferAccent = false, originalRgb = null } = {}) {
   const black = { red: 0, green: 0, blue: 0 };
   const white = { red: 255, green: 255, blue: 255 };
+
+  if (preferAccent) {
+    const huePreservingColor = getHuePreservingContrastColor(originalRgb, backgroundRgb);
+
+    if (huePreservingColor) {
+      return huePreservingColor;
+    }
+  }
 
   if (preferAccent) {
     const accent = getReadableAccentContrastColor(backgroundRgb);
@@ -947,7 +1091,7 @@ function getReadableAccentContrastColor(backgroundRgb) {
   return bestContrast >= AUTO_CONTRAST_MIN_RATIO ? bestColor : null;
 }
 
-function getAutoContrastColor(color, backgroundRgb, { preferAccent = false } = {}) {
+function getAutoContrastColor(color, backgroundRgb, { preferAccent = false, neutralOnly = false } = {}) {
   const parsedColor = parseCssRgbColorForContrast(color);
 
   if (!parsedColor) {
@@ -957,21 +1101,31 @@ function getAutoContrastColor(color, backgroundRgb, { preferAccent = false } = {
   const textRgb = parsedColor.alpha < 1
     ? blendRgb(parsedColor, backgroundRgb, parsedColor.alpha)
     : parsedColor;
-  const cacheKey = getAutoContrastCacheKey(textRgb, backgroundRgb, { preferAccent });
+  const cacheKey = getAutoContrastCacheKey(textRgb, backgroundRgb, { preferAccent, neutralOnly });
 
   if (autoContrastCache.has(cacheKey)) {
     return autoContrastCache.get(cacheKey);
   }
 
   const currentContrast = getContrastRatio(textRgb, backgroundRgb);
-  const shouldCorrect =
-    currentContrast < AUTO_CONTRAST_MIN_RATIO &&
-    (
-      preferAccent ||
-      isNearNeutralRgb(textRgb) ||
+
+  if (currentContrast >= AUTO_CONTRAST_MIN_RATIO) {
+    rememberAutoContrastResult(cacheKey, null);
+    return null;
+  }
+
+  const isNeutralColor = isNearNeutralRgb(textRgb);
+  const shouldConsiderColor = neutralOnly
+    ? isNeutralColor
+    : (
+      isNeutralColor ||
+      (
+        preferAccent &&
+        getHuePreservingContrastColor(textRgb, backgroundRgb)
+      ) ||
       getRgbDistance(textRgb, backgroundRgb) <= AUTO_CONTRAST_NEAR_COLOR_DISTANCE
     );
-  const result = shouldCorrect ? getReadableContrastColor(backgroundRgb, { preferAccent }) : null;
+  const result = shouldConsiderColor ? getReadableContrastColor(backgroundRgb, { preferAccent, originalRgb: textRgb }) : null;
 
   rememberAutoContrastResult(cacheKey, result);
   return result;
@@ -1054,14 +1208,17 @@ function syncAutoContrast(row) {
   clearAutoContrast(row);
 
   const shouldAutoContrast = currentOptions.useAutoTextContrast === true;
-  const shouldProtectNicknameColorMessage =
+  const shouldProtectNeutralNicknameColorMessage =
     currentOptions.useChatTextColor === true &&
     currentOptions.useNicknameColorForMessage === true;
 
-  if (!shouldAutoContrast && !shouldProtectNicknameColorMessage) {
+  if (!shouldAutoContrast && !shouldProtectNeutralNicknameColorMessage) {
     return;
   }
 
+  const shouldPreferAccentForNicknameColorMessage =
+    currentOptions.useChatTextColor === true &&
+    currentOptions.useNicknameColorForMessage === true;
   const backgroundRgb = getContrastBackgroundRgb(row);
   const contrastRoles = [];
 
@@ -1078,7 +1235,8 @@ function syncAutoContrast(row) {
   const messageText = getMessageTextElement(row);
   const messageColor = messageText instanceof HTMLElement ? getMessageBaseTextColor(row) : null;
   const autoMessageColor = getAutoContrastColor(messageColor, backgroundRgb, {
-    preferAccent: shouldProtectNicknameColorMessage
+    preferAccent: shouldPreferAccentForNicknameColorMessage,
+    neutralOnly: !shouldAutoContrast && shouldProtectNeutralNicknameColorMessage
   });
 
   if (autoMessageColor) {
