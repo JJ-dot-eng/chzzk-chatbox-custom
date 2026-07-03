@@ -272,17 +272,39 @@ product-after-direction.md
   - 스트리머 채팅 행 감지 수정
   - 비로그인 채팅 README 문구 정리
   - 스토어 리뷰 친화 문구 정리
+  - 확장 권한을 심사 친화적으로 축소
 
 기술 변경:
 
 - `content.css` 분리
 - 기존 큰 `content.js` 구조 정리 준비
 - package/validator 구조 대폭 정리
+- `activeTab`, `scripting`, `webNavigation` 권한 제거
+- `https://*.chzzk.naver.com/*` wildcard host permission 제거
+- 남긴 권한은 `storage`와 `https://chzzk.naver.com/*`로 축소
+
+권한 변경 배경:
+
+초기 버전에서는 실제 치지직 페이지와 subframe 대응, stale content script 재주입, navigation 대응을 위해 권한이 점점 늘어났다.
+
+- `0.1.0`: `storage`, `activeTab`
+- `0.1.1`: `scripting` 추가
+- `0.1.14`: `webNavigation` 추가
+- subframe 대응 과정에서 `https://*.chzzk.naver.com/*` host permission 사용
+
+하지만 스토어 심사 관점에서는 권한이 많을수록 심사가 늦어지거나 설명 부담이 커질 수 있다. `0.4.1`에서는 이 문제를 줄이기 위해 직접 주입과 navigation 재주입 흐름을 제거하고, manifest content script 중심으로 단순화했다.
+
+현재 방향은 다음과 같다.
+
+```text
+필수 권한만 남긴다.
+불필요한 재주입 권한보다 manifest content script와 사용자의 새로고침 안내를 우선한다.
+```
 
 릴리스 메모:
 
 ```text
-스토어 리뷰와 유지보수를 위해 구조와 문구를 정리한 릴리스.
+스토어 리뷰와 유지보수를 위해 권한, 구조, 문구를 정리한 릴리스.
 ```
 
 ### 4.11 `0.4.2`
@@ -491,6 +513,27 @@ product-after-direction.md
 - 사용자가 `글자색 자동 보정`을 켠 경우에만 보정한다.
 - 자동 보정이 꺼져 있으면 사용자가 고른 색을 최대한 그대로 둔다.
 - 닉네임 색 메시지도 불필요하게 바꾸지 않는다.
+
+### 6.6 확장 권한은 최소화한다
+
+`0.4.1`에서 권한을 크게 줄인 뒤, 현재 제품 방향은 "필요한 권한만 남긴다"로 정리됐다.
+
+현재 manifest 기준:
+
+```text
+permissions:
+- storage
+
+host_permissions:
+- https://chzzk.naver.com/*
+```
+
+이 결정의 이유는 두 가지다.
+
+- 스토어 심사에서 과도한 권한으로 보이는 것을 줄인다.
+- 이 확장이 "내 브라우저에서만 채팅 표시를 조정한다"는 제품 방향을 권한 구조에서도 보여준다.
+
+따라서 앞으로 새 기능을 만들 때도 `activeTab`, `scripting`, `webNavigation`, 넓은 host permission을 다시 추가하기 전에 먼저 다른 구현 방법을 검토한다. 정말 필요하다면 `product-after-direction.md`에 왜 필요한지, 어떤 대안이 있었는지, 사용자에게 어떤 영향을 주는지 같이 기록한다.
 
 ---
 
