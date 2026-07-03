@@ -980,10 +980,11 @@ function getHuePreservingContrastColor(textRgb, backgroundRgb) {
 }
 
 function getChatBoxContrastBackgroundRgb() {
-  const boxColor = hexToRgb(currentOptions.chatBoxColor);
-  const backdrop = getThemeBackdropRgb();
+  const theme = typeof getCurrentChatBoxTheme === "function"
+    ? getCurrentChatBoxTheme()
+    : "light";
 
-  return blendRgb(boxColor, backdrop, CHAT_BOX_ALPHA);
+  return getChatBoxEffectiveBackgroundRgb(currentOptions.chatBoxColor, theme);
 }
 
 function getThemeBackdropRgb() {

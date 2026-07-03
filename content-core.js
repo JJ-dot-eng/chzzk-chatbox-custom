@@ -7,6 +7,46 @@ function markReady() {
   document.documentElement.dataset.chzzkChatUiToggleReady = "true";
 }
 
+function getCurrentChatBoxTheme() {
+  const detectedTheme = document.documentElement.dataset.chzzkChatUiToggleDetectedTheme;
+
+  if (detectedTheme === "dark" || detectedTheme === "light") {
+    return detectedTheme;
+  }
+
+  if (typeof GUEST_CHAT_THEME_ATTR !== "undefined") {
+    const guestTheme = document.documentElement.getAttribute(GUEST_CHAT_THEME_ATTR);
+
+    if (guestTheme === "dark" || guestTheme === "light") {
+      return guestTheme;
+    }
+  }
+
+  if (typeof detectPageTheme === "function") {
+    const theme = detectPageTheme();
+
+    if (theme === "dark" || theme === "light") {
+      document.documentElement.dataset.chzzkChatUiToggleDetectedTheme = theme;
+      return theme;
+    }
+  }
+
+  return "light";
+}
+
+function syncChatBoxColorVariables() {
+  const theme = getCurrentChatBoxTheme();
+
+  document.documentElement.style.setProperty(
+    "--chzzk-chat-ui-toggle-box-bg",
+    getChatBoxBackgroundColor(currentOptions.chatBoxColor, theme)
+  );
+  document.documentElement.style.setProperty(
+    "--chzzk-chat-ui-toggle-box-bg-hover",
+    getChatBoxBackgroundColor(currentOptions.chatBoxColor, theme, { hover: true })
+  );
+}
+
 function applyOptions(options, { markAsReady = true, cache = true, source = "direct" } = {}) {
   cleanupUnscopedAnnotations();
   lastFullCleanupAt = Date.now();
@@ -28,14 +68,7 @@ function applyOptions(options, { markAsReady = true, cache = true, source = "dir
   document.documentElement.dataset.chzzkChatUiToggleMiniFloatingChatScale =
     String(currentOptions.miniFloatingChatScale);
 
-  document.documentElement.style.setProperty(
-    "--chzzk-chat-ui-toggle-box-bg",
-    hexToRgba(currentOptions.chatBoxColor, CHAT_BOX_ALPHA)
-  );
-  document.documentElement.style.setProperty(
-    "--chzzk-chat-ui-toggle-box-bg-hover",
-    hexToRgba(currentOptions.chatBoxColor, 0.26)
-  );
+  syncChatBoxColorVariables();
   document.documentElement.style.setProperty(
     "--chzzk-chat-ui-toggle-chat-text-color",
     currentOptions.chatTextColor

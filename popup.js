@@ -1,6 +1,6 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const PRESET_STORAGE_KEY = "chzzkChatUiToggleCustomPreset";
-const CONTENT_VERSION = "0.5.3";
+const CONTENT_VERSION = "0.5.4";
 const POPUP_THEME_FALLBACK = "light";
 
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
@@ -19,6 +19,11 @@ const MINI_CHAT_SCALE_DEFAULT = 100;
 const CHAT_FONT_SIZE_PT_MIN = 8;
 const CHAT_FONT_SIZE_PT_MAX = 36;
 const CHAT_FONT_SIZE_PT_DEFAULT = 13;
+const CHAT_BOX_ALPHA = 0.18;
+const CHAT_BOX_ALPHA_MAX = 0.88;
+const CHAT_BOX_ALPHA_CONTRAST_START = 3;
+const CHAT_BOX_ALPHA_CONTRAST_END = 12;
+const CHAT_BOX_HOVER_ALPHA_BONUS = 0.08;
 
 const COLOR_CHIPS = [
   { id: "gray", hex: "#808080" },
@@ -375,6 +380,10 @@ function normalizePopupTheme(value) {
 
 function applyPopupTheme(theme) {
   document.documentElement.dataset.popupTheme = normalizePopupTheme(theme);
+
+  if (chatPreview) {
+    syncPreview();
+  }
 }
 
 async function resolvePopupThemeFromActiveTab() {
@@ -541,7 +550,12 @@ function syncPreview() {
   chatPreview.style.setProperty("--preview-weight", currentOptions.showBoldText ? "700" : "400");
   chatPreview.style.setProperty(
     "--preview-box",
-    currentOptions.showChatBoxes ? `${hexToRgba(currentOptions.chatBoxColor, 0.22)}` : "transparent"
+    currentOptions.showChatBoxes
+      ? getChatBoxBackgroundColor(
+        currentOptions.chatBoxColor,
+        normalizePopupTheme(document.documentElement.dataset.popupTheme)
+      )
+      : "transparent"
   );
 
   const useCustomTextColor = currentOptions.useChatTextColor === true;
@@ -595,6 +609,53 @@ function hexToRgba(hexColor, alpha) {
   const { red, green, blue } = hexToRgb(hexColor);
 
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
+function clampRatio(value) {
+  return Math.max(0, Math.min(1, value));
+}
+
+function getChatBoxBackdropRgb(theme) {
+  return theme === "dark"
+    ? { red: 16, green: 20, blue: 24 }
+    : { red: 255, green: 255, blue: 255 };
+}
+
+function getChatBoxLuminance(color) {
+  const channels = [color.red, color.green, color.blue].map((channel) => {
+    const normalized = channel / 255;
+
+    return normalized <= 0.03928
+      ? normalized / 12.92
+      : ((normalized + 0.055) / 1.055) ** 2.4;
+  });
+
+  return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+}
+
+function getChatBoxContrastRatio(firstColor, secondColor) {
+  const first = getChatBoxLuminance(firstColor);
+  const second = getChatBoxLuminance(secondColor);
+
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+}
+
+function getChatBoxAlpha(hexColor, theme, { hover = false } = {}) {
+  const boxColor = hexToRgb(hexColor);
+  const backdrop = getChatBoxBackdropRgb(theme);
+  const contrast = getChatBoxContrastRatio(boxColor, backdrop);
+  const progress = clampRatio(
+    (contrast - CHAT_BOX_ALPHA_CONTRAST_START) /
+    (CHAT_BOX_ALPHA_CONTRAST_END - CHAT_BOX_ALPHA_CONTRAST_START)
+  );
+  const alpha = CHAT_BOX_ALPHA + progress * (CHAT_BOX_ALPHA_MAX - CHAT_BOX_ALPHA);
+  const hoverAlpha = hover ? alpha + CHAT_BOX_HOVER_ALPHA_BONUS : alpha;
+
+  return Math.min(CHAT_BOX_ALPHA_MAX, hoverAlpha);
+}
+
+function getChatBoxBackgroundColor(hexColor, theme, { hover = false } = {}) {
+  return hexToRgba(hexColor, Number(getChatBoxAlpha(hexColor, theme, { hover }).toFixed(2)));
 }
 
 function renderColorChips() {

@@ -337,6 +337,10 @@ function applyGuestChatTheme(theme, { source = "direct" } = {}) {
       delete document.documentElement.dataset.chzzkChatUiToggleGuestThemeSource;
     }
 
+    if (typeof syncChatBoxColorVariables === "function") {
+      syncChatBoxColorVariables();
+    }
+
     return;
   }
 
@@ -542,6 +546,11 @@ function syncGuestChatTheme() {
 
     applyNativeGuestChatThemeClass(getGuestChatThemeFromUrl(window.location.href));
     readGuestChatThemeFromBackground();
+
+    if (typeof syncChatBoxColorVariables === "function") {
+      syncChatBoxColorVariables();
+    }
+
     return;
   }
 
@@ -553,6 +562,11 @@ function syncGuestChatTheme() {
   const previousGuestChatTheme = currentGuestChatTheme;
   currentGuestChatTheme = detectedTheme;
   document.documentElement.dataset.chzzkChatUiToggleDetectedTheme = detectedTheme;
+
+  if (typeof syncChatBoxColorVariables === "function") {
+    syncChatBoxColorVariables();
+  }
+
   publishGuestChatThemeToBackground(detectedTheme);
 
   if (previousGuestChatTheme !== detectedTheme) {
