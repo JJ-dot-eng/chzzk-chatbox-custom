@@ -1,26 +1,26 @@
-# 치지직 채팅 커스텀 Product After Direction
+# 치지직 채팅 커스텀 Project After Direction
 
 - 문서 버전: v0.1
 - 작성일: 2026-07-03
 - 프로젝트: 치지직 채팅 커스텀
 - 현재 확장 버전: `0.5.4`
 - 현재 HEAD: `55db4f9`
-- 기준 문서: `docs/product/product-pre-direction.md`
+- 기준 문서: `docs/project/project-pre-direction.md`
 - 기준 파일: `README.md`, `manifest.json`, `package.json`, `popup.html`, `popup.js`, `content-*.js`
 
 ---
 
 ## 1. 이 문서의 역할
 
-`product-pre-direction.md`가 "무엇을 만들 것인가"를 정리한 문서라면, 이 문서는 "실제로 어떤 버전에서 무엇이 구현됐는가"를 기록하는 문서다.
+`project-pre-direction.md`가 "무엇을 만들 것인가"를 정리한 문서라면, 이 문서는 "실제로 어떤 버전에서 무엇이 구현됐는가"를 기록하는 문서다.
 
 쉽게 말하면 다음처럼 나뉜다.
 
 ```text
-product-pre-direction.md
+project-pre-direction.md
 -> 제품 의도, 기능 범위, 구현 원칙
 
-product-after-direction.md
+project-after-direction.md
 -> 현재 구현 상태, 버전별 패치, 실제 파일 구조, 유지보수 기준
 ```
 
@@ -533,7 +533,7 @@ host_permissions:
 - 스토어 심사에서 과도한 권한으로 보이는 것을 줄인다.
 - 이 확장이 "내 브라우저에서만 채팅 표시를 조정한다"는 제품 방향을 권한 구조에서도 보여준다.
 
-따라서 앞으로 새 기능을 만들 때도 `activeTab`, `scripting`, `webNavigation`, 넓은 host permission을 다시 추가하기 전에 먼저 다른 구현 방법을 검토한다. 정말 필요하다면 `product-after-direction.md`에 왜 필요한지, 어떤 대안이 있었는지, 사용자에게 어떤 영향을 주는지 같이 기록한다.
+따라서 앞으로 새 기능을 만들 때도 `activeTab`, `scripting`, `webNavigation`, 넓은 host permission을 다시 추가하기 전에 먼저 다른 구현 방법을 검토한다. 정말 필요하다면 `project-after-direction.md`에 왜 필요한지, 어떤 대안이 있었는지, 사용자에게 어떤 영향을 주는지 같이 기록한다.
 
 ---
 

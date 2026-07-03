@@ -1,4 +1,4 @@
-# 치지직 채팅 커스텀 Product Direction
+# 치지직 채팅 커스텀 Project Direction
 
 - 문서 버전: v0.1
 - 작성일: 2026-07-03
@@ -20,7 +20,7 @@
 채팅 서버나 실제 채팅 데이터에는 영향을 주지 않는가?
 ```
 
-`product-after-direction.md`는 이 문서의 방향이 실제 버전별 패치에서 어떻게 구현됐는지 기록한다.
+`project-after-direction.md`는 이 문서의 방향이 실제 버전별 패치에서 어떻게 구현됐는지 기록한다.
 
 ---
 
