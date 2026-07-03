@@ -1018,7 +1018,7 @@ function getContrastBackgroundRgb(row) {
     : getAmbientContrastBackgroundRgb(row);
 }
 
-function getAutoContrastCacheKey(textRgb, backgroundRgb, { preferAccent = false, neutralOnly = false } = {}) {
+function getAutoContrastCacheKey(textRgb, backgroundRgb, { preferAccent = false } = {}) {
   return [
     Math.round(textRgb.red),
     Math.round(textRgb.green),
@@ -1026,8 +1026,7 @@ function getAutoContrastCacheKey(textRgb, backgroundRgb, { preferAccent = false,
     Math.round(backgroundRgb.red),
     Math.round(backgroundRgb.green),
     Math.round(backgroundRgb.blue),
-    preferAccent ? "accent" : "plain",
-    neutralOnly ? "neutral" : "wide"
+    preferAccent ? "accent" : "plain"
   ].join(",");
 }
 
@@ -1092,7 +1091,7 @@ function getReadableAccentContrastColor(backgroundRgb) {
   return bestContrast >= AUTO_CONTRAST_MIN_RATIO ? bestColor : null;
 }
 
-function getAutoContrastColor(color, backgroundRgb, { preferAccent = false, neutralOnly = false } = {}) {
+function getAutoContrastColor(color, backgroundRgb, { preferAccent = false } = {}) {
   const parsedColor = parseCssRgbColorForContrast(color);
 
   if (!parsedColor) {
@@ -1102,7 +1101,7 @@ function getAutoContrastColor(color, backgroundRgb, { preferAccent = false, neut
   const textRgb = parsedColor.alpha < 1
     ? blendRgb(parsedColor, backgroundRgb, parsedColor.alpha)
     : parsedColor;
-  const cacheKey = getAutoContrastCacheKey(textRgb, backgroundRgb, { preferAccent, neutralOnly });
+  const cacheKey = getAutoContrastCacheKey(textRgb, backgroundRgb, { preferAccent });
 
   if (autoContrastCache.has(cacheKey)) {
     return autoContrastCache.get(cacheKey);
@@ -1116,16 +1115,13 @@ function getAutoContrastColor(color, backgroundRgb, { preferAccent = false, neut
   }
 
   const isNeutralColor = isNearNeutralRgb(textRgb);
-  const shouldConsiderColor = neutralOnly
-    ? isNeutralColor
-    : (
-      isNeutralColor ||
-      (
-        preferAccent &&
-        getHuePreservingContrastColor(textRgb, backgroundRgb)
-      ) ||
-      getRgbDistance(textRgb, backgroundRgb) <= AUTO_CONTRAST_NEAR_COLOR_DISTANCE
-    );
+  const shouldConsiderColor =
+    isNeutralColor ||
+    (
+      preferAccent &&
+      getHuePreservingContrastColor(textRgb, backgroundRgb)
+    ) ||
+    getRgbDistance(textRgb, backgroundRgb) <= AUTO_CONTRAST_NEAR_COLOR_DISTANCE;
   const result = shouldConsiderColor ? getReadableContrastColor(backgroundRgb, { preferAccent, originalRgb: textRgb }) : null;
 
   rememberAutoContrastResult(cacheKey, result);
@@ -1209,11 +1205,8 @@ function syncAutoContrast(row) {
   clearAutoContrast(row);
 
   const shouldAutoContrast = currentOptions.useAutoTextContrast === true;
-  const shouldProtectNeutralNicknameColorMessage =
-    currentOptions.useChatTextColor === true &&
-    currentOptions.useNicknameColorForMessage === true;
 
-  if (!shouldAutoContrast && !shouldProtectNeutralNicknameColorMessage) {
+  if (!shouldAutoContrast) {
     return;
   }
 
@@ -1236,8 +1229,7 @@ function syncAutoContrast(row) {
   const messageText = getMessageTextElement(row);
   const messageColor = messageText instanceof HTMLElement ? getMessageBaseTextColor(row) : null;
   const autoMessageColor = getAutoContrastColor(messageColor, backgroundRgb, {
-    preferAccent: shouldPreferAccentForNicknameColorMessage,
-    neutralOnly: !shouldAutoContrast && shouldProtectNeutralNicknameColorMessage
+    preferAccent: shouldPreferAccentForNicknameColorMessage
   });
 
   if (autoMessageColor) {
