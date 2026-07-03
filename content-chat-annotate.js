@@ -846,22 +846,51 @@ function isNearNeutralRgb(color) {
 
 function getChatBoxContrastBackgroundRgb() {
   const boxColor = hexToRgb(currentOptions.chatBoxColor);
-  const detectedTheme = document.documentElement.dataset.chzzkChatUiToggleDetectedTheme;
-  const backdrop = detectedTheme === "dark"
-    ? { red: 16, green: 20, blue: 24 }
-    : { red: 255, green: 255, blue: 255 };
+  const backdrop = getThemeBackdropRgb();
 
   return blendRgb(boxColor, backdrop, CHAT_BOX_ALPHA);
 }
 
-function getAutoContrastCacheKey(textRgb, backgroundRgb) {
+function getThemeBackdropRgb() {
+  const detectedTheme = document.documentElement.dataset.chzzkChatUiToggleDetectedTheme;
+
+  return detectedTheme === "dark"
+    ? { red: 16, green: 20, blue: 24 }
+    : { red: 255, green: 255, blue: 255 };
+}
+
+function getAmbientContrastBackgroundRgb(row) {
+  let element = getMessageTextElement(row) || row;
+  const fallback = getThemeBackdropRgb();
+
+  for (let depth = 0; element instanceof HTMLElement && depth < 10; depth += 1) {
+    const color = parseCssRgbColorForContrast(getComputedStyle(element).backgroundColor);
+
+    if (color) {
+      return color.alpha < 1 ? blendRgb(color, fallback, color.alpha) : color;
+    }
+
+    element = element.parentElement;
+  }
+
+  return fallback;
+}
+
+function getContrastBackgroundRgb(row) {
+  return currentOptions.showChatBoxes === true
+    ? getChatBoxContrastBackgroundRgb()
+    : getAmbientContrastBackgroundRgb(row);
+}
+
+function getAutoContrastCacheKey(textRgb, backgroundRgb, { preferAccent = false } = {}) {
   return [
     Math.round(textRgb.red),
     Math.round(textRgb.green),
     Math.round(textRgb.blue),
     Math.round(backgroundRgb.red),
     Math.round(backgroundRgb.green),
-    Math.round(backgroundRgb.blue)
+    Math.round(backgroundRgb.blue),
+    preferAccent ? "accent" : "plain"
   ].join(",");
 }
 
@@ -879,16 +908,46 @@ function rememberAutoContrastResult(key, value) {
   }
 }
 
-function getReadableContrastColor(backgroundRgb) {
+function getReadableContrastColor(backgroundRgb, { preferAccent = false } = {}) {
   const black = { red: 0, green: 0, blue: 0 };
   const white = { red: 255, green: 255, blue: 255 };
+
+  if (preferAccent) {
+    const accent = getReadableAccentContrastColor(backgroundRgb);
+
+    if (accent) {
+      return accent;
+    }
+  }
 
   return getContrastRatio(black, backgroundRgb) >= getContrastRatio(white, backgroundRgb)
     ? "#000000"
     : "#ffffff";
 }
 
-function getAutoContrastColor(color, backgroundRgb) {
+function getReadableAccentContrastColor(backgroundRgb) {
+  let bestColor = null;
+  let bestContrast = 0;
+
+  for (const color of AUTO_CONTRAST_ACCENT_COLORS) {
+    const parsedColor = parseCssRgbColorForContrast(color);
+
+    if (!parsedColor) {
+      continue;
+    }
+
+    const contrast = getContrastRatio(parsedColor, backgroundRgb);
+
+    if (contrast > bestContrast) {
+      bestColor = color;
+      bestContrast = contrast;
+    }
+  }
+
+  return bestContrast >= AUTO_CONTRAST_MIN_RATIO ? bestColor : null;
+}
+
+function getAutoContrastColor(color, backgroundRgb, { preferAccent = false } = {}) {
   const parsedColor = parseCssRgbColorForContrast(color);
 
   if (!parsedColor) {
@@ -898,7 +957,7 @@ function getAutoContrastColor(color, backgroundRgb) {
   const textRgb = parsedColor.alpha < 1
     ? blendRgb(parsedColor, backgroundRgb, parsedColor.alpha)
     : parsedColor;
-  const cacheKey = getAutoContrastCacheKey(textRgb, backgroundRgb);
+  const cacheKey = getAutoContrastCacheKey(textRgb, backgroundRgb, { preferAccent });
 
   if (autoContrastCache.has(cacheKey)) {
     return autoContrastCache.get(cacheKey);
@@ -908,10 +967,11 @@ function getAutoContrastColor(color, backgroundRgb) {
   const shouldCorrect =
     currentContrast < AUTO_CONTRAST_MIN_RATIO &&
     (
+      preferAccent ||
       isNearNeutralRgb(textRgb) ||
       getRgbDistance(textRgb, backgroundRgb) <= AUTO_CONTRAST_NEAR_COLOR_DISTANCE
     );
-  const result = shouldCorrect ? getReadableContrastColor(backgroundRgb) : null;
+  const result = shouldCorrect ? getReadableContrastColor(backgroundRgb, { preferAccent }) : null;
 
   rememberAutoContrastResult(cacheKey, result);
   return result;
@@ -993,23 +1053,33 @@ function syncNicknameColorMessage(row) {
 function syncAutoContrast(row) {
   clearAutoContrast(row);
 
-  if (currentOptions.showChatBoxes !== true || currentOptions.useAutoTextContrast !== true) {
+  const shouldAutoContrast = currentOptions.useAutoTextContrast === true;
+  const shouldProtectNicknameColorMessage =
+    currentOptions.useChatTextColor === true &&
+    currentOptions.useNicknameColorForMessage === true;
+
+  if (!shouldAutoContrast && !shouldProtectNicknameColorMessage) {
     return;
   }
 
-  const backgroundRgb = getChatBoxContrastBackgroundRgb();
+  const backgroundRgb = getContrastBackgroundRgb(row);
   const contrastRoles = [];
-  const nicknameColor = getNicknameTextColor(row);
-  const autoNicknameColor = getAutoContrastColor(nicknameColor, backgroundRgb);
 
-  if (autoNicknameColor) {
-    contrastRoles.push("nickname");
-    row.style.setProperty("--chzzk-chat-ui-toggle-auto-nickname-color", autoNicknameColor);
+  if (shouldAutoContrast) {
+    const nicknameColor = getNicknameTextColor(row);
+    const autoNicknameColor = getAutoContrastColor(nicknameColor, backgroundRgb);
+
+    if (autoNicknameColor) {
+      contrastRoles.push("nickname");
+      row.style.setProperty("--chzzk-chat-ui-toggle-auto-nickname-color", autoNicknameColor);
+    }
   }
 
   const messageText = getMessageTextElement(row);
   const messageColor = messageText instanceof HTMLElement ? getMessageBaseTextColor(row) : null;
-  const autoMessageColor = getAutoContrastColor(messageColor, backgroundRgb);
+  const autoMessageColor = getAutoContrastColor(messageColor, backgroundRgb, {
+    preferAccent: shouldProtectNicknameColorMessage
+  });
 
   if (autoMessageColor) {
     contrastRoles.push("message");

@@ -224,6 +224,9 @@ for (const token of [
   "function syncAutoContrast(row)",
   "var autoContrastCache = new Map();",
   "AUTO_CONTRAST_CACHE_LIMIT",
+  "AUTO_CONTRAST_ACCENT_COLORS",
+  "function getContrastBackgroundRgb(row)",
+  "function getReadableAccentContrastColor(backgroundRgb)",
   "getAutoContrastColor(",
   "getReadableContrastColor("
 ]) {

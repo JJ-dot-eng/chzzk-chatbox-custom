@@ -1,4 +1,4 @@
-var SCRIPT_VERSION = "0.5.1";
+var SCRIPT_VERSION = "0.5.2";
 var GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 var CHZZK_CHAT_UI_TOGGLE_SHOULD_START = !window[GLOBAL_KEY];
 
@@ -87,6 +87,20 @@ var AUTO_CONTRAST_MIN_RATIO = 3;
 var AUTO_CONTRAST_NEAR_COLOR_DISTANCE = 96;
 var AUTO_CONTRAST_NEUTRAL_CHANNEL_DELTA = 32;
 var AUTO_CONTRAST_CACHE_LIMIT = 180;
+var AUTO_CONTRAST_ACCENT_COLORS = [
+  "#312e81",
+  "#bef264",
+  "#2563eb",
+  "#7c3aed",
+  "#dc2626",
+  "#0891b2",
+  "#d97706",
+  "#16a34a",
+  "#38bdf8",
+  "#f59e0b",
+  "#22c55e",
+  "#a78bfa"
+];
 var GUEST_CHAT_NATIVE_THEME_CLASSES = ["light", "dark", "theme_light", "theme_dark"];
 var GUEST_CHAT_TOGGLE_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-toggle";
 var GUEST_CHAT_TOGGLE_BUTTON_ICON_CLASS = "chzzk-chat-ui-toggle-guest-chat-toggle__icon";
