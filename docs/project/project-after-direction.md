@@ -4,20 +4,20 @@
 - 작성일: 2026-07-03
 - 프로젝트: 치지직 채팅 커스텀
 - 현재 확장 버전: `0.5.4`
-- 현재 HEAD: `55db4f9`
-- 기준 문서: `docs/project/project-pre-direction.md`
+- 커밋 기준: 버전별 항목에 기록
+- 기준 문서: `docs/project/project-direction.md`
 - 기준 파일: `README.md`, `manifest.json`, `package.json`, `popup.html`, `popup.js`, `content-*.js`
 
 ---
 
 ## 1. 이 문서의 역할
 
-`project-pre-direction.md`가 "무엇을 만들 것인가"를 정리한 문서라면, 이 문서는 "실제로 어떤 버전에서 무엇이 구현됐는가"를 기록하는 문서다.
+`project-direction.md`가 "무엇을 만들 것인가"를 정리한 문서라면, 이 문서는 "실제로 어떤 버전에서 무엇이 구현됐는가"를 기록하는 문서다.
 
 쉽게 말하면 다음처럼 나뉜다.
 
 ```text
-project-pre-direction.md
+project-direction.md
 -> 제품 의도, 기능 범위, 구현 원칙
 
 project-after-direction.md
@@ -58,9 +58,9 @@ project-after-direction.md
 
 ---
 
-## 3. 프리디렉션 반영 맵
+## 3. 프로젝트 디렉션 반영 맵
 
-| 프리디렉션 항목 | 현재 구현 상태 | 실제 표현 방식 | 주요 파일 |
+| 프로젝트 디렉션 항목 | 현재 구현 상태 | 실제 표현 방식 | 주요 파일 |
 |---|---|---|---|
 | 로컬 표시 제어 | 완료 | `storage`에 저장된 옵션을 content script가 페이지에 적용 | `background.js`, `content-options.js`, `content-runtime.js` |
 | 닉네임/배지/시간 토글 | 완료 | 채팅 행을 분석해 각 요소 표시를 독립 제어 | `content-chat-annotate.js`, `content.css`, `popup.html` |
@@ -474,6 +474,20 @@ project-after-direction.md
 조건부로 나타나는 설정 행의 스위치 정렬을 일관되게 정리.
 ```
 
+### 4.19 프로젝트 방향 문서명 정리
+
+- 기록 기준: 전역 `AGENTS.md`의 최신 Project direction docs 규칙 반영
+- 버전 숫자: 그대로 `0.5.4`
+- 주요 변경:
+  - 프로젝트 기획/계획 기준 문서명을 `docs/project/project-direction.md`로 정리
+  - after 문서 안의 기준 문서명과 설명 문구를 새 파일명 기준으로 정리
+  - 상단의 고정 HEAD 표기를 버전별 항목 기준으로 정리
+
+변경 이유:
+
+- `pre`라는 표현은 초기 기획 전용 문서처럼 보일 수 있다.
+- 실제 규칙은 초기 기획뿐 아니라 개발 중간의 새 기능 계획도 `project-direction.md`에 기록하는 방향이므로, 파일명도 그 의미에 맞게 정리했다.
+
 ---
 
 ## 5. 현재 파일별 책임
@@ -611,7 +625,7 @@ host_permissions:
 
 ## 10. 현재 결론
 
-현재 `0.5.4` 빌드는 프리디렉션의 핵심 방향인 "치지직 채팅창을 내 브라우저 화면에서만 읽기 쉽게 정리하는 도구"를 구현하고 있다.
+현재 `0.5.4` 빌드는 프로젝트 디렉션의 핵심 방향인 "치지직 채팅창을 내 브라우저 화면에서만 읽기 쉽게 정리하는 도구"를 구현하고 있다.
 
 버전 흐름을 크게 나누면 다음과 같다.
 
