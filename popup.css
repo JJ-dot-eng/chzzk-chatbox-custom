@@ -754,6 +754,11 @@ input[type="range"] {
   display: grid;
 }
 
+.setting-row.is-visible[data-when],
+.setting-row.is-visible[data-when-chat-mode] {
+  display: flex;
+}
+
 .is-hidden {
   display: none !important;
 }
