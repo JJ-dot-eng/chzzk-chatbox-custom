@@ -211,7 +211,11 @@ function isGuestChatFrameEmbedUrl(url) {
   try {
     const parsedUrl = new URL(url);
 
-    return isLiveChatFrameUrl(url) && parsedUrl.searchParams.get(GUEST_CHAT_FRAME_MARKER_PARAM) === "1";
+    return (
+      window.self !== window.top &&
+      isLiveChatFrameUrl(url) &&
+      parsedUrl.searchParams.get(GUEST_CHAT_FRAME_MARKER_PARAM) === "1"
+    );
   } catch (_error) {
     return false;
   }
@@ -221,14 +225,18 @@ function isMiniChatFrameEmbedUrl(url) {
   try {
     const parsedUrl = new URL(url);
 
-    return isLiveChatFrameUrl(url) && parsedUrl.searchParams.get(MINI_CHAT_FRAME_MARKER_PARAM) === "1";
+    return (
+      window.self !== window.top &&
+      isLiveChatFrameUrl(url) &&
+      parsedUrl.searchParams.get(MINI_CHAT_FRAME_MARKER_PARAM) === "1"
+    );
   } catch (_error) {
     return false;
   }
 }
 
 function applyGuestChatCleanBotDefault() {
-  if (!isGuestChatFrameEmbedUrl(window.location.href)) {
+  if (window.self === window.top || !isGuestChatFrameEmbedUrl(window.location.href)) {
     document.documentElement.removeAttribute(GUEST_CHAT_CLEANBOT_DEFAULT_ATTR);
     return;
   }

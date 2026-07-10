@@ -1,3 +1,5 @@
+var chatRowAnnotationSnapshots = new WeakMap();
+
 function hasChatLikeText(element) {
   const text = element.textContent?.trim() ?? "";
 
@@ -5,9 +7,31 @@ function hasChatLikeText(element) {
 }
 
 function getChatRoots() {
-  const roots = queryAllSafe(document, CHAT_ROOT_SELECTORS)
+  const candidates = queryAllSafe(document, CHAT_ROOT_SELECTORS)
     .filter(hasChatLikeText)
-    .slice(0, 20);
+    .map((root) => {
+      let depth = 0;
+
+      for (let current = root.parentElement; current; current = current.parentElement) {
+        depth += 1;
+      }
+
+      return { root, depth };
+    })
+    .sort((first, second) => first.depth - second.depth);
+  const roots = [];
+
+  for (const { root } of candidates) {
+    if (roots.some((candidate) => candidate.contains(root))) {
+      continue;
+    }
+
+    roots.push(root);
+
+    if (roots.length >= 20) {
+      break;
+    }
+  }
 
   return roots.length > 0 ? roots : [document.body ?? document.documentElement];
 }
@@ -298,6 +322,27 @@ function findMiniChatCompactInputContainer(actionRow) {
   return fallbackContainer;
 }
 
+function isMiniChatInputFieldInChatContext(field) {
+  if (closestAnySafe(field, MINI_CHAT_INPUT_CONTAINER_SELECTORS)) {
+    return true;
+  }
+
+  for (
+    let current = field.parentElement, depth = 0;
+    current && current !== document.body && depth < 12;
+    current = current.parentElement, depth += 1
+  ) {
+    if (
+      matchesAnySafe(current, CHAT_ACTION_HOST_SELECTORS) &&
+      (hasChatMessageContent(current) || current.querySelector("[role='log']"))
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function markMiniChatCompactInputContainer(actionRow) {
   const inputContainer = findMiniChatCompactInputContainer(actionRow);
 
@@ -314,7 +359,8 @@ function findMiniChatInputOnlyContainer(root = document) {
     "[role='textbox']"
   ])
     .filter((element) => element instanceof HTMLElement)
-    .filter(isMiniChatTextEntryField);
+    .filter(isMiniChatTextEntryField)
+    .filter(isMiniChatInputFieldInChatContext);
   let fallbackContainer = null;
   let actionFallbackContainer = null;
 
@@ -598,6 +644,29 @@ function isInsideLiveChatNicknameShell(element) {
   );
 }
 
+function isTimestampCandidate(row, element) {
+  if (!looksLikeTimestamp(element)) {
+    return false;
+  }
+
+  const messageText = getMessageTextElement(row);
+
+  if (
+    messageText &&
+    (messageText === element || messageText.contains(element) || element.contains(messageText))
+  ) {
+    return false;
+  }
+
+  const nicknameButton = getNicknameButtonElement(row);
+
+  return !(
+    isInsideLiveChatNicknameShell(element) ||
+    (nicknameButton &&
+      (nicknameButton === element || nicknameButton.contains(element) || element.contains(nicknameButton)))
+  );
+}
+
 function isLikelyNickname(element) {
   const tagName = element.tagName.toLowerCase();
   const className = getClassName(element);
@@ -634,7 +703,7 @@ function annotateSelectorTargets(row, role) {
     role === "nickname" ? candidates.filter((element) => isLikelyNickname(element)) : [];
 
   for (const element of candidates) {
-    if (role === "timestamp" && !looksLikeTimestamp(element)) {
+    if (role === "timestamp" && !isTimestampCandidate(row, element)) {
       continue;
     }
 
@@ -674,6 +743,10 @@ function annotateTimestampLeaves(row) {
       const parent = node.parentElement;
 
       if (!parent || parent.childElementCount > 0 || parent.textContent?.trim() !== text) {
+        return NodeFilter.FILTER_REJECT;
+      }
+
+      if (!isTimestampCandidate(row, parent)) {
         return NodeFilter.FILTER_REJECT;
       }
 
@@ -1269,7 +1342,7 @@ function getMessagePrefixAnchor(row, nickname) {
 }
 
 function ensureGeneratedTimestamp(row) {
-  if (!isChatMessageRow(row) || hasTimestamp(row)) {
+  if (!isChatMessageRow(row)) {
     return;
   }
 
@@ -1280,6 +1353,10 @@ function ensureGeneratedTimestamp(row) {
   }
 
   const anchor = getMessagePrefixAnchor(row, nickname);
+
+  if (hasTimestamp(row)) {
+    return;
+  }
 
   const timestamp = document.createElement("span");
   timestamp.className = "chzzk-chat-ui-toggle-timestamp";
@@ -1328,14 +1405,85 @@ function annotateLeadingBadges(row) {
   }
 }
 
-function annotateChatRow(row) {
+function getChatRowAnnotationSnapshot(row) {
+  const nickname = getNicknameTextElement(row);
+  const messageText = getMessageTextElement(row);
+
+  return {
+    nickname,
+    nicknameText: nickname ? getCompactText(nickname) : "",
+    messageContainer: getMessageContainerElement(row),
+    messageText,
+    messageValue: messageText ? getCompactText(messageText) : ""
+  };
+}
+
+function hasChatRowSnapshotChanged(previous, next) {
+  return Boolean(
+    previous &&
+      (previous.nickname !== next.nickname ||
+        previous.nicknameText !== next.nicknameText ||
+        previous.messageContainer !== next.messageContainer ||
+        previous.messageText !== next.messageText ||
+        previous.messageValue !== next.messageValue)
+  );
+}
+
+function revalidateChatRowAnnotations(row, snapshotChanged) {
+  const generatedTimestamps = queryAllSafe(row, [`[${GENERATED_TIMESTAMP_ATTR}]`]);
+
+  if (snapshotChanged) {
+    for (const timestamp of generatedTimestamps) {
+      timestamp.remove();
+    }
+  } else {
+    for (const timestamp of generatedTimestamps.slice(1)) {
+      timestamp.remove();
+    }
+  }
+
+  for (const element of queryAllIncludingRootSafe(row, [
+    `[${ROLE_ATTR}]`,
+    `[${MESSAGE_PREFIX_ATTR}]`,
+    `[${MESSAGE_TEXT_ATTR}]`
+  ])) {
+    element.removeAttribute(ROLE_ATTR);
+    element.removeAttribute(MESSAGE_PREFIX_ATTR);
+    element.removeAttribute(MESSAGE_TEXT_ATTR);
+  }
+}
+
+function removeGeneratedTimestampWhenNativeExists(row) {
+  const timestampElements = queryAllSafe(row, [`[${ROLE_ATTR}~="timestamp"]`]);
+  const hasNativeTimestamp = timestampElements.some(
+    (element) => !element.hasAttribute(GENERATED_TIMESTAMP_ATTR)
+  );
+
+  if (!hasNativeTimestamp) {
+    return;
+  }
+
+  for (const timestamp of queryAllSafe(row, [`[${GENERATED_TIMESTAMP_ATTR}]`])) {
+    timestamp.remove();
+  }
+}
+
+function annotateChatRow(row, { contentMutated = false } = {}) {
   if (!isChatMessageRow(row)) {
     return;
   }
 
+  const snapshot = getChatRowAnnotationSnapshot(row);
+  const previousSnapshot = chatRowAnnotationSnapshots.get(row);
+
+  revalidateChatRowAnnotations(
+    row,
+    contentMutated || hasChatRowSnapshotChanged(previousSnapshot, snapshot)
+  );
   row.setAttribute(CHAT_ROW_ATTR, "true");
   annotateSelectorTargets(row, "timestamp");
   annotateTimestampLeaves(row);
+  removeGeneratedTimestampWhenNativeExists(row);
   ensureGeneratedTimestamp(row);
   annotateSelectorTargets(row, "badge");
   annotateLeadingBadges(row);
@@ -1343,6 +1491,7 @@ function annotateChatRow(row) {
   annotateMessageText(row);
   syncNicknameColorMessage(row);
   syncAutoContrast(row);
+  chatRowAnnotationSnapshots.set(row, snapshot);
 }
 
 function clearLargeTextRowLayout(row) {
@@ -1371,9 +1520,15 @@ function getLargeTextLayoutElements(row) {
 
 function syncLargeTextRowLayout() {
   largeTextLayoutFrame = 0;
+  const rows = largeTextLayoutSyncAll
+    ? queryAllSafe(document, [`[${CHAT_ROW_ATTR}="true"]`])
+    : [...largeTextLayoutRows];
 
-  for (const row of queryAllSafe(document, [`[${CHAT_ROW_ATTR}="true"]`])) {
-    if (!(row instanceof HTMLElement)) {
+  largeTextLayoutRows.clear();
+  largeTextLayoutSyncAll = false;
+
+  for (const row of rows) {
+    if (!(row instanceof HTMLElement) || !row.isConnected) {
       continue;
     }
 
@@ -1410,7 +1565,18 @@ function syncLargeTextRowLayout() {
   }
 }
 
-function scheduleLargeTextLayoutSync() {
+function scheduleLargeTextLayoutSync(rows = null) {
+  if (rows === null) {
+    largeTextLayoutSyncAll = true;
+    largeTextLayoutRows.clear();
+  } else if (!largeTextLayoutSyncAll) {
+    for (const row of rows) {
+      if (row instanceof HTMLElement) {
+        largeTextLayoutRows.add(row);
+      }
+    }
+  }
+
   if (largeTextLayoutFrame) {
     return;
   }
@@ -1460,18 +1626,18 @@ function cleanupUnscopedAnnotationsWhenDue() {
   cleanupUnscopedAnnotations();
 }
 
-function scanRows(rows) {
+function scanRows(rows, { contentMutated = false, contentMutatedRows = null } = {}) {
   const uniqueRows = [...new Set(rows)].filter((element) => element instanceof HTMLElement);
 
   cleanupRows(uniqueRows);
 
   for (const row of uniqueRows.filter(hasChatLikeText)) {
-    annotateChatRow(row);
+    annotateChatRow(row, {
+      contentMutated: contentMutated || Boolean(contentMutatedRows?.has(row))
+    });
   }
 
-  annotateNonChatPanels();
-  annotateMiniChatHiddenControls();
-  scheduleLargeTextLayoutSync();
+  scheduleLargeTextLayoutSync(uniqueRows);
 }
 
 function scan() {
@@ -1484,11 +1650,15 @@ function scan() {
 
   try {
     cleanupUnscopedAnnotationsWhenDue();
+    const rows = new Set();
 
     for (const root of roots) {
-      scanRows(getChatRows(root));
+      for (const row of getChatRows(root)) {
+        rows.add(row);
+      }
     }
 
+    scanRows(rows);
     annotateNonChatPanels();
     annotateMiniChatHiddenControls();
     syncGuestChatUi();
@@ -1527,32 +1697,186 @@ function closestAnySafe(element, selectors) {
   return null;
 }
 
-function collectAddedChatRows(mutations) {
-  const rows = [];
+function isGeneratedTimestampMutationNode(node, mutationTarget = null) {
+  const element = node instanceof Element ? node : node.parentElement;
 
-  for (const mutation of mutations) {
-    for (const node of mutation.addedNodes) {
-      const element = node instanceof Element ? node : node.parentElement;
+  if (element?.closest(`[${GENERATED_TIMESTAMP_ATTR}]`)) {
+    return true;
+  }
 
-      if (!element) {
-        continue;
+  return Boolean(
+    mutationTarget instanceof Element && mutationTarget.closest(`[${GENERATED_TIMESTAMP_ATTR}]`)
+  );
+}
+
+function isGeneratedTimestampMutation(mutation) {
+  const changedNodes = [...mutation.addedNodes, ...mutation.removedNodes];
+
+  if (mutation.type === "characterData") {
+    return isGeneratedTimestampMutationNode(mutation.target, mutation.target.parentElement);
+  }
+
+  return (
+    changedNodes.length > 0 &&
+    changedNodes.every((node) => isGeneratedTimestampMutationNode(node, mutation.target))
+  );
+}
+
+function hasNonGeneratedAddedNodes(mutations) {
+  return mutations.some((mutation) => [...mutation.addedNodes].some((node) => {
+    return !isGeneratedTimestampMutationNode(node, mutation.target);
+  }));
+}
+
+function hasNonGeneratedAddedNodesOutsideChatRows(mutations) {
+  return mutations.some((mutation) => [...mutation.addedNodes].some((node) => {
+    if (isGeneratedTimestampMutationNode(node, mutation.target)) {
+      return false;
+    }
+
+    const element = node instanceof Element ? node : node.parentElement;
+    const closestRow = element ? closestAnySafe(element, CHAT_ROW_SELECTORS) : null;
+
+    return Boolean(element && (!closestRow || !isChatMessageRow(closestRow)));
+  }));
+}
+
+function collectMutationChatRows(mutation) {
+  const rows = new Set();
+
+  if (mutation.type === "characterData") {
+    const element = mutation.target.parentElement;
+
+    if (!element) {
+      return rows;
+    }
+
+    const closestRow = closestAnySafe(element, CHAT_ROW_SELECTORS);
+
+    if (closestRow) {
+      rows.add(closestRow);
+    }
+
+    return rows;
+  }
+
+  if (mutation.removedNodes.length > 0 && mutation.target instanceof Element) {
+    const closestRow = closestAnySafe(mutation.target, CHAT_ROW_SELECTORS);
+
+    if (closestRow) {
+      rows.add(closestRow);
+    }
+  }
+
+  for (const node of mutation.addedNodes) {
+    const element = node instanceof Element ? node : node.parentElement;
+
+    if (!element || isGeneratedTimestampMutationNode(node, mutation.target)) {
+      continue;
+    }
+
+    if (element instanceof HTMLElement && matchesAnySafe(element, CHAT_ROW_SELECTORS)) {
+      rows.add(element);
+    }
+
+    for (const row of queryAllSafe(element, CHAT_ROW_SELECTORS)) {
+      if (row instanceof HTMLElement) {
+        rows.add(row);
       }
+    }
 
-      if (element instanceof HTMLElement && matchesAnySafe(element, CHAT_ROW_SELECTORS)) {
-        rows.push(element);
-      }
+    const closestRow = closestAnySafe(element, CHAT_ROW_SELECTORS);
 
-      rows.push(...queryAllSafe(element, CHAT_ROW_SELECTORS).filter((row) => row instanceof HTMLElement));
-
-      const closestRow = closestAnySafe(element, CHAT_ROW_SELECTORS);
-
-      if (closestRow) {
-        rows.push(closestRow);
-      }
+    if (closestRow) {
+      rows.add(closestRow);
     }
   }
 
   return rows;
+}
+
+function getChatContentMutationElements(row) {
+  const previous = chatRowAnnotationSnapshots.get(row);
+
+  return [...new Set([
+    previous?.nickname,
+    previous?.messageText,
+    getNicknameTextElement(row),
+    getMessageTextElement(row)
+  ].filter((element) => element instanceof HTMLElement))];
+}
+
+function mutationReplacesChatContentElement(node, contentElements) {
+  return contentElements.some(
+    (element) => node === element || (node instanceof Element && node.contains(element))
+  );
+}
+
+function isLogicalChatContentMutation(row, mutation) {
+  const contentElements = getChatContentMutationElements(row);
+
+  if (contentElements.length === 0) {
+    return false;
+  }
+
+  if (mutation.type === "characterData") {
+    const parent = mutation.target.parentElement;
+
+    return Boolean(
+      parent && contentElements.some((element) => element === parent || element.contains(parent))
+    );
+  }
+
+  const changedNodes = [...mutation.addedNodes, ...mutation.removedNodes];
+
+  if (changedNodes.some((node) => mutationReplacesChatContentElement(node, contentElements))) {
+    return true;
+  }
+
+  if (!(mutation.target instanceof Element)) {
+    return false;
+  }
+
+  const targetIsInsideContent = contentElements.some(
+    (element) => element === mutation.target || element.contains(mutation.target)
+  );
+
+  if (!targetIsInsideContent) {
+    return false;
+  }
+
+  return changedNodes.some((node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return Boolean(node.textContent?.trim());
+    }
+
+    return node instanceof Element && Boolean(getCompactText(node));
+  });
+}
+
+function collectChangedChatRowDetails(mutations) {
+  const rows = new Set();
+  const contentMutatedRows = new Set();
+
+  for (const mutation of mutations) {
+    if (isGeneratedTimestampMutation(mutation)) {
+      continue;
+    }
+
+    for (const row of collectMutationChatRows(mutation)) {
+      rows.add(row);
+
+      if (isLogicalChatContentMutation(row, mutation)) {
+        contentMutatedRows.add(row);
+      }
+    }
+  }
+
+  return { rows: [...rows], contentMutatedRows };
+}
+
+function collectChangedChatRows(mutations) {
+  return collectChangedChatRowDetails(mutations).rows;
 }
 
 function scheduleScan() {

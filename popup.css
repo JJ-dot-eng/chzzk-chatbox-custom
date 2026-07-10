@@ -294,6 +294,7 @@ label {
 
 .preview-row__nick {
   flex: 0 0 auto;
+  font-size: var(--preview-nickname-font, var(--preview-font));
   font-weight: 700;
 }
 

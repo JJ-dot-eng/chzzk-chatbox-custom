@@ -1,3 +1,9 @@
+var miniChatOptionsWriteQueue = [];
+var miniChatOptionsWriteInFlight = false;
+var miniChatOptionsOptimisticState = null;
+var miniChatOptionsCommittedState = null;
+var miniChatOptionsOptimisticPatch = null;
+
 function getViewportBounds() {
   return {
     width: Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0),
@@ -309,7 +315,7 @@ async function restoreMiniFloatingChatFromBubble() {
 
   const result = await updateMiniChatOptions(patch, "mini-chat-bubble-restore");
 
-  if (!result.ok) {
+  if (!result.ok && !result.uncertain) {
     miniChatMinimized = true;
     miniChatBubbleBounds = bounds;
     miniChatRestoreBounds = nextBounds;
@@ -317,21 +323,148 @@ async function restoreMiniFloatingChatFromBubble() {
   }
 }
 
-async function updateMiniChatOptions(patch, source) {
-  const previousOptions = currentOptions;
-  const nextOptions = normalizeOptions({
-    ...currentOptions,
-    ...patch
-  });
-  const result = await writeOptionsToStorageLocal(nextOptions);
+function applyMiniChatOptionsState(options, source) {
+  const normalizedOptions = normalizeOptions(options);
 
-  if (!result.ok) {
-    applyOptions(previousOptions, { source: `${source}-error` });
-    return result;
+  applyOptions(normalizedOptions, { source });
+
+  const panel = document.getElementById(MINI_CHAT_PANEL_ID);
+
+  if (panel instanceof HTMLElement) {
+    applyMiniChatPanelBounds(panel, normalizedOptions.miniFloatingChatBounds, {
+      scale: normalizedOptions.miniFloatingChatScale,
+      inputOnly: normalizedOptions.miniFloatingChatInputOnly
+    });
+  }
+}
+
+function reapplyPendingMiniChatOptionsAfterStorageChange(storedOptions) {
+  if (!miniChatOptionsOptimisticState) {
+    return false;
   }
 
-  applyOptions(result.options, { source });
-  return result;
+  miniChatOptionsCommittedState = normalizeOptions(storedOptions);
+  miniChatOptionsOptimisticState = normalizeOptions({
+    ...miniChatOptionsCommittedState,
+    ...miniChatOptionsOptimisticPatch
+  });
+  applyMiniChatOptionsState(miniChatOptionsOptimisticState, "mini-chat-storage-pending");
+  return true;
+}
+
+function getQueuedMiniChatOptionsPatch() {
+  const patch = Object.assign(
+    {},
+    ...miniChatOptionsWriteQueue.map((item) => item.patch)
+  );
+
+  return Object.keys(patch).length > 0 ? patch : null;
+}
+
+function finishMiniChatOptionsWrite(item, result) {
+  const storageStateChanged = optionsStateRevision !== item.stateRevisionAtStart;
+  const latestObservedOptions = storageStateChanged && miniChatOptionsCommittedState
+    ? normalizeOptions(miniChatOptionsCommittedState)
+    : null;
+  const writeResult = result?.ok
+    ? {
+      ...result,
+      options: latestObservedOptions || normalizeOptions(result.options || item.snapshot)
+    }
+    : (result || { ok: false, error: "storage-local-set-error" });
+
+  if (writeResult.ok) {
+    miniChatOptionsCommittedState = writeResult.options;
+  }
+
+  miniChatOptionsOptimisticPatch = getQueuedMiniChatOptionsPatch();
+
+  if (miniChatOptionsWriteQueue.length > 0) {
+    const pendingBaseOptions = writeResult.ok
+      ? writeResult.options
+      : miniChatOptionsCommittedState;
+
+    miniChatOptionsOptimisticState = normalizeOptions({
+      ...pendingBaseOptions,
+      ...miniChatOptionsOptimisticPatch
+    });
+
+    applyMiniChatOptionsState(
+      miniChatOptionsOptimisticState,
+      `${item.source}-${writeResult.ok ? "pending" : "error-pending"}`
+    );
+  } else {
+    const settledOptions = writeResult.ok
+      ? writeResult.options
+      : miniChatOptionsCommittedState;
+
+    miniChatOptionsOptimisticState = null;
+    miniChatOptionsCommittedState = null;
+    miniChatOptionsOptimisticPatch = null;
+    applyMiniChatOptionsState(
+      settledOptions,
+      writeResult.ok ? item.source : `${item.source}-error`
+    );
+  }
+
+  item.resolve(writeResult);
+}
+
+function drainMiniChatOptionsWriteQueue() {
+  if (miniChatOptionsWriteInFlight) {
+    return;
+  }
+
+  const item = miniChatOptionsWriteQueue.shift();
+
+  if (!item) {
+    return;
+  }
+
+  miniChatOptionsWriteInFlight = true;
+  item.stateRevisionAtStart = optionsStateRevision;
+
+  Promise.resolve(writeOptionsPatchToStorageLocal(item.patch))
+    .then(
+      (result) => finishMiniChatOptionsWrite(item, result),
+      (error) => finishMiniChatOptionsWrite(item, {
+        ok: false,
+        error: String(error?.message || error || "storage-local-set-error")
+      })
+    )
+    .finally(() => {
+      miniChatOptionsWriteInFlight = false;
+      drainMiniChatOptionsWriteQueue();
+    });
+}
+
+function enqueueMiniChatOptionsWrite(snapshot, patch, source) {
+  return new Promise((resolve) => {
+    miniChatOptionsWriteQueue.push({ snapshot, patch, source, resolve });
+    drainMiniChatOptionsWriteQueue();
+  });
+}
+
+function updateMiniChatOptions(patch, source) {
+  const baseOptions = miniChatOptionsOptimisticState || currentOptions;
+
+  if (!miniChatOptionsOptimisticState) {
+    miniChatOptionsCommittedState = normalizeOptions(currentOptions);
+  }
+
+  const nextOptions = normalizeOptions({
+    ...baseOptions,
+    ...patch
+  });
+
+  miniChatOptionsOptimisticPatch = {
+    ...miniChatOptionsOptimisticPatch,
+    ...patch
+  };
+  miniChatOptionsOptimisticState = nextOptions;
+  applyMiniChatOptionsState(nextOptions, `${source}-optimistic`);
+
+  return enqueueMiniChatOptionsWrite(nextOptions, { ...patch }, source);
 }
 
 function getMiniChatLayoutTopForVisualTop(visualTop, height, scale = currentOptions.miniFloatingChatScale) {

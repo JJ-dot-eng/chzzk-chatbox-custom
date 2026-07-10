@@ -4,7 +4,47 @@ $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Resolve-Path (Join-Path $scriptRoot "..")
 $manifestPath = Join-Path $repoRoot "manifest.json"
 $manifest = Get-Content -Raw -Encoding UTF8 -Path $manifestPath | ConvertFrom-Json
-$packageName = "chzzk-chat-ui-settings-$($manifest.version)"
+
+function Assert-ChromeManifestVersion {
+  param([object]$Version)
+
+  if ($Version -isnot [string]) {
+    throw "manifest.version must be a string containing one to four dot-separated integers."
+  }
+
+  $parts = $Version.Split(".")
+
+  if ($parts.Count -lt 1 -or $parts.Count -gt 4) {
+    throw "Invalid Chrome extension version '$Version': expected one to four dot-separated integers."
+  }
+
+  $hasNonZeroPart = $false
+
+  foreach ($part in $parts) {
+    if ($part -notmatch '^(0|[1-9][0-9]*)$') {
+      throw "Invalid Chrome extension version '$Version': version parts must be decimal integers without leading zeroes."
+    }
+
+    $partValue = 0
+
+    if (-not [int]::TryParse($part, [ref]$partValue) -or $partValue -gt 65535) {
+      throw "Invalid Chrome extension version '$Version': each version part must be between 0 and 65535."
+    }
+
+    if ($partValue -ne 0) {
+      $hasNonZeroPart = $true
+    }
+  }
+
+  if (-not $hasNonZeroPart) {
+    throw "Invalid Chrome extension version '$Version': version parts cannot all be zero."
+  }
+
+  return $Version
+}
+
+$manifestVersion = Assert-ChromeManifestVersion -Version $manifest.version
+$packageName = "chzzk-chat-ui-settings-$manifestVersion"
 $distRoot = Join-Path $repoRoot "dist"
 $stageRoot = Join-Path $distRoot $packageName
 $zipPath = Join-Path $distRoot "$packageName.zip"
@@ -18,10 +58,17 @@ function Get-ResolvedFullPath {
 function Assert-PathInsideRepo {
   param([string]$Path)
 
-  $resolvedRepo = Get-ResolvedFullPath -Path $repoRoot
+  $resolvedRepo = (Get-ResolvedFullPath -Path $repoRoot).TrimEnd(
+    [System.IO.Path]::DirectorySeparatorChar,
+    [System.IO.Path]::AltDirectorySeparatorChar
+  )
   $resolvedPath = Get-ResolvedFullPath -Path $Path
+  $repoPrefix = $resolvedRepo + [System.IO.Path]::DirectorySeparatorChar
 
-  if (-not $resolvedPath.StartsWith($resolvedRepo, [System.StringComparison]::OrdinalIgnoreCase)) {
+  if (
+    $resolvedPath -ne $resolvedRepo -and
+    -not $resolvedPath.StartsWith($repoPrefix, [System.StringComparison]::OrdinalIgnoreCase)
+  ) {
     throw "Refusing to write outside repository: $resolvedPath"
   }
 

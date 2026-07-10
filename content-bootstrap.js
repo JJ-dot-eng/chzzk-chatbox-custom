@@ -1,4 +1,4 @@
-var SCRIPT_VERSION = "0.5.5";
+var SCRIPT_VERSION = "0.5.6";
 var GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 var CHZZK_CHAT_UI_TOGGLE_SHOULD_START = !window[GLOBAL_KEY];
 
@@ -9,6 +9,7 @@ var NATIVE_CHAT_ROW_SELECTOR = `:is([class*="live_chatting_list_item" i], [role=
 var CHAT_ROW_SCOPE_SELECTOR = `:is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i])[${CHAT_ROW_ATTR}="true"]`;
 var CACHE_KEY = "chzzkChatUiToggleOptionsCache";
 var READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
+var UPDATE_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_UPDATE_OPTIONS";
 var OPEN_POPUP_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_POPUP";
 var READ_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_GUEST_CHAT_THEME";
 var SET_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_GUEST_CHAT_THEME";
@@ -297,6 +298,8 @@ var currentOptions = { ...DEFAULT_OPTIONS };
 var scanTimer = 0;
 var uiSyncTimer = 0;
 var optionsLoadTimer = 0;
+var optionsLoadGeneration = 0;
+var optionsStateRevision = 0;
 var scanIntervalTimer = 0;
 var isScanning = false;
 var observer = null;
@@ -305,6 +308,8 @@ var messagesConnected = false;
 var storageListenerConnected = false;
 var themeSyncTimer = 0;
 var largeTextLayoutFrame = 0;
+var largeTextLayoutRows = new Set();
+var largeTextLayoutSyncAll = false;
 var lastOptionsSource = "default";
 var lastOptionsLoadError = "";
 var currentGuestChatTheme = null;

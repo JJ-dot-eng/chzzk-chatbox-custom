@@ -460,24 +460,33 @@ async function openExtensionPopupFromHeader(button) {
 
 async function toggleGuestChatFrame(button) {
   const previousOptions = currentOptions;
-  const nextOptions = normalizeOptions({
-    ...currentOptions,
+  const stateRevisionAtStart = optionsStateRevision;
+  const patch = {
     useGuestChatFrame: !currentOptions.useGuestChatFrame
-  });
+  };
 
   setGuestChatToggleButtonState(button, "loading");
 
-  const result = await writeOptionsToStorageLocal(nextOptions);
+  const result = await writeOptionsPatchToStorageLocal(patch);
+  const storageStateChanged = optionsStateRevision !== stateRevisionAtStart;
 
   if (!result.ok) {
-    applyOptions(previousOptions, { source: "header-toggle-error" });
+    if (!storageStateChanged && result.authoritative && result.options) {
+      applyOptions(result.options, { source: "header-toggle-reconciled-error" });
+    } else if (!storageStateChanged) {
+      applyOptions(previousOptions, { source: "header-toggle-error" });
+    }
+
     scan();
     setGuestChatToggleButtonState(button, "error");
     resetGuestChatToggleButtonStateLater(button);
     return;
   }
 
-  applyOptions(result.options, { source: "header-toggle" });
+  if (!storageStateChanged) {
+    applyOptions(result.options, { source: "header-toggle" });
+  }
+
   scan();
 }
 

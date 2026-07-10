@@ -1,5 +1,6 @@
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
+import vm from "node:vm";
 
 const root = process.cwd();
 
@@ -25,6 +26,30 @@ function assertExcludes(source, token, message) {
   assert(!source.includes(token), `${message}: ${token}`);
 }
 
+function getDefaultOptionContract(source, declaration, label, globals = {}) {
+  const start = source.indexOf(declaration);
+  assert(start >= 0, `${label} must declare DEFAULT_OPTIONS.`);
+  const end = source.indexOf("\n};", start);
+  assert(end > start, `${label} DEFAULT_OPTIONS must have a closing brace.`);
+  const keys = source
+    .slice(start, end)
+    .split(/\r?\n/)
+    .map((line) => line.match(/^  ([A-Za-z][A-Za-z0-9_]*):/u)?.[1] ?? null)
+    .filter(Boolean);
+  const context = vm.createContext({ ...globals });
+
+  vm.runInContext(
+    `${source.slice(0, end + 3)}\nglobalThis.__defaultOptions = DEFAULT_OPTIONS;`,
+    context,
+    { filename: `${label}-default-options.js` }
+  );
+
+  return {
+    keys,
+    values: JSON.parse(JSON.stringify(context.__defaultOptions))
+  };
+}
+
 const manifest = await readJson("manifest.json");
 const packageJson = await readJson("package.json");
 const packageLock = await readJson("package-lock.json");
@@ -47,6 +72,8 @@ const popupStyles = await readText("popup.css");
 const popupSource = await readText("popup.js");
 const readmeSource = await readText("README.md");
 const liveVerifySource = await readText(path.join("tools", "verify-live-edge.cjs"));
+const packageScriptSource = await readText(path.join("tools", "package-extension.ps1"));
+const regressionTestSource = await readText(path.join("tests", "extension-regressions.test.cjs"));
 const normalizedContentSource = contentSource.replace(/\r\n/g, "\n");
 const contentSurface = `${contentSource}\n${contentCssSource}`;
 
@@ -81,8 +108,102 @@ assert(
   packageLock.version === manifest.version && packageLock.packages?.[""]?.version === manifest.version,
   "package-lock root versions must match manifest version."
 );
+const manifestVersionParts = manifest.version.split(".");
+assert(
+  manifestVersionParts.length >= 1 &&
+    manifestVersionParts.length <= 4 &&
+    manifestVersionParts.every(
+      (part) => /^(0|[1-9][0-9]*)$/u.test(part) && Number(part) <= 65535
+    ) &&
+    manifestVersionParts.some((part) => Number(part) !== 0),
+  "manifest version must follow Chrome's one-to-four integer component rules."
+);
 assertIncludes(contentSource, `var SCRIPT_VERSION = "${manifest.version}";`, "content script version must match manifest version");
 assertIncludes(popupSource, `const CONTENT_VERSION = "${manifest.version}";`, "popup content version must match manifest version");
+
+const defaultOptionContracts = [
+  [backgroundSource, "const DEFAULT_OPTIONS = {", "background"],
+  [contentSource, "var DEFAULT_OPTIONS = {", "content"],
+  [popupSource, "const DEFAULT_OPTIONS = {", "popup"]
+].map(([source, declaration, label]) => ({
+  label,
+  ...getDefaultOptionContract(
+    source,
+    declaration,
+    label,
+    label === "content" ? { window: {} } : {}
+  )
+}));
+const canonicalDefaultOptionKeys = defaultOptionContracts[0].keys;
+const canonicalDefaultOptionValues = defaultOptionContracts[0].values;
+
+for (const contract of defaultOptionContracts.slice(1)) {
+  assert(
+    JSON.stringify(contract.keys) === JSON.stringify(canonicalDefaultOptionKeys),
+    `${contract.label} DEFAULT_OPTIONS keys/order must match background DEFAULT_OPTIONS.`
+  );
+  assert(
+    JSON.stringify(contract.values) === JSON.stringify(canonicalDefaultOptionValues),
+    `${contract.label} DEFAULT_OPTIONS values must match background DEFAULT_OPTIONS.`
+  );
+}
+
+const emptyNumericValueGuard =
+  'if (value === null || value === undefined || (typeof value === "string" && value.trim() === "")) {';
+
+for (const [source, label] of [
+  [backgroundSource, "background"],
+  [contentSource, "content"],
+  [popupSource, "popup"]
+]) {
+  assert(
+    source.split(emptyNumericValueGuard).length - 1 >= 2,
+    `${label} clamp and coordinate normalization must both preserve null/blank fallbacks.`
+  );
+  assertIncludes(source, "function normalizeOptionalCoordinate(value)", `${label} must normalize optional coordinates`);
+}
+
+assert(
+  packageJson.scripts?.package?.startsWith("npm.cmd run check && "),
+  "package script must run the complete check before creating release artifacts."
+);
+assert(
+  packageJson.scripts?.test === "node --test tests/extension-regressions.test.cjs" &&
+    packageJson.scripts?.check?.endsWith("&& npm.cmd test"),
+  "check must run the Edge-backed regression test suite."
+);
+for (const token of [
+  'createChatDocument("12:34")',
+  'nativeTimestamp: "09:41"',
+  "sameNode: generated === window.__generatedTimestampBefore",
+  "__generatedTimestampBeforeReuse",
+  'panel.id = "sports-panel"',
+  "storageSetDelays: [80, 5]",
+  "storageEventsAfterCallbacks: true",
+  "assert.deepEqual(result.requestedScales, [110, 120]);",
+  "nickname prefix annotation must be restored",
+  "팝업 닉네임 크기 저장 직후 미니 채팅을 조작해도 새 설정을 덮어쓰지 않는다",
+  "외부 설정으로 rebase한 미니 저장이 실패해도 최신 닉네임 설정은 유지된다",
+  "새 storage 변경 뒤 늦게 끝난 초기 읽기는 닉네임 설정을 되돌리지 않는다",
+  "실제 background FIFO는 미니 patch 뒤 팝업 patch를 병합해 둘 다 보존한다",
+  "게스트 채팅 저장 응답이 늦어도 저장된 최신 상태를 되돌리지 않는다",
+  "늦은 게스트 채팅 READ 응답이 더 최신 storage 변경을 덮지 않는다",
+  "늦은 미니 채팅 성공 응답이 더 최신 storage 변경을 덮지 않는다",
+  "완료된 미니 patch는 뒤의 대기 patch에 다시 섞이지 않는다",
+  "미니 버블 복원 저장이 미확정 timeout이어도 다시 최소화하지 않는다",
+  "optionsUpdateResponseDelays: [900]",
+  "vm.runInContext(source, context"
+]) {
+  assertIncludes(regressionTestSource, token, "regression tests must cover timestamp and mini-chat races");
+}
+for (const token of [
+  "function Assert-ChromeManifestVersion",
+  "$repoPrefix = $resolvedRepo + [System.IO.Path]::DirectorySeparatorChar",
+  "$resolvedPath -ne $resolvedRepo",
+  "-not $resolvedPath.StartsWith($repoPrefix, [System.StringComparison]::OrdinalIgnoreCase)"
+]) {
+  assertIncludes(packageScriptSource, token, "package script must validate versions and directory boundaries");
+}
 
 assert(manifest.action?.default_popup === "popup.html", "default popup must point to popup.html.");
 assert(manifest.background?.service_worker === "background.js", "background service worker must point to background.js.");
@@ -134,6 +255,7 @@ for (const token of [
 
 for (const token of [
   'const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";',
+  'const UPDATE_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_UPDATE_OPTIONS";',
   'const OPEN_POPUP_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_POPUP";',
   'const READ_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_GUEST_CHAT_THEME";',
   'const SET_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_GUEST_CHAT_THEME";',
@@ -141,6 +263,8 @@ for (const token of [
   "chrome.runtime.onMessage.addListener",
   "chrome.action.openPopup()",
   "chrome.storage.local.get(STORAGE_KEY",
+  "function queueStoredOptionsUpdate(message)",
+  "optionsUpdateQueue.then(() => getStoredOptions(sendResponse));",
   "chrome.tabs.sendMessage("
 ]) {
   assertIncludes(backgroundSource, token, "background script must keep storage, popup, and guest-theme message support");
@@ -156,8 +280,34 @@ for (const token of [
   "function syncGuestChatFrame()",
   "function syncMiniFloatingChatPanel()",
   "function cleanupUnscopedAnnotations",
-  "function scanRows(rows)",
-  "observer = new MutationObserver"
+  "function scanRows(rows, { contentMutated = false, contentMutatedRows = null } = {})",
+  "observer = new MutationObserver",
+  "characterData: true",
+  "function collectChangedChatRows(mutations)",
+  "function collectChangedChatRowDetails(mutations)",
+  "function isTimestampCandidate(row, element)",
+  "function hasNonGeneratedAddedNodesOutsideChatRows(mutations)",
+  "return Boolean(element && (!closestRow || !isChatMessageRow(closestRow)));",
+  "var largeTextLayoutRows = new Set();",
+  "scheduleLargeTextLayoutSync(uniqueRows);",
+  "function removeGeneratedTimestampWhenNativeExists(row)",
+  "function isMiniChatInputFieldInChatContext(field)",
+  "var chatRowAnnotationSnapshots = new WeakMap();",
+  "var miniChatOptionsWriteQueue = [];",
+  "function drainMiniChatOptionsWriteQueue()",
+  "function reapplyPendingMiniChatOptionsAfterStorageChange(storedOptions)",
+  "function getQueuedMiniChatOptionsPatch()",
+  "miniChatOptionsCommittedState = normalizeOptions(storedOptions);",
+  "reapplyPendingMiniChatOptionsAfterStorageChange(changes[STORAGE_KEY].newValue);",
+  "function writeOptionsPatchToStorageLocal(patch)",
+  "function doOptionsMatchPatch(options, patch)",
+  "const reconcileWithLatestOptions = async (fallbackResult)",
+  "authoritative: true",
+  "stateRevisionAtStart !== optionsStateRevision",
+  "optionsStateRevision !== item.stateRevisionAtStart",
+  "header-toggle-reconciled-error",
+  "if (!result.ok && !result.uncertain)",
+  "const baseOptions = miniChatOptionsOptimisticState || currentOptions;"
 ]) {
   assertIncludes(normalizedContentSource, token, "content script must keep core chat and option wiring");
 }
@@ -169,7 +319,7 @@ for (const token of [
   'var GUEST_CHAT_CLEANBOT_STORAGE_KEY = "cleanbot";',
   'var GUEST_CHAT_CLEANBOT_DISABLED_VALUE = "false";',
   "function applyGuestChatCleanBotDefault()",
-  "if (!isGuestChatFrameEmbedUrl(window.location.href))",
+  "if (window.self === window.top || !isGuestChatFrameEmbedUrl(window.location.href))",
   "window.localStorage?.setItem(GUEST_CHAT_CLEANBOT_STORAGE_KEY, GUEST_CHAT_CLEANBOT_DISABLED_VALUE);",
   'document.documentElement.setAttribute(GUEST_CHAT_CLEANBOT_DEFAULT_ATTR, "off");',
   "applyGuestChatCleanBotDefault();",
@@ -187,10 +337,18 @@ const cleanBotDefaultSource =
     : "";
 
 assert(
-  cleanBotDefaultSource.includes("if (!isGuestChatFrameEmbedUrl(window.location.href))") &&
+  cleanBotDefaultSource.includes(
+    "if (window.self === window.top || !isGuestChatFrameEmbedUrl(window.location.href))"
+  ) &&
     cleanBotDefaultSource.indexOf("window.localStorage?.setItem") >
-      cleanBotDefaultSource.indexOf("if (!isGuestChatFrameEmbedUrl(window.location.href))"),
+      cleanBotDefaultSource.indexOf(
+        "if (window.self === window.top || !isGuestChatFrameEmbedUrl(window.location.href))"
+      ),
   "guest cleanbot default must only write localStorage inside the guest iframe guard."
+);
+assert(
+  contentSource.split("window.self !== window.top &&").length - 1 >= 2,
+  "guest and mini embed markers must both activate only inside subframes."
 );
 
 const startFunctionStart = contentSource.indexOf("function start()");
@@ -248,6 +406,7 @@ for (const token of [
   "color: var(--chzzk-chat-ui-toggle-chat-text-color) !important;",
   "color: var(--chzzk-chat-ui-toggle-auto-nickname-color) !important;",
   "color: var(--chzzk-chat-ui-toggle-auto-message-color) !important;",
+  ':not(:has(:is(.chzzk-chat-ui-toggle-timestamp, [data-chzzk-chat-ui-toggle-role~="timestamp"])))',
   "font-size: var(--chzzk-chat-ui-toggle-chat-font-size, 13pt) !important;",
   "transform: scale(var(--chzzk-chat-ui-toggle-mini-chat-scale, 1)) !important;",
   "#chzzk-chat-ui-toggle-mini-chat-panel",
@@ -257,6 +416,16 @@ for (const token of [
 }
 
 assertExcludes(contentCssSource, "${", "content.css must not contain unexpanded JavaScript template placeholders");
+const autoMessageSelectorIndex = contentCssSource.indexOf(
+  '[data-chzzk-chat-ui-toggle-auto-contrast~="message"]'
+);
+assert(autoMessageSelectorIndex >= 0, "content.css must style auto-contrasted message text.");
+assert(
+  !contentCssSource
+    .slice(Math.max(0, autoMessageSelectorIndex - 180), autoMessageSelectorIndex)
+    .includes('data-chzzk-chat-ui-toggle-chat-text-color="on"'),
+  "standalone auto contrast must not depend on custom chat text color being enabled."
+);
 assertExcludes(contentSource, "const STYLE_ID", "content script should not keep the old injected style element id.");
 assertExcludes(contentSource, "style.textContent = `", "content script should not keep the old large CSS template string.");
 
@@ -270,8 +439,33 @@ for (const token of [
 ]) {
   assertIncludes(popupSource, token, "popup must use manifest-injected content scripts and show reload status");
 }
+assertExcludes(
+  normalizedContentSource,
+  "scanRows(changedRows, { contentMutated: true });",
+  "row mutations must not reset generated timestamps unconditionally"
+);
+for (const token of [
+  "function prepareCommitSnapshot()",
+  "return normalizeOptions(currentOptions);",
+  'window.addEventListener("pagehide", persistLatestOptionsBeforeClose);',
+  "function setLocalStorage(values)",
+  'const UPDATE_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_UPDATE_OPTIONS";',
+  "function getChangedOptionsPatch(previousOptions, nextOptions)",
+  "lastCommittedPopupSnapshot = normalizeOptions(currentOptions);",
+  "patch",
+  'chatPreview.style.setProperty("--preview-nickname-font"',
+  "{ frameId: 0 }",
+  "!menuButton.contains(event.target) && !appMenu.contains(event.target)"
+]) {
+  assertIncludes(popupSource, token, "popup must keep durable ordered storage and top-frame status routing");
+}
 assertExcludes(popupSource, "chrome.scripting", "popup must not use scripting permission.");
 assertExcludes(popupSource, "executeScript", "popup must not dynamically inject content scripts.");
+assertIncludes(
+  popupStyles,
+  "font-size: var(--preview-nickname-font, var(--preview-font));",
+  "popup preview must render the independent nickname font size"
+);
 
 for (const token of [
   'id="useGuestChatFrame"',
@@ -295,6 +489,33 @@ for (const token of [
 ]) {
   assertIncludes(popupMarkup, token, "popup markup must keep expected controls");
 }
+
+for (const token of [
+  "function hexToExpectedRgba(hexColor, theme)",
+  "function selectPopupView(popup, targetView)",
+  "function assertPopupImmediateClosePersistence",
+  "function assertDirectGuestMarkerProtection",
+  "function assertMiniChatDefaultPosition",
+  "function waitForMiniChatFrameState",
+  "function assertSyntheticNativeTimestamp",
+  "function assertSyntheticStandaloneAutoContrast"
+]) {
+  assertIncludes(liveVerifySource, token, "live verifier must cover the current popup and regression contracts");
+}
+for (const token of [
+  "unannotatedRowCount",
+  "nicknameMissingRoleCount",
+  "minNicknameFontSize",
+  "nicknameFontSizeSpread"
+]) {
+  assertIncludes(liveVerifySource, token, "live verifier must reject incomplete nickname coverage");
+}
+assertIncludes(
+  liveVerifySource,
+  "singleLineTextInsetDeltas",
+  "live verifier must avoid wrapped-line false positives when checking chat-box padding"
+);
+assertExcludes(liveVerifySource, "data-tab-target", "live verifier must not use the removed tab UI contract");
 
 for (const token of [
   "nicknameColorOption.disabled = !isChatTextColorEnabled;",

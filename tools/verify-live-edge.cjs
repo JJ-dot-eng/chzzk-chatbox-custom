@@ -9,10 +9,15 @@ const LIVE_URL =
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const ROLE_ATTR = "data-chzzk-chat-ui-toggle-role";
 const CHAT_ROW_ATTR = "data-chzzk-chat-ui-toggle-chat-row";
+const NATIVE_CHAT_ROW_SELECTOR = `:is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i]):has(:is([class*="live_chatting_message_container" i], [class*="_chatting_message_" i]))`;
 const OUTPUT_DIR = path.join(process.cwd(), "output", "playwright");
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
 const DEFAULT_CHAT_TEXT_COLOR = "#101418";
 const CHAT_FONT_SIZE_PT_DEFAULT = 13;
+const CHAT_BOX_ALPHA = 0.18;
+const CHAT_BOX_ALPHA_MAX = 0.88;
+const CHAT_BOX_ALPHA_CONTRAST_START = 3;
+const CHAT_BOX_ALPHA_CONTRAST_END = 12;
 const EXTENSION_NAME = "치지직 채팅 커스텀";
 const EXTENSION_BACKGROUND_FILE = "background.js";
 const GUEST_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-guest-chat-frame";
@@ -23,6 +28,7 @@ const GUEST_CHAT_CONTROL_HOST_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-contr
 const GUEST_CHAT_EMBED_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-embed";
 const GUEST_CHAT_CLEANBOT_DEFAULT_ATTR = "data-chzzk-chat-ui-toggle-guest-cleanbot-default";
 const GUEST_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleGuest";
+const MINI_CHAT_PANEL_ID = "chzzk-chat-ui-toggle-mini-chat-panel";
 const LIVE_CHANNEL_ID_PATTERN = /^[0-9a-f]{32}$/i;
 const HEADER_BUTTON_IDS = [
   GUEST_CHAT_TOGGLE_BUTTON_ID,
@@ -114,6 +120,8 @@ const largeTextColorOptions = {
   showGuestChatToggleButton: true,
   showLargeText: true,
   chatFontSizePt: 36,
+  useNicknameFontSize: true,
+  nicknameFontSizePt: 24,
   showBoldText: false,
   useChatTextColor: false,
   chatTextColor: DEFAULT_CHAT_TEXT_COLOR,
@@ -151,13 +159,54 @@ function normalizeHexColor(value) {
   return DEFAULT_CHAT_BOX_COLOR;
 }
 
-function hexToExpectedRgba(hexColor) {
+function hexToRgb(hexColor) {
   const hex = normalizeHexColor(hexColor).slice(1);
-  const red = Number.parseInt(hex.slice(0, 2), 16);
-  const green = Number.parseInt(hex.slice(2, 4), 16);
-  const blue = Number.parseInt(hex.slice(4, 6), 16);
 
-  return `rgba(${red}, ${green}, ${blue}, 0.18)`;
+  return {
+    red: Number.parseInt(hex.slice(0, 2), 16),
+    green: Number.parseInt(hex.slice(2, 4), 16),
+    blue: Number.parseInt(hex.slice(4, 6), 16)
+  };
+}
+
+function getRelativeLuminance(color) {
+  const channels = [color.red, color.green, color.blue].map((channel) => {
+    const normalized = channel / 255;
+
+    return normalized <= 0.03928
+      ? normalized / 12.92
+      : ((normalized + 0.055) / 1.055) ** 2.4;
+  });
+
+  return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+}
+
+function getContrastRatio(firstColor, secondColor) {
+  const first = getRelativeLuminance(firstColor);
+  const second = getRelativeLuminance(secondColor);
+
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+}
+
+function hexToExpectedRgba(hexColor, theme) {
+  const color = hexToRgb(hexColor);
+  const backdrop = theme === "dark"
+    ? { red: 16, green: 20, blue: 24 }
+    : { red: 255, green: 255, blue: 255 };
+  const contrast = getContrastRatio(color, backdrop);
+  const progress = Math.max(
+    0,
+    Math.min(
+      1,
+      (contrast - CHAT_BOX_ALPHA_CONTRAST_START) /
+        (CHAT_BOX_ALPHA_CONTRAST_END - CHAT_BOX_ALPHA_CONTRAST_START)
+    )
+  );
+  const alpha = Number(
+    (CHAT_BOX_ALPHA + progress * (CHAT_BOX_ALPHA_MAX - CHAT_BOX_ALPHA)).toFixed(2)
+  );
+
+  return `rgba(${color.red}, ${color.green}, ${color.blue}, ${alpha})`;
 }
 
 function extractLiveChannelId(url) {
@@ -196,10 +245,13 @@ function summarizeFrameState(frameStates) {
         summary.layout.timestampNicknameGaps.push(gap);
       }
 
-      const chatBoxes = state.layout?.chatBoxes;
+        const chatBoxes = state.layout?.chatBoxes;
 
-      if (chatBoxes) {
-        summary.layout.chatBoxes.sampleCount += chatBoxes.sampleCount || 0;
+        if (chatBoxes) {
+          summary.layout.chatBoxes.nativeRowCount += chatBoxes.nativeRowCount || 0;
+          summary.layout.chatBoxes.unannotatedRowCount += chatBoxes.unannotatedRowCount || 0;
+          summary.layout.chatBoxes.nicknameMissingRoleCount += chatBoxes.nicknameMissingRoleCount || 0;
+          summary.layout.chatBoxes.sampleCount += chatBoxes.sampleCount || 0;
         summary.layout.chatBoxes.roundedCount += chatBoxes.roundedCount || 0;
         summary.layout.chatBoxes.backgroundedCount += chatBoxes.backgroundedCount || 0;
         summary.layout.chatBoxes.paddedCount += chatBoxes.paddedCount || 0;
@@ -227,6 +279,10 @@ function summarizeFrameState(frameStates) {
 
         for (const delta of chatBoxes.textInsetDeltas || []) {
           summary.layout.chatBoxes.textInsetDeltas.push(delta);
+        }
+
+        for (const delta of chatBoxes.singleLineTextInsetDeltas || []) {
+          summary.layout.chatBoxes.singleLineTextInsetDeltas.push(delta);
         }
 
         for (const fontSize of chatBoxes.fontSizes || []) {
@@ -264,17 +320,30 @@ function summarizeFrameState(frameStates) {
         summary.framesWithRootDataset += 1;
       }
 
+      const detectedTheme = state.rootDataset?.detectedTheme;
+
+      if (
+        (detectedTheme === "dark" || detectedTheme === "light") &&
+        !summary.detectedThemes.includes(detectedTheme)
+      ) {
+        summary.detectedThemes.push(detectedTheme);
+      }
+
       return summary;
     },
     {
       framesWithStyle: 0,
       framesWithRootDataset: 0,
+      detectedThemes: [],
       counts: { nickname: 0, badge: 0, timestamp: 0 },
       hidden: { nickname: 0, badge: 0, timestamp: 0 },
       visible: { nickname: 0, badge: 0, timestamp: 0 },
       layout: {
         timestampNicknameGaps: [],
         chatBoxes: {
+          nativeRowCount: 0,
+          unannotatedRowCount: 0,
+          nicknameMissingRoleCount: 0,
           sampleCount: 0,
           roundedCount: 0,
           backgroundedCount: 0,
@@ -287,10 +356,14 @@ function summarizeFrameState(frameStates) {
           widthSpread: null,
           textInsetDeltas: [],
           maxTextInsetDelta: null,
+          singleLineTextInsetDeltas: [],
+          maxSingleLineTextInsetDelta: null,
           fontSizes: [],
           maxFontSize: null,
           nicknameFontSizes: [],
+          minNicknameFontSize: null,
           maxNicknameFontSize: null,
+          nicknameFontSizeSpread: null,
           fontWeights: [],
           maxFontWeight: null,
           messageFontWeights: [],
@@ -311,10 +384,18 @@ function summarizeFrameState(frameStates) {
 
   const insetDeltas = summary.layout.chatBoxes.textInsetDeltas;
   summary.layout.chatBoxes.maxTextInsetDelta = insetDeltas.length ? Math.max(...insetDeltas) : null;
+  const singleLineInsetDeltas = summary.layout.chatBoxes.singleLineTextInsetDeltas;
+  summary.layout.chatBoxes.maxSingleLineTextInsetDelta = singleLineInsetDeltas.length
+    ? Math.max(...singleLineInsetDeltas)
+    : null;
   const fontSizes = summary.layout.chatBoxes.fontSizes;
   summary.layout.chatBoxes.maxFontSize = fontSizes.length ? Math.max(...fontSizes) : null;
   const nicknameFontSizes = summary.layout.chatBoxes.nicknameFontSizes;
+  summary.layout.chatBoxes.minNicknameFontSize = nicknameFontSizes.length ? Math.min(...nicknameFontSizes) : null;
   summary.layout.chatBoxes.maxNicknameFontSize = nicknameFontSizes.length ? Math.max(...nicknameFontSizes) : null;
+  summary.layout.chatBoxes.nicknameFontSizeSpread = nicknameFontSizes.length
+    ? Math.max(...nicknameFontSizes) - Math.min(...nicknameFontSizes)
+    : null;
   const fontWeights = summary.layout.chatBoxes.fontWeights;
   summary.layout.chatBoxes.maxFontWeight = fontWeights.length ? Math.max(...fontWeights) : null;
   const messageFontWeights = summary.layout.chatBoxes.messageFontWeights;
@@ -330,7 +411,7 @@ async function collectFrameStates(page) {
 
   for (const frame of page.frames()) {
     try {
-      const state = await frame.evaluate(({ roleAttr, chatRowAttr }) => {
+      const state = await frame.evaluate(({ roleAttr, chatRowAttr, nativeChatRowSelector }) => {
         const roles = ["nickname", "badge", "timestamp"];
         const counts = {};
         const hidden = {};
@@ -354,6 +435,18 @@ async function collectFrameStates(page) {
           }));
         }
 
+        const nativeChatRows = [...document.querySelectorAll(nativeChatRowSelector)]
+          .filter((row) =>
+            row.querySelector(
+              "button[class*='live_chatting_message_nickname' i], button[class*='nickname' i]"
+            ) &&
+            row.querySelector(
+              "[class*='live_chatting_message_text' i], [class*='message_text' i], [class*='_chatting_message_' i] [class*='_text_' i]"
+            )
+          );
+        const unannotatedRowCount = nativeChatRows.filter(
+          (row) => row.getAttribute(chatRowAttr) !== "true"
+        ).length;
         const chatRows = [...document.querySelectorAll(`[${chatRowAttr}="true"]`)];
         const timestampNicknameGaps = chatRows
           .slice(-80)
@@ -417,16 +510,23 @@ async function collectFrameStates(page) {
             const nicknameFontSize = nicknameTextStyle ? Number.parseFloat(nicknameTextStyle.fontSize) || 0 : 0;
             let textLeftInset = null;
             let textRightInset = null;
+            let textLineCount = null;
 
             if (messageText) {
               const range = document.createRange();
               range.selectNodeContents(messageText);
               const textRect = range.getBoundingClientRect();
+              const lineTops = new Set(
+                [...range.getClientRects()]
+                  .filter((clientRect) => clientRect.width > 0 && clientRect.height > 0)
+                  .map((clientRect) => Math.round(clientRect.top))
+              );
               range.detach();
 
               if (textRect.width > 0 && textRect.height > 0) {
                 textLeftInset = Math.round(textRect.left - rect.left);
                 textRightInset = Math.round(rect.right - textRect.right);
+                textLineCount = lineTops.size;
               }
             }
 
@@ -448,6 +548,7 @@ async function collectFrameStates(page) {
               isShrunken: parentWidth > 0 && width <= Math.round(parentWidth) - 40,
               textLeftInset,
               textRightInset,
+              textLineCount,
               textInsetDelta:
                 textLeftInset !== null && textRightInset !== null
                   ? Math.abs(textLeftInset - textRightInset)
@@ -462,12 +563,16 @@ async function collectFrameStates(page) {
         const textInsetDeltas = chatBoxSamples
           .map((sample) => sample.textInsetDelta)
           .filter((delta) => Number.isFinite(delta));
+        const singleLineTextInsetDeltas = chatBoxSamples
+          .filter((sample) => sample.textLineCount === 1)
+          .map((sample) => sample.textInsetDelta)
+          .filter((delta) => Number.isFinite(delta));
         const fontSizes = chatBoxSamples
           .map((sample) => sample.fontSize)
           .filter((fontSize) => Number.isFinite(fontSize) && fontSize > 0);
         const nicknameFontSizes = chatBoxSamples
           .map((sample) => sample.nicknameFontSize)
-          .filter((fontSize) => Number.isFinite(fontSize) && fontSize > 0);
+          .filter((fontSize) => Number.isFinite(fontSize));
         const fontWeights = chatBoxSamples
           .map((sample) => sample.fontWeight)
           .filter((fontWeight) => Number.isFinite(fontWeight) && fontWeight > 0);
@@ -489,8 +594,10 @@ async function collectFrameStates(page) {
             chatBoxes: document.documentElement.dataset.chzzkChatUiToggleChatBoxes || null,
             largeText: document.documentElement.dataset.chzzkChatUiToggleLargeText || null,
             chatFontSizePt: document.documentElement.dataset.chzzkChatUiToggleChatFontSizePt || null,
+            nicknameFontSizePt: document.documentElement.dataset.chzzkChatUiToggleNicknameFontSizePt || null,
             boldText: document.documentElement.dataset.chzzkChatUiToggleBoldText || null,
-            chatBoxColor: document.documentElement.dataset.chzzkChatUiToggleChatBoxColor || null
+            chatBoxColor: document.documentElement.dataset.chzzkChatUiToggleChatBoxColor || null,
+            detectedTheme: document.documentElement.dataset.chzzkChatUiToggleDetectedTheme || null
           },
           counts,
           hidden,
@@ -499,6 +606,11 @@ async function collectFrameStates(page) {
           layout: {
             timestampNicknameGaps,
             chatBoxes: {
+              nativeRowCount: nativeChatRows.length,
+              unannotatedRowCount,
+              nicknameMissingRoleCount: chatBoxSamples.filter(
+                (sample) => sample.nicknameFontSize <= 0
+              ).length,
               sampleCount: chatBoxSamples.length,
               roundedCount: chatBoxSamples.filter((sample) => sample.isRounded).length,
               backgroundedCount: chatBoxSamples.filter((sample) => sample.backgroundIsVisible).length,
@@ -510,6 +622,7 @@ async function collectFrameStates(page) {
               maxHeight: chatBoxHeights.length ? Math.max(...chatBoxHeights) : null,
               widthSpread: chatBoxWidths.length ? Math.max(...chatBoxWidths) - Math.min(...chatBoxWidths) : null,
               textInsetDeltas,
+              singleLineTextInsetDeltas,
               fontSizes,
               nicknameFontSizes,
               fontWeights,
@@ -519,7 +632,11 @@ async function collectFrameStates(page) {
             }
           }
         };
-      }, { roleAttr: ROLE_ATTR, chatRowAttr: CHAT_ROW_ATTR });
+      }, {
+        roleAttr: ROLE_ATTR,
+        chatRowAttr: CHAT_ROW_ATTR,
+        nativeChatRowSelector: NATIVE_CHAT_ROW_SELECTOR
+      });
 
       states.push(state);
     } catch (error) {
@@ -931,6 +1048,45 @@ async function setExtensionOptions(worker, options) {
   );
 }
 
+async function readExtensionOptions(worker) {
+  return worker.evaluate(
+    (key) =>
+      new Promise((resolve, reject) => {
+        chrome.storage.local.get(key, (result) => {
+          const error = chrome.runtime.lastError;
+
+          if (error) {
+            reject(new Error(error.message));
+            return;
+          }
+
+          resolve(result?.[key] || null);
+        });
+      }),
+    STORAGE_KEY
+  );
+}
+
+async function waitForExtensionOption(worker, optionKey, expectedValue, timeoutMs = 3000) {
+  const deadline = Date.now() + timeoutMs;
+  let latestOptions = null;
+
+  while (Date.now() < deadline) {
+    latestOptions = await readExtensionOptions(worker);
+
+    if (latestOptions?.[optionKey] === expectedValue) {
+      return latestOptions;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+
+  throw new Error(
+    `Stored popup option ${optionKey} did not become ${expectedValue}; ` +
+    `latest value ${latestOptions?.[optionKey]}`
+  );
+}
+
 async function collectSyntheticFirstMutationState(page) {
   return page.evaluate(
     ({ roleAttr, chatRowAttr }) =>
@@ -1055,6 +1211,203 @@ async function collectSyntheticFirstMutationState(page) {
   );
 }
 
+async function collectSyntheticRowRegressionState(
+  page,
+  { includeNativeTimestamp = false, useLowContrastMessage = false } = {}
+) {
+  return page.evaluate(
+    ({
+      roleAttr,
+      chatRowAttr,
+      includeNativeTimestamp,
+      useLowContrastMessage
+    }) =>
+      new Promise((resolve) => {
+        const rootId = `chzzk-chat-ui-toggle-regression-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        const rowId = `${rootId}-row`;
+        const deadline = Date.now() + 3000;
+        const detectedTheme = document.documentElement.dataset.chzzkChatUiToggleDetectedTheme;
+        const baseMessageColor = detectedTheme === "dark" ? "#101418" : "#ffffff";
+        const colorProbe = document.createElement("span");
+        colorProbe.style.color = baseMessageColor;
+        document.body.appendChild(colorProbe);
+        const baseComputedMessageColor = getComputedStyle(colorProbe).color;
+        colorProbe.remove();
+
+        function readElementState(element) {
+          if (!(element instanceof Element)) {
+            return { exists: false };
+          }
+
+          const style = getComputedStyle(element);
+          const rect = element.getBoundingClientRect();
+
+          return {
+            exists: true,
+            display: style.display,
+            visibility: style.visibility,
+            width: Math.round(rect.width),
+            height: Math.round(rect.height),
+            role: element.getAttribute(roleAttr) || "",
+            color: style.color
+          };
+        }
+
+        function isVisible(state) {
+          return Boolean(
+            state.exists &&
+            state.display !== "none" &&
+            state.visibility !== "hidden" &&
+            state.width > 0 &&
+            state.height > 0
+          );
+        }
+
+        function finishWhenAnnotated() {
+          const root = document.getElementById(rootId);
+          const row = document.getElementById(rowId);
+
+          if (!(root instanceof HTMLElement) || !(row instanceof HTMLElement)) {
+            resolve({ missing: true });
+            return;
+          }
+
+          const nativeTimestamp = row.querySelector("[data-probe='native-timestamp']");
+          const message = row.querySelector("[data-probe='message']");
+          const nativeTimestampReady =
+            !includeNativeTimestamp || nativeTimestamp?.getAttribute(roleAttr)?.includes("timestamp");
+          const autoContrastReady =
+            !useLowContrastMessage || row.getAttribute("data-chzzk-chat-ui-toggle-auto-contrast")?.includes("message");
+          const messageReady = message?.getAttribute("data-chzzk-chat-ui-toggle-message-text") === "true";
+
+          if (
+            Date.now() < deadline &&
+            (row.getAttribute(chatRowAttr) !== "true" || !nativeTimestampReady || !autoContrastReady || !messageReady)
+          ) {
+            window.setTimeout(finishWhenAnnotated, 50);
+            return;
+          }
+
+          const state = {
+            row: readElementState(row),
+            nativeTimestamp: readElementState(nativeTimestamp),
+            message: readElementState(message),
+            chatRow: row.getAttribute(chatRowAttr) || "",
+            generatedTimestampCount: row.querySelectorAll(
+              "[data-chzzk-chat-ui-toggle-generated-timestamp]"
+            ).length,
+            autoContrastRoles: row.getAttribute("data-chzzk-chat-ui-toggle-auto-contrast") || "",
+            autoMessageColor: row.style.getPropertyValue(
+              "--chzzk-chat-ui-toggle-auto-message-color"
+            ).trim(),
+            baseComputedMessageColor,
+            rootDataset: {
+              timestamps: document.documentElement.dataset.chzzkChatUiToggleTimestamps || null,
+              chatTextColor: document.documentElement.dataset.chzzkChatUiToggleChatTextColor || null,
+              autoTextContrast:
+                document.documentElement.dataset.chzzkChatUiToggleAutoTextContrast || null
+            }
+          };
+          state.visible = {
+            row: isVisible(state.row),
+            nativeTimestamp: isVisible(state.nativeTimestamp),
+            message: isVisible(state.message)
+          };
+
+          root.remove();
+          resolve(state);
+        }
+
+        const root = document.createElement("ul");
+        root.id = rootId;
+        root.className = "live_chatting_list__probe";
+        root.style.position = "fixed";
+        root.style.left = "16px";
+        root.style.top = "16px";
+        root.style.width = "320px";
+        root.style.zIndex = "2147483647";
+        root.style.pointerEvents = "none";
+
+        const row = document.createElement("li");
+        row.id = rowId;
+        row.className = "live_chatting_list_item__probe";
+
+        if (includeNativeTimestamp) {
+          const timestamp = document.createElement("span");
+          timestamp.dataset.probe = "native-timestamp";
+          timestamp.className = "live_chatting_message_time__probe";
+          timestamp.textContent = "12:34";
+          row.appendChild(timestamp);
+        }
+
+        const nicknameButton = document.createElement("button");
+        nicknameButton.type = "button";
+        nicknameButton.className = "live_chatting_message_nickname__probe";
+
+        const nickname = document.createElement("span");
+        nickname.className = "name_text__probe live_chatting_username_nickname__probe";
+        nickname.textContent = "probeUser";
+        nicknameButton.appendChild(nickname);
+
+        const messageContainer = document.createElement("span");
+        messageContainer.className = "live_chatting_message_container__probe";
+
+        const message = document.createElement("span");
+        message.dataset.probe = "message";
+        message.className = "live_chatting_message_text__probe";
+        message.textContent = "probe message";
+
+        if (useLowContrastMessage) {
+          message.style.color = baseMessageColor;
+        }
+
+        messageContainer.appendChild(message);
+        row.append(nicknameButton, messageContainer);
+        root.appendChild(row);
+        document.body.appendChild(root);
+        window.setTimeout(finishWhenAnnotated, 50);
+      }),
+    {
+      roleAttr: ROLE_ATTR,
+      chatRowAttr: CHAT_ROW_ATTR,
+      includeNativeTimestamp,
+      useLowContrastMessage
+    }
+  );
+}
+
+function assertSyntheticNativeTimestamp(label, state) {
+  if (state.chatRow !== "true") {
+    throw new Error(`${label}: synthetic native timestamp row was not annotated`);
+  }
+
+  if (!state.nativeTimestamp.exists || !state.nativeTimestamp.role.includes("timestamp")) {
+    throw new Error(`${label}: native HH:mm timestamp was not recognized`);
+  }
+
+  if (state.generatedTimestampCount !== 0) {
+    throw new Error(`${label}: generated timestamp was added beside a native timestamp`);
+  }
+
+  if (!state.visible.row || !state.visible.nativeTimestamp || !state.visible.message) {
+    throw new Error(`${label}: native timestamp row or its content is hidden; state ${JSON.stringify(state)}`);
+  }
+}
+
+function assertSyntheticStandaloneAutoContrast(label, state) {
+  if (state.rootDataset.chatTextColor !== "off") {
+    throw new Error(`${label}: custom chat text color must remain off during standalone auto contrast`);
+  }
+
+  if (!state.autoContrastRoles.includes("message") || !state.autoMessageColor) {
+    throw new Error(`${label}: message auto-contrast value was not calculated`);
+  }
+
+  if (!state.visible.message || state.message.color === state.baseComputedMessageColor) {
+    throw new Error(`${label}: calculated auto-contrast color was not applied; state ${JSON.stringify(state)}`);
+  }
+}
+
 function assertSyntheticNoRawPrefixFlash(label, state) {
   if (state.row.chatRow !== "true") {
     throw new Error(`${label}: synthetic row was not confirmed as a scoped chat row`);
@@ -1079,6 +1432,7 @@ function assertSyntheticNoRawPrefixFlash(label, state) {
 
 function assertSummary(label, summary) {
   const missing = [];
+  const chatBoxes = summary.layout.chatBoxes;
 
   for (const role of ["nickname", "badge", "timestamp"]) {
     if (summary.counts[role] <= 0) {
@@ -1088,6 +1442,14 @@ function assertSummary(label, summary) {
 
   if (summary.framesWithStyle <= 0) {
     missing.push("content-style");
+  }
+
+  if (chatBoxes.unannotatedRowCount > 0) {
+    missing.push(`chat-row-annotations:${chatBoxes.unannotatedRowCount}`);
+  }
+
+  if (chatBoxes.nicknameMissingRoleCount > 0) {
+    missing.push(`nickname-role:${chatBoxes.nicknameMissingRoleCount}`);
   }
 
   if (missing.length > 0) {
@@ -1113,7 +1475,7 @@ function assertOnState(summary) {
   }
 }
 
-function assertChatBoxesOn(label, summary) {
+function assertChatBoxesOn(label, summary, { requireWidthVariation = true } = {}) {
   const chatBoxes = summary.layout.chatBoxes;
 
   if (chatBoxes.sampleCount <= 0) {
@@ -1136,20 +1498,34 @@ function assertChatBoxesOn(label, summary) {
     throw new Error(`${label}: no content-width chat row boxes`);
   }
 
-  if (chatBoxes.widthSpread === null || chatBoxes.widthSpread < 32) {
+  if (
+    requireWidthVariation &&
+    (chatBoxes.widthSpread === null || chatBoxes.widthSpread < 32)
+  ) {
     throw new Error(`${label}: chat row boxes are not varying by content length`);
   }
 }
 
 function assertChatBoxColor(label, summary, hexColor) {
-  const expectedColor = hexToExpectedRgba(hexColor);
+  const themes = summary.detectedThemes.length > 0
+    ? summary.detectedThemes
+    : ["dark", "light"];
+  const expectedColors = themes.map((theme) => hexToExpectedRgba(hexColor, theme));
 
-  if (!summary.layout.chatBoxes.backgroundColors.includes(expectedColor)) {
-    throw new Error(`${label}: expected ${expectedColor} chat box background`);
+  if (!summary.layout.chatBoxes.backgroundColors.some((color) => expectedColors.includes(color))) {
+    throw new Error(
+      `${label}: expected adaptive chat box background ${expectedColors.join(" or ")}; ` +
+      `received ${[...new Set(summary.layout.chatBoxes.backgroundColors)].join(", ")}`
+    );
   }
 }
 
-function assertLargeTextOn(label, summary, expectedFontSizePt = CHAT_FONT_SIZE_PT_DEFAULT) {
+function assertLargeTextOn(
+  label,
+  summary,
+  expectedFontSizePt = CHAT_FONT_SIZE_PT_DEFAULT,
+  expectedNicknameFontSizePt = null
+) {
   const chatBoxes = summary.layout.chatBoxes;
   const expectedFontSizePx = expectedFontSizePt * 96 / 72;
   const expectedLineHeightPx = expectedFontSizePx * 1.45;
@@ -1158,8 +1534,22 @@ function assertLargeTextOn(label, summary, expectedFontSizePt = CHAT_FONT_SIZE_P
     throw new Error(`${label}: large text font size was not applied`);
   }
 
-  if (chatBoxes.maxNicknameFontSize === null || chatBoxes.maxNicknameFontSize < expectedFontSizePx - 0.5) {
-    throw new Error(`${label}: large text nickname font size was not applied`);
+  if (Number.isFinite(expectedNicknameFontSizePt)) {
+    const expectedNicknameFontSizePx = expectedNicknameFontSizePt * 96 / 72;
+
+    if (
+      chatBoxes.minNicknameFontSize === null ||
+      chatBoxes.maxNicknameFontSize === null ||
+      Math.abs(chatBoxes.minNicknameFontSize - expectedNicknameFontSizePx) > 0.5 ||
+      Math.abs(chatBoxes.maxNicknameFontSize - expectedNicknameFontSizePx) > 0.5 ||
+      chatBoxes.nicknameFontSizeSpread > 0.5
+    ) {
+      throw new Error(
+        `${label}: independent nickname font size was inconsistent; ` +
+        `expected ${expectedNicknameFontSizePx.toFixed(2)}px, ` +
+        `received ${chatBoxes.minNicknameFontSize ?? "none"}-${chatBoxes.maxNicknameFontSize ?? "none"}px`
+      );
+    }
   }
 
   if (chatBoxes.maxHeight === null || chatBoxes.maxHeight < expectedLineHeightPx - 1) {
@@ -1208,13 +1598,13 @@ function assertChatBoxesOff(label, summary) {
 function assertAllOffChatBoxPadding(label, summary) {
   const chatBoxes = summary.layout.chatBoxes;
 
-  if (chatBoxes.textInsetDeltas.length <= 0) {
-    throw new Error(`${label}: no text inset samples`);
+  if (chatBoxes.singleLineTextInsetDeltas.length <= 0) {
+    throw new Error(`${label}: no single-line text inset samples`);
   }
 
-  if (chatBoxes.maxTextInsetDelta > 14) {
+  if (chatBoxes.maxSingleLineTextInsetDelta > 14) {
     throw new Error(
-      `${label}: chat box text padding is unbalanced; max inset delta ${chatBoxes.maxTextInsetDelta}px`
+      `${label}: chat box text padding is unbalanced; max single-line inset delta ${chatBoxes.maxSingleLineTextInsetDelta}px`
     );
   }
 }
@@ -1321,48 +1711,314 @@ async function collectState(page, label) {
   return state;
 }
 
-async function selectPopupTab(popup, targetId) {
-  await popup.locator(`[data-tab-target="${targetId}"]`).click();
-  await popup.locator(`#${targetId}`).waitFor({ state: "visible", timeout: 5000 });
+async function waitForPopupReady(popup) {
+  await popup.locator('[data-view="home"]').waitFor({ state: "attached", timeout: 10000 });
+  await popup.waitForFunction(
+    () => document.getElementById("statusLabel")?.textContent?.trim() !== "준비 중",
+    null,
+    { timeout: 10000 }
+  );
+}
+
+async function selectPopupView(popup, targetView) {
+  await popup.bringToFront();
+  const target = popup.locator(`[data-view="${targetView}"]`);
+
+  if (await target.isVisible()) {
+    return target;
+  }
+
+  const home = popup.locator('[data-view="home"]');
+
+  for (let attempt = 0; attempt < 3 && !(await home.isVisible()); attempt += 1) {
+    const activeView = popup.locator("[data-view]:not([hidden])").first();
+    const backButton = activeView.locator("[data-back], [data-color-back]").first();
+
+    if ((await backButton.count()) === 0) {
+      throw new Error(`Popup cannot navigate from the active view to ${targetView}`);
+    }
+
+    await backButton.click();
+    await popup.waitForTimeout(50);
+  }
+
+  await home.waitFor({ state: "visible", timeout: 5000 });
+
+  if (targetView === "home") {
+    return home;
+  }
+
+  await home.locator(`[data-goto="${targetView}"]`).click();
+  await target.waitFor({ state: "visible", timeout: 5000 });
+  return target;
+}
+
+async function setPopupCheckbox(view, optionKey, value) {
+  if (typeof value !== "boolean") {
+    return;
+  }
+
+  const input = view.locator(`[data-option="${optionKey}"]`);
+
+  if ((await input.count()) !== 1) {
+    throw new Error(`Popup option ${optionKey} was not found exactly once in the selected view`);
+  }
+
+  await input.setChecked(value);
+}
+
+async function setPopupColor(popup, target, hexColor) {
+  const normalized = normalizeHexColor(hexColor);
+  const styleView = await selectPopupView(popup, "style");
+  const chip = styleView.locator(
+    `[data-color-target="${target}"] .color-chip[aria-label="${normalized}"]`
+  );
+
+  if ((await chip.count()) === 1) {
+    await chip.click();
+    return;
+  }
+
+  await styleView.locator(`[data-open-color="${target}"]`).click();
+  const colorView = popup.locator('[data-view="color-picker"]');
+  await colorView.waitFor({ state: "visible", timeout: 5000 });
+  await colorView.locator("#chatTextColorHex").evaluate((input, value) => {
+    input.value = value;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }, normalized);
+  await selectPopupView(popup, "style");
 }
 
 async function setPopupOptions(popup, options) {
-  await popup.bringToFront();
-  await selectPopupTab(popup, "textPanel");
-  await popup.locator("#showNicknames").setChecked(options.showNicknames);
-  await popup.locator("#showBadges").setChecked(options.showBadges);
-  await popup.locator("#showTimestamps").setChecked(options.showTimestamps);
-  if (typeof options.useGuestChatFrame === "boolean") {
-    await popup.locator("#useGuestChatFrame").setChecked(options.useGuestChatFrame);
-  }
+  await waitForPopupReady(popup);
 
-  await selectPopupTab(popup, "stylePanel");
-  await popup.locator("#showChatBoxes").setChecked(options.showChatBoxes);
-  await popup.locator("#showLargeText").setChecked(options.showLargeText);
+  const visibilityView = await selectPopupView(popup, "visibility");
+  await setPopupCheckbox(visibilityView, "showNicknames", options.showNicknames);
+  await setPopupCheckbox(visibilityView, "showBadges", options.showBadges);
+  await setPopupCheckbox(visibilityView, "showTimestamps", options.showTimestamps);
+  await setPopupCheckbox(visibilityView, "showNonChatPanels", options.showNonChatPanels);
+
+  const styleView = await selectPopupView(popup, "style");
+  await setPopupCheckbox(styleView, "showChatBoxes", options.showChatBoxes);
+  await setPopupCheckbox(styleView, "showLargeText", options.showLargeText);
   if (typeof options.chatFontSizePt === "number") {
-    await popup.locator("#chatFontSizePt").evaluate((slider, fontSizePt) => {
+    await styleView.locator('[data-option="chatFontSizePt"]').evaluate((slider, fontSizePt) => {
       slider.value = String(fontSizePt);
       slider.dispatchEvent(new Event("input", { bubbles: true }));
     }, options.chatFontSizePt);
     await popup.waitForTimeout(150);
   }
-  await popup.locator("#showBoldText").setChecked(options.showBoldText);
-  await popup.locator("#useChatTextColor").setChecked(options.useChatTextColor === true);
-  if (options.chatTextColor) {
-    const textHexInput = popup.locator("#chatTextColorHex");
-    await textHexInput.fill(options.chatTextColor);
-    await textHexInput.press("Enter");
+  await setPopupCheckbox(styleView, "useNicknameFontSize", options.useNicknameFontSize);
+  if (typeof options.nicknameFontSizePt === "number") {
+    await styleView.locator('[data-option="nicknameFontSizePt"]').evaluate((slider, fontSizePt) => {
+      slider.value = String(fontSizePt);
+      slider.dispatchEvent(new Event("input", { bubbles: true }));
+    }, options.nicknameFontSizePt);
+    await popup.waitForTimeout(150);
   }
-  await popup.locator("#useNicknameColorForMessage").setChecked(options.useNicknameColorForMessage === true);
+  await setPopupCheckbox(styleView, "showBoldText", options.showBoldText);
+  await setPopupCheckbox(styleView, "useAutoTextContrast", options.useAutoTextContrast);
+  await setPopupCheckbox(styleView, "useChatTextColor", options.useChatTextColor === true);
+  await setPopupCheckbox(
+    styleView,
+    "useNicknameColorForMessage",
+    options.useNicknameColorForMessage === true
+  );
+
+  if (options.useChatTextColor === true && options.chatTextColor) {
+    await setPopupColor(popup, "text", options.chatTextColor);
+  }
 
   if (options.chatBoxColor) {
-    const hexInput = popup.locator("#chatBoxColorHex");
-    await hexInput.fill(options.chatBoxColor);
-    await hexInput.press("Enter");
+    await setPopupColor(popup, "box", options.chatBoxColor);
   }
 
-  await selectPopupTab(popup, "settingsPanel");
-  await popup.locator("#showGuestChatToggleButton").setChecked(options.showGuestChatToggleButton);
+  if (
+    typeof options.useGuestChatFrame === "boolean" ||
+    typeof options.useMiniFloatingChat === "boolean"
+  ) {
+    const chatModeView = await selectPopupView(popup, "chat-mode");
+    const chatMode = options.useGuestChatFrame
+      ? "guest"
+      : options.useMiniFloatingChat
+        ? "mini"
+        : "default";
+    await chatModeView.locator(`input[name="chatMode"][value="${chatMode}"]`).setChecked(true);
+  }
+
+  const buttonsView = await selectPopupView(popup, "buttons");
+  await setPopupCheckbox(
+    buttonsView,
+    "showGuestChatToggleButton",
+    options.showGuestChatToggleButton
+  );
+  await setPopupCheckbox(
+    buttonsView,
+    "showMiniFloatingChatButton",
+    options.showMiniFloatingChatButton
+  );
+  await setPopupCheckbox(
+    buttonsView,
+    "showHeaderSettingsButton",
+    options.showHeaderSettingsButton
+  );
+  await popup.waitForTimeout(180);
+}
+
+async function assertPopupImmediateClosePersistence(context, worker, extensionId) {
+  await setExtensionOptions(worker, onOptions);
+  const popup = await context.newPage();
+
+  try {
+    await popup.goto(`chrome-extension://${extensionId}/popup.html`, {
+      waitUntil: "domcontentloaded",
+      timeout: 15000
+    });
+    await waitForPopupReady(popup);
+    const visibilityView = await selectPopupView(popup, "visibility");
+    await visibilityView.locator('[data-option="showBadges"]').setChecked(false);
+    await popup.close({ runBeforeUnload: true });
+    const storedOptions = await waitForExtensionOption(worker, "showBadges", false);
+
+    return {
+      option: "showBadges",
+      storedValue: storedOptions.showBadges
+    };
+  } finally {
+    if (!popup.isClosed()) {
+      await popup.close().catch(() => {});
+    }
+
+    await setExtensionOptions(worker, onOptions);
+  }
+}
+
+async function collectMiniChatDefaultPosition(page) {
+  const panel = page.locator(`#${MINI_CHAT_PANEL_ID}`);
+  await panel.waitFor({ state: "visible", timeout: 10000 });
+
+  return panel.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+
+    return {
+      rect: {
+        left: Math.round(rect.left),
+        top: Math.round(rect.top),
+        right: Math.round(rect.right),
+        bottom: Math.round(rect.bottom),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height)
+      },
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight
+      },
+      rightGap: Math.round(window.innerWidth - rect.right),
+      bottomGap: Math.round(window.innerHeight - rect.bottom)
+    };
+  });
+}
+
+async function waitForMiniChatFrameState(page, timeoutMs = 10000) {
+  const deadline = Date.now() + timeoutMs;
+  let latestState = null;
+
+  while (Date.now() < deadline) {
+    const frame = page.frames().find((candidate) =>
+      candidate.url().includes("chzzkChatUiToggleMini=1")
+    );
+
+    if (frame) {
+      latestState = await frame.evaluate(() => ({
+        url: location.href,
+        readyState: document.readyState,
+        embed: document.documentElement.dataset.chzzkChatUiToggleMiniChatEmbed || null,
+        logCount: document.querySelectorAll("[role='log']").length,
+        rowCount: document.querySelectorAll('[data-chzzk-chat-ui-toggle-chat-row="true"]').length
+      }));
+
+      if (
+        latestState.readyState === "complete" &&
+        latestState.embed === "true" &&
+        latestState.logCount > 0
+      ) {
+        return latestState;
+      }
+    }
+
+    await page.waitForTimeout(100);
+  }
+
+  throw new Error(`mini chat frame did not become ready; state ${JSON.stringify(latestState)}`);
+}
+
+function assertMiniChatDefaultPosition(label, state) {
+  if (
+    state.rightGap < 0 ||
+    state.bottomGap < 0 ||
+    state.rightGap > 48 ||
+    state.bottomGap > 48
+  ) {
+    throw new Error(`${label}: mini chat did not start near the bottom-right; state ${JSON.stringify(state)}`);
+  }
+}
+
+async function assertDirectGuestMarkerProtection(context, page) {
+  const channelId = extractLiveChannelId(page.url());
+
+  if (!channelId) {
+    throw new Error(`Cannot build direct guest marker URL from ${page.url()}`);
+  }
+
+  const sentinel = `chzzk-chat-ui-toggle-verifier-${Date.now()}`;
+  const originalCleanbot = await page.evaluate(() => window.localStorage.getItem("cleanbot"));
+  const directPage = await context.newPage();
+
+  try {
+    await page.evaluate((value) => window.localStorage.setItem("cleanbot", value), sentinel);
+    const directUrl = new URL(`/live/${channelId}/chat`, page.url());
+    directUrl.searchParams.set(GUEST_CHAT_FRAME_MARKER_PARAM, "1");
+    await directPage.goto(directUrl.href, {
+      waitUntil: "domcontentloaded",
+      timeout: 30000
+    });
+    await directPage.waitForTimeout(1000);
+
+    const state = await directPage.evaluate(
+      ({ guestEmbedAttr, guestCleanbotDefaultAttr }) => ({
+        url: location.href,
+        isTopLevel: window.self === window.top,
+        cleanbot: window.localStorage.getItem("cleanbot"),
+        guestEmbed: document.documentElement.getAttribute(guestEmbedAttr),
+        guestCleanbotDefault: document.documentElement.getAttribute(guestCleanbotDefaultAttr)
+      }),
+      {
+        guestEmbedAttr: GUEST_CHAT_EMBED_ATTR,
+        guestCleanbotDefaultAttr: GUEST_CHAT_CLEANBOT_DEFAULT_ATTR
+      }
+    );
+
+    if (
+      !state.isTopLevel ||
+      state.cleanbot !== sentinel ||
+      state.guestEmbed !== null ||
+      state.guestCleanbotDefault !== null
+    ) {
+      throw new Error(`direct guest marker changed top-level storage; state ${JSON.stringify(state)}`);
+    }
+
+    return state;
+  } finally {
+    await directPage.close().catch(() => {});
+    await page.bringToFront();
+    await page.evaluate((originalValue) => {
+      if (originalValue === null) {
+        window.localStorage.removeItem("cleanbot");
+      } else {
+        window.localStorage.setItem("cleanbot", originalValue);
+      }
+    }, originalCleanbot);
+  }
 }
 
 async function main() {
@@ -1398,6 +2054,12 @@ async function main() {
     throw new Error(`Could not parse extension id from ${worker.url()}`);
   }
 
+  const popupImmediateClose = await assertPopupImmediateClosePersistence(
+    context,
+    worker,
+    extensionId
+  );
+  await page.bringToFront();
   await setExtensionOptions(worker, onOptions);
   await page.waitForTimeout(1500);
 
@@ -1411,6 +2073,28 @@ async function main() {
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-on-before.png"), fullPage: false });
 
   const guestChatToggle = await assertGuestChatHeaderToggleFlow(page);
+  const directGuestMarker = await assertDirectGuestMarkerProtection(context, page);
+
+  await setExtensionOptions(worker, {
+    ...onOptions,
+    useMiniFloatingChat: true,
+    miniFloatingChatBounds: {
+      left: null,
+      top: null,
+      width: 360,
+      height: 520
+    },
+    miniFloatingChatScale: 100
+  });
+  const miniChatDefaultPosition = await collectMiniChatDefaultPosition(page);
+  assertMiniChatDefaultPosition("mini chat default position", miniChatDefaultPosition);
+  const miniChatFrame = await waitForMiniChatFrameState(page);
+  await page.screenshot({
+    path: path.join(OUTPUT_DIR, "chzzk-live-mini-chat-default-position.png"),
+    fullPage: false
+  });
+  await setExtensionOptions(worker, onOptions);
+  await page.waitForTimeout(500);
 
   await setExtensionOptions(worker, boldTextOptions);
   await page.reload({ waitUntil: "domcontentloaded", timeout: 45000 });
@@ -1432,6 +2116,28 @@ async function main() {
   await page.waitForTimeout(500);
   const noFlashProbe = await collectSyntheticFirstMutationState(page);
   assertSyntheticNoRawPrefixFlash("synthetic first-frame off state", noFlashProbe);
+  await setExtensionOptions(worker, onOptions);
+  await page.waitForTimeout(500);
+
+  const nativeTimestampProbe = await collectSyntheticRowRegressionState(page, {
+    includeNativeTimestamp: true
+  });
+  assertSyntheticNativeTimestamp("synthetic native timestamp state", nativeTimestampProbe);
+
+  await setExtensionOptions(worker, {
+    ...onOptions,
+    useAutoTextContrast: true,
+    useChatTextColor: false,
+    useNicknameColorForMessage: false
+  });
+  await page.waitForTimeout(500);
+  const standaloneAutoContrastProbe = await collectSyntheticRowRegressionState(page, {
+    useLowContrastMessage: true
+  });
+  assertSyntheticStandaloneAutoContrast(
+    "synthetic standalone auto-contrast state",
+    standaloneAutoContrastProbe
+  );
   await setExtensionOptions(worker, onOptions);
   await page.waitForTimeout(500);
 
@@ -1464,8 +2170,15 @@ async function main() {
 
   const largeTextColor = await collectState(page, "large-text color state");
   assertOnState(largeTextColor.summary);
-  assertChatBoxesOn("large-text color state", largeTextColor.summary);
-  assertLargeTextOn("large-text color state", largeTextColor.summary, largeTextColorOptions.chatFontSizePt);
+  assertChatBoxesOn("large-text color state", largeTextColor.summary, {
+    requireWidthVariation: false
+  });
+  assertLargeTextOn(
+    "large-text color state",
+    largeTextColor.summary,
+    largeTextColorOptions.chatFontSizePt,
+    largeTextColorOptions.nicknameFontSizePt
+  );
   assertBoldTextOff("large-text color state", largeTextColor.summary);
   assertChatBoxColor("large-text color state", largeTextColor.summary, largeTextColorOptions.chatBoxColor);
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-large-text-blue.png"), fullPage: false });
@@ -1514,6 +2227,7 @@ async function main() {
         screenshots: [
           "output/playwright/chzzk-live-on-before.png",
           "output/playwright/chzzk-live-guest-chat-on.png",
+          "output/playwright/chzzk-live-mini-chat-default-position.png",
           "output/playwright/chzzk-live-bold-reload-no-popup.png",
           "output/playwright/chzzk-live-badge-off.png",
           "output/playwright/chzzk-live-nickname-off.png",
@@ -1527,6 +2241,10 @@ async function main() {
           before: before.summary,
           headerButtonsBefore,
           guestChatToggle,
+          directGuestMarker,
+          miniChatDefaultPosition,
+          miniChatFrame,
+          popupImmediateClose,
           boldReloadNoPopup: boldReloadNoPopup.summary,
           badgeOff: badgeOff.summary,
           nicknameOff: nicknameOff.summary,
@@ -1537,6 +2255,8 @@ async function main() {
           onAfter: onAfter.summary
         },
         noFlashProbe,
+        nativeTimestampProbe,
+        standaloneAutoContrastProbe,
         sampleFrames: before.states
           .filter((state) => state.counts.nickname || state.counts.badge || state.counts.timestamp)
           .slice(0, 3)

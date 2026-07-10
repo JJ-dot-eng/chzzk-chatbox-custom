@@ -28,20 +28,26 @@ function connectObserver() {
   }
 
   observer = new MutationObserver((mutations) => {
-    if (mutations.some((mutation) => mutation.addedNodes.length > 0)) {
-      const addedRows = collectAddedChatRows(mutations);
+    const hasAddedNodes = hasNonGeneratedAddedNodes(mutations);
+    const hasGlobalUiAddedNodes = hasNonGeneratedAddedNodesOutsideChatRows(mutations);
+    const { rows: changedRows, contentMutatedRows } = collectChangedChatRowDetails(mutations);
 
-      if (addedRows.length > 0) {
-        scanRows(addedRows);
+    if (changedRows.length > 0) {
+      scanRows(changedRows, { contentMutatedRows });
+
+      if (hasGlobalUiAddedNodes) {
+        annotateNonChatPanels();
+        annotateMiniChatHiddenControls();
         scheduleGuestChatUiSync();
-      } else {
-        scheduleScan();
       }
+    } else if (hasAddedNodes) {
+      scheduleScan();
     }
   });
 
   observer.observe(target, {
     childList: true,
+    characterData: true,
     subtree: true
   });
 }
@@ -82,6 +88,7 @@ function connectMessages() {
 
     if (message?.type === "CHZZK_CHAT_UI_TOGGLE_SET_OPTIONS") {
       injectStyle();
+      optionsStateRevision += 1;
       applyOptions(message.options, { source: "popup-message" });
       scan();
       sendResponse(getStatus());
@@ -121,7 +128,13 @@ function connectStorageListener() {
       return;
     }
 
+    optionsStateRevision += 1;
     applyOptions(changes[STORAGE_KEY].newValue, { source: "storage-change" });
+
+    if (typeof reapplyPendingMiniChatOptionsAfterStorageChange === "function") {
+      reapplyPendingMiniChatOptionsAfterStorageChange(changes[STORAGE_KEY].newValue);
+    }
+
     scan();
   });
 }
@@ -130,8 +143,17 @@ async function loadStoredOptions(attempt = 1, { allowFallback = false } = {}) {
   window.clearTimeout(optionsLoadTimer);
   connectMessages();
   connectStorageListener();
+  const loadGeneration = ++optionsLoadGeneration;
+  const stateRevisionAtStart = optionsStateRevision;
 
   const result = await readOptions();
+
+  if (
+    loadGeneration !== optionsLoadGeneration ||
+    stateRevisionAtStart !== optionsStateRevision
+  ) {
+    return true;
+  }
 
   if (result.ok) {
     applyOptions(result.options, {

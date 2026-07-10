@@ -1,5 +1,6 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
+const UPDATE_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_UPDATE_OPTIONS";
 const OPEN_POPUP_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_OPEN_POPUP";
 const READ_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_GUEST_CHAT_THEME";
 const SET_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_GUEST_CHAT_THEME";
@@ -64,6 +65,7 @@ const DEFAULT_OPTIONS = {
 };
 
 const guestChatThemesByTab = new Map();
+let optionsUpdateQueue = Promise.resolve();
 
 function normalizeHexColor(value, fallback = DEFAULT_CHAT_BOX_COLOR) {
   if (typeof value !== "string") {
@@ -127,6 +129,10 @@ function normalizeOptions(options) {
 }
 
 function clampNumber(value, min, max, fallback) {
+  if (value === null || value === undefined || (typeof value === "string" && value.trim() === "")) {
+    return fallback;
+  }
+
   const number = Number(value);
 
   if (!Number.isFinite(number)) {
@@ -170,6 +176,10 @@ function normalizeChatFontSizePt(value) {
 }
 
 function normalizeOptionalCoordinate(value) {
+  if (value === null || value === undefined || (typeof value === "string" && value.trim() === "")) {
+    return null;
+  }
+
   const number = Number(value);
 
   return Number.isFinite(number) ? number : null;
@@ -281,6 +291,70 @@ function getStoredOptions(sendResponse) {
   });
 }
 
+function readStoredOptions() {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.get(STORAGE_KEY, (result) => {
+      const error = chrome.runtime.lastError;
+
+      if (error) {
+        reject(new Error(error.message || "storage-local-error"));
+        return;
+      }
+
+      resolve(normalizeOptions(hasOwn(result, STORAGE_KEY) ? result[STORAGE_KEY] : DEFAULT_OPTIONS));
+    });
+  });
+}
+
+function writeStoredOptions(options) {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.set({ [STORAGE_KEY]: options }, () => {
+      const error = chrome.runtime.lastError;
+
+      if (error) {
+        reject(new Error(error.message || "storage-local-set-error"));
+        return;
+      }
+
+      resolve(options);
+    });
+  });
+}
+
+function getKnownOptionsPatch(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return Object.fromEntries(
+    Object.keys(DEFAULT_OPTIONS)
+      .filter((key) => hasOwn(value, key))
+      .map((key) => [key, value[key]])
+  );
+}
+
+function queueStoredOptionsUpdate(message) {
+  const update = getKnownOptionsPatch(message?.patch);
+
+  if (!update) {
+    return Promise.resolve({ ok: false, error: "invalid-options-update" });
+  }
+
+  const task = optionsUpdateQueue.then(async () => {
+    const current = await readStoredOptions();
+    const options = normalizeOptions({ ...current, ...update });
+
+    await writeStoredOptions(options);
+    return { ok: true, options };
+  });
+
+  optionsUpdateQueue = task.catch(() => {});
+  return task.catch((error) => ({
+    ok: false,
+    error: String(error?.message || error || "storage-local-set-error")
+  }));
+}
+
 function openExtensionPopup(sendResponse) {
   if (!chrome.action?.openPopup) {
     sendResponse({ ok: false, error: "open-popup-unavailable" });
@@ -317,7 +391,12 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === READ_OPTIONS_MESSAGE) {
-    getStoredOptions(sendResponse);
+    optionsUpdateQueue.then(() => getStoredOptions(sendResponse));
+    return true;
+  }
+
+  if (message?.type === UPDATE_OPTIONS_MESSAGE) {
+    queueStoredOptionsUpdate(message).then(sendResponse);
     return true;
   }
 

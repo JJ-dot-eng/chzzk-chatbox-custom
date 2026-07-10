@@ -102,6 +102,10 @@ function getChatBoxEffectiveBackgroundRgb(hexColor, theme) {
 }
 
 function clampNumber(value, min, max, fallback) {
+  if (value === null || value === undefined || (typeof value === "string" && value.trim() === "")) {
+    return fallback;
+  }
+
   const number = Number(value);
 
   if (!Number.isFinite(number)) {
@@ -112,6 +116,10 @@ function clampNumber(value, min, max, fallback) {
 }
 
 function normalizeOptionalCoordinate(value) {
+  if (value === null || value === undefined || (typeof value === "string" && value.trim() === "")) {
+    return null;
+  }
+
   const number = Number(value);
 
   return Number.isFinite(number) ? number : null;
@@ -373,6 +381,18 @@ function readOptionsFromBackground() {
   });
 }
 
+function doOptionsMatchPatch(options, patch) {
+  const normalizedOptions = normalizeOptions(options);
+  const normalizedWithPatch = normalizeOptions({
+    ...normalizedOptions,
+    ...(patch && typeof patch === "object" ? patch : {})
+  });
+
+  return Object.keys(patch || {}).every((key) =>
+    JSON.stringify(normalizedOptions[key]) === JSON.stringify(normalizedWithPatch[key])
+  );
+}
+
 function sendOpenPopupMessage() {
   const runtime = getRuntime();
 
@@ -426,28 +446,118 @@ async function readOptions() {
   };
 }
 
-function writeOptionsToStorageLocal(options) {
+function writeOptionsPatchToStorageLocal(patch) {
   const runtime = getRuntime();
-  const normalizedOptions = normalizeOptions(options);
 
-  if (!runtime?.storage?.local) {
-    return Promise.resolve({ ok: false, error: "storage-local-unavailable" });
+  if (!runtime?.runtime?.sendMessage) {
+    return Promise.resolve({ ok: false, error: "runtime-message-unavailable" });
   }
 
   return new Promise((resolve) => {
-    try {
-      runtime.storage.local.set({ [STORAGE_KEY]: normalizedOptions }, () => {
-        const error = runtime.runtime?.lastError;
+    let phase = "pending";
+    let timeout = 0;
 
-        if (error) {
-          resolve({ ok: false, error: error.message || "storage-local-set-error" });
+    const settle = (result) => {
+      if (phase === "settled") {
+        return;
+      }
+
+      phase = "settled";
+      window.clearTimeout(timeout);
+      resolve(result);
+    };
+
+    const reconcileWithLatestOptions = async (fallbackResult) => {
+      const latestResult = await readOptionsFromBackground();
+
+      if (!latestResult.ok) {
+        settle({
+          ...fallbackResult,
+          authoritative: false
+        });
+        return;
+      }
+
+      const options = normalizeOptions(latestResult.options);
+      const patchApplied = doOptionsMatchPatch(options, patch);
+
+      if (fallbackResult.ok || patchApplied) {
+        settle({
+          ok: true,
+          options,
+          authoritative: true,
+          superseded: fallbackResult.ok && !patchApplied
+        });
+        return;
+      }
+
+      settle({
+        ...fallbackResult,
+        options,
+        authoritative: true,
+        uncertain: true
+      });
+    };
+
+    timeout = window.setTimeout(() => {
+      if (phase !== "pending") {
+        return;
+      }
+
+      phase = "reconciling";
+      void reconcileWithLatestOptions({
+        ok: false,
+        error: "background-options-update-timeout",
+        uncertain: true
+      });
+    }, STORAGE_READ_TIMEOUT_MS);
+
+    try {
+      runtime.runtime.sendMessage({
+        type: UPDATE_OPTIONS_MESSAGE,
+        patch
+      }, (response) => {
+        if (phase !== "pending") {
           return;
         }
 
-        resolve({ ok: true, options: normalizedOptions });
+        phase = "reconciling";
+        window.clearTimeout(timeout);
+        const error = runtime.runtime?.lastError;
+
+        if (error) {
+          settle({
+            ok: false,
+            error: error.message || "background-options-update-error",
+            authoritative: false
+          });
+          return;
+        }
+
+        if (!response?.ok) {
+          settle({
+            ok: false,
+            error: response?.error || "background-options-update-empty",
+            authoritative: false
+          });
+          return;
+        }
+
+        void reconcileWithLatestOptions({
+          ok: true,
+          options: normalizeOptions(response.options)
+        });
       });
     } catch (error) {
-      resolve({ ok: false, error: String(error?.message || error) });
+      if (phase !== "pending") {
+        return;
+      }
+
+      settle({
+        ok: false,
+        error: String(error?.message || error),
+        authoritative: false
+      });
     }
   });
 }

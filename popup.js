@@ -1,6 +1,8 @@
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const PRESET_STORAGE_KEY = "chzzkChatUiToggleCustomPreset";
-const CONTENT_VERSION = "0.5.5";
+const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
+const UPDATE_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_UPDATE_OPTIONS";
+const CONTENT_VERSION = "0.5.6";
 const POPUP_THEME_FALLBACK = "light";
 
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
@@ -138,10 +140,21 @@ let activeView = "home";
 let colorPickerTarget = null;
 let colorPickerHsv = { hue: 0, saturation: 0, value: 0.5 };
 let commitTimer = 0;
+let pendingCommitSnapshot = null;
+let latestCommitSnapshot = normalizeOptions(DEFAULT_OPTIONS);
+let lastCommittedPopupSnapshot = normalizeOptions(DEFAULT_OPTIONS);
+let commitQueue = [];
+let commitInFlight = false;
+let optionsDirty = false;
+let popupIsClosing = false;
 let returnViewAfterColor = "style";
 let customPresetSnapshot = null;
 
 function clampNumber(value, min, max, fallback) {
+  if (value === null || value === undefined || (typeof value === "string" && value.trim() === "")) {
+    return fallback;
+  }
+
   const number = Number(value);
 
   if (!Number.isFinite(number)) {
@@ -172,6 +185,10 @@ function normalizeHexColor(value, fallback = DEFAULT_CHAT_BOX_COLOR) {
 }
 
 function normalizeOptionalCoordinate(value) {
+  if (value === null || value === undefined || (typeof value === "string" && value.trim() === "")) {
+    return null;
+  }
+
   const number = Number(value);
 
   return Number.isFinite(number) ? number : null;
@@ -546,7 +563,11 @@ function syncPreview() {
   const fontSize = currentOptions.showLargeText
     ? currentOptions.chatFontSizePt
     : CHAT_FONT_SIZE_PT_DEFAULT;
+  const nicknameFontSize = currentOptions.showLargeText && currentOptions.useNicknameFontSize
+    ? currentOptions.nicknameFontSizePt
+    : fontSize;
   chatPreview.style.setProperty("--preview-font", `${fontSize}px`);
+  chatPreview.style.setProperty("--preview-nickname-font", `${nicknameFontSize}px`);
   chatPreview.style.setProperty("--preview-weight", currentOptions.showBoldText ? "700" : "400");
   chatPreview.style.setProperty(
     "--preview-box",
@@ -688,7 +709,7 @@ function renderChipGroup(container, activeHex, target) {
 
       renderColorChips();
       syncPreview();
-      scheduleCommit();
+      scheduleCommit({ immediate: true });
     });
 
     container.append(button);
@@ -758,42 +779,181 @@ function applyPreset(presetId) {
   activePreset = presetId;
   syncControlsFromOptions();
   syncPreview();
-  scheduleCommit();
+  scheduleCommit({ immediate: true });
 }
 
-function saveCustomPreset() {
-  customPresetSnapshot = normalizeOptions(currentOptions);
+async function saveCustomPreset() {
+  const nextCustomPresetSnapshot = normalizeOptions(currentOptions);
 
-  chrome.storage.local.set({ [PRESET_STORAGE_KEY]: customPresetSnapshot }, () => {
+  try {
+    await setLocalStorage({ [PRESET_STORAGE_KEY]: nextCustomPresetSnapshot });
+    customPresetSnapshot = nextCustomPresetSnapshot;
     activePreset = "custom";
     syncPresetButtons();
     setStatus("나만의 프리셋 저장됨", "ok");
+  } catch {
+    setStatus("프리셋 저장 실패", "warn");
+  }
+}
+
+function prepareCommitSnapshot() {
+  currentOptions = normalizeOptions(currentOptions);
+  syncNicknameColorDependencies();
+  activePreset = detectPreset(currentOptions);
+  syncPresetButtons();
+  syncPreview();
+
+  return normalizeOptions(currentOptions);
+}
+
+function scheduleCommit({ immediate = false } = {}) {
+  window.clearTimeout(commitTimer);
+  commitTimer = 0;
+  pendingCommitSnapshot = prepareCommitSnapshot();
+  latestCommitSnapshot = pendingCommitSnapshot;
+  optionsDirty = true;
+
+  if (immediate) {
+    return flushScheduledCommit();
+  }
+
+  commitTimer = window.setTimeout(() => {
+    flushScheduledCommit();
+  }, 120);
+
+  return Promise.resolve(true);
+}
+
+function flushScheduledCommit() {
+  window.clearTimeout(commitTimer);
+  commitTimer = 0;
+
+  if (!pendingCommitSnapshot) {
+    return Promise.resolve(true);
+  }
+
+  const snapshot = pendingCommitSnapshot;
+  pendingCommitSnapshot = null;
+
+  return enqueueCommit(snapshot);
+}
+
+function enqueueCommit(snapshot) {
+  return new Promise((resolve) => {
+    commitQueue.push({ snapshot, resolve });
+    drainCommitQueue();
   });
 }
 
-function scheduleCommit() {
-  window.clearTimeout(commitTimer);
-  commitTimer = window.setTimeout(() => {
-    commitOptions();
-  }, 120);
+function drainCommitQueue() {
+  if (commitInFlight || popupIsClosing) {
+    return;
+  }
+
+  const nextCommit = commitQueue.shift();
+
+  if (!nextCommit) {
+    return;
+  }
+
+  commitInFlight = true;
+  performCommit(nextCommit.snapshot)
+    .then(nextCommit.resolve, () => nextCommit.resolve(false))
+    .finally(() => {
+      commitInFlight = false;
+      drainCommitQueue();
+    });
 }
 
-function getStoredOptions() {
-  return new Promise((resolve) => {
-    chrome.storage.local.get([STORAGE_KEY, PRESET_STORAGE_KEY], (result) => {
-      resolve({
-        options: normalizeOptions(result?.[STORAGE_KEY] ?? DEFAULT_OPTIONS),
-        customPreset: result?.[PRESET_STORAGE_KEY]
-          ? normalizeOptions(result[PRESET_STORAGE_KEY])
-          : null
-      });
+function getLocalStorage(keys) {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.get(keys, (result) => {
+      const storageError = chrome.runtime.lastError;
+
+      if (storageError) {
+        reject(new Error(storageError.message || "설정을 불러오지 못했습니다."));
+        return;
+      }
+
+      resolve(result || {});
     });
   });
 }
 
-function setStoredOptions(options) {
+function getOptionsFromBackground() {
   return new Promise((resolve) => {
-    chrome.storage.local.set({ [STORAGE_KEY]: normalizeOptions(options) }, resolve);
+    chrome.runtime.sendMessage({ type: READ_OPTIONS_MESSAGE }, (response) => {
+      const runtimeError = chrome.runtime.lastError;
+
+      resolve(!runtimeError && response?.ok ? normalizeOptions(response.options) : null);
+    });
+  });
+}
+
+async function getStoredOptions() {
+  const [backgroundOptions, local] = await Promise.all([
+    getOptionsFromBackground(),
+    getLocalStorage([STORAGE_KEY, PRESET_STORAGE_KEY])
+  ]);
+
+  return {
+    options: backgroundOptions || normalizeOptions(local?.[STORAGE_KEY] ?? DEFAULT_OPTIONS),
+    customPreset: local?.[PRESET_STORAGE_KEY]
+      ? normalizeOptions(local[PRESET_STORAGE_KEY])
+      : null
+  };
+}
+
+function setLocalStorage(values) {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.set(values, () => {
+      const storageError = chrome.runtime.lastError;
+
+      if (storageError) {
+        reject(new Error(storageError.message || "설정을 저장하지 못했습니다."));
+        return;
+      }
+
+      resolve();
+    });
+  });
+}
+
+function getChangedOptionsPatch(previousOptions, nextOptions) {
+  const previous = normalizeOptions(previousOptions);
+  const next = normalizeOptions(nextOptions);
+
+  return Object.fromEntries(
+    Object.keys(DEFAULT_OPTIONS)
+      .filter((key) => JSON.stringify(previous[key]) !== JSON.stringify(next[key]))
+      .map((key) => [key, next[key]])
+  );
+}
+
+function setStoredOptions(options) {
+  const normalizedOptions = normalizeOptions(options);
+  const patch = getChangedOptionsPatch(lastCommittedPopupSnapshot, normalizedOptions);
+
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({
+      type: UPDATE_OPTIONS_MESSAGE,
+      patch
+    }, (response) => {
+      const runtimeError = chrome.runtime.lastError;
+
+      if (runtimeError) {
+        reject(new Error(runtimeError.message || "설정을 저장하지 못했습니다."));
+        return;
+      }
+
+      if (!response?.ok) {
+        reject(new Error(response?.error || "설정을 저장하지 못했습니다."));
+        return;
+      }
+
+      lastCommittedPopupSnapshot = normalizedOptions;
+      resolve(normalizeOptions(response.options));
+    });
   });
 }
 
@@ -805,36 +965,36 @@ function queryActiveTab() {
   });
 }
 
-function sendMessageToTab(tabId, message) {
+function sendMessageToTab(tabId, message, options = null) {
   return new Promise((resolve) => {
-    chrome.tabs.sendMessage(tabId, message, (response) => {
+    const handleResponse = (response) => {
       if (chrome.runtime.lastError) {
         resolve(null);
         return;
       }
 
       resolve(response ?? null);
-    });
+    };
+
+    if (options) {
+      chrome.tabs.sendMessage(tabId, message, options, handleResponse);
+      return;
+    }
+
+    chrome.tabs.sendMessage(tabId, message, handleResponse);
   });
 }
 
 function getContentStatus(tabId) {
   return sendMessageToTab(tabId, {
     type: "CHZZK_CHAT_UI_TOGGLE_GET_STATUS"
-  });
+  }, { frameId: 0 });
 }
 
 function refreshContent(tabId) {
   return sendMessageToTab(tabId, {
     type: "CHZZK_CHAT_UI_TOGGLE_REFRESH"
-  });
-}
-
-function sendOptionsToTab(tabId, options) {
-  return sendMessageToTab(tabId, {
-    type: "CHZZK_CHAT_UI_TOGGLE_SET_OPTIONS",
-    options: normalizeOptions(options)
-  });
+  }, { frameId: 0 });
 }
 
 function isCurrentContentStatus(status) {
@@ -857,7 +1017,7 @@ async function ensureCurrentContentScript(tabId) {
   return false;
 }
 
-async function applyToActiveTab(options) {
+async function applyToActiveTab() {
   const tab = await queryActiveTab();
 
   if (!tab?.id || !tab.url?.startsWith("https://chzzk.naver.com/")) {
@@ -873,9 +1033,7 @@ async function applyToActiveTab(options) {
     applyPopupTheme(status.detectedTheme);
   }
 
-  const applied = await sendOptionsToTab(tab.id, options);
-
-  if (ready && applied?.ok) {
+  if (ready && status?.ok) {
     setStatus("적용됨", "ok");
     return true;
   }
@@ -884,14 +1042,55 @@ async function applyToActiveTab(options) {
   return false;
 }
 
-async function commitOptions() {
-  currentOptions = normalizeOptions(currentOptions);
-  syncNicknameColorDependencies();
-  activePreset = detectPreset(currentOptions);
-  syncPresetButtons();
-  syncPreview();
-  await setStoredOptions(currentOptions);
-  await applyToActiveTab(currentOptions);
+async function performCommit(snapshot) {
+  try {
+    await setStoredOptions(snapshot);
+
+    if (JSON.stringify(snapshot) === JSON.stringify(latestCommitSnapshot)) {
+      optionsDirty = false;
+    }
+
+    if (popupIsClosing) {
+      return true;
+    }
+
+    return await applyToActiveTab();
+  } catch {
+    if (!popupIsClosing) {
+      setStatus("설정 저장 실패", "warn");
+    }
+
+    return false;
+  }
+}
+
+function commitOptions() {
+  return scheduleCommit({ immediate: true });
+}
+
+function persistLatestOptionsBeforeClose() {
+  popupIsClosing = true;
+  window.clearTimeout(commitTimer);
+  commitTimer = 0;
+  pendingCommitSnapshot = null;
+
+  if (!optionsDirty) {
+    return;
+  }
+
+  const snapshot = normalizeOptions(latestCommitSnapshot);
+  const patch = getChangedOptionsPatch(lastCommittedPopupSnapshot, snapshot);
+
+  chrome.runtime.sendMessage({
+    type: UPDATE_OPTIONS_MESSAGE,
+    patch
+  }, (response) => {
+    const storageError = chrome.runtime.lastError;
+
+    if (!storageError && response?.ok) {
+      optionsDirty = false;
+    }
+  });
 }
 
 function openColorPicker(target) {
@@ -914,7 +1113,7 @@ function updateColorPickerUi(hexColor) {
   colorPickerField.style.setProperty("--field-y", String(1 - colorPickerHsv.value));
 }
 
-function applyColorPickerValue(hexColor, { commit = true } = {}) {
+function applyColorPickerValue(hexColor, { commit = true, immediate = false } = {}) {
   const normalized = normalizeHexColor(
     hexColor,
     colorPickerTarget === "box" ? DEFAULT_CHAT_BOX_COLOR : DEFAULT_CHAT_TEXT_COLOR
@@ -931,7 +1130,7 @@ function applyColorPickerValue(hexColor, { commit = true } = {}) {
   syncPreview();
 
   if (commit) {
-    scheduleCommit();
+    scheduleCommit({ immediate });
   }
 }
 
@@ -969,7 +1168,7 @@ function handleQuickBundleInput(event) {
   syncConditionalBlocks();
   syncControlsFromOptions();
   syncPreview();
-  scheduleCommit();
+  scheduleCommit({ immediate: true });
 }
 
 function handleOptionInput(event) {
@@ -999,7 +1198,7 @@ function handleOptionInput(event) {
   syncConditionalBlocks();
   syncControlsFromOptions();
   syncPreview();
-  scheduleCommit();
+  scheduleCommit({ immediate: event.type === "change" });
 }
 
 function handleChatModeChange(event) {
@@ -1012,7 +1211,7 @@ function handleChatModeChange(event) {
   setChatMode(radio.value);
   syncConditionalBlocks();
   syncPreview();
-  scheduleCommit();
+  scheduleCommit({ immediate: true });
 }
 
 function bindEvents() {
@@ -1091,7 +1290,7 @@ function bindEvents() {
   });
 
   document.addEventListener("click", (event) => {
-    if (!app.contains(event.target)) {
+    if (!menuButton.contains(event.target) && !appMenu.contains(event.target)) {
       appMenu.hidden = true;
       menuButton.setAttribute("aria-expanded", "false");
     }
@@ -1117,12 +1316,24 @@ function bindEvents() {
     }
   });
 
+  colorPickerField.addEventListener("pointerup", () => {
+    flushScheduledCommit();
+  });
+
+  colorPickerField.addEventListener("pointercancel", () => {
+    flushScheduledCommit();
+  });
+
   colorPickerHue.addEventListener("input", () => {
     setColorPickerFromHsv({
       hue: Number(colorPickerHue.value),
       saturation: colorPickerHsv.saturation,
       value: colorPickerHsv.value
     });
+  });
+
+  colorPickerHue.addEventListener("change", () => {
+    flushScheduledCommit();
   });
 
   colorPickerHex.addEventListener("change", () => {
@@ -1133,12 +1344,17 @@ function bindEvents() {
       return;
     }
 
-    applyColorPickerValue(value);
+    applyColorPickerValue(value, { immediate: true });
   });
 
   colorPickerReset.addEventListener("click", () => {
-    applyColorPickerValue(colorPickerTarget === "box" ? DEFAULT_CHAT_BOX_COLOR : DEFAULT_CHAT_TEXT_COLOR);
+    applyColorPickerValue(
+      colorPickerTarget === "box" ? DEFAULT_CHAT_BOX_COLOR : DEFAULT_CHAT_TEXT_COLOR,
+      { immediate: true }
+    );
   });
+
+  window.addEventListener("pagehide", persistLatestOptionsBeforeClose);
 }
 
 async function init() {
@@ -1148,13 +1364,16 @@ async function init() {
 
   const stored = await getStoredOptions();
   currentOptions = stored.options;
+  latestCommitSnapshot = currentOptions;
+  lastCommittedPopupSnapshot = normalizeOptions(currentOptions);
+  optionsDirty = false;
   customPresetSnapshot = stored.customPreset;
   activePreset = detectPreset(currentOptions);
 
   syncControlsFromOptions();
   syncPreview();
   navigate("home");
-  await applyToActiveTab(currentOptions);
+  await applyToActiveTab();
 }
 
 init().catch(() => {
