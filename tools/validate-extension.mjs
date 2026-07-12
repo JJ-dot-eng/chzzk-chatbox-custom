@@ -759,7 +759,9 @@ for (const token of [
   "다른 시청자와 스트리머에게는 보이지 않습니다.",
   "닉네임, 시간, 채팅 박스, 굵기, 글자색과 글자 크기 설정이 실제 채팅과 같은 방식으로 적용됩니다.",
   "글씨 크기/닉네임 크기 조정(이모티콘 포함)",
-  "미니 플로팅 채팅창"
+  "미니 플로팅 채팅창",
+  "본 확장 프로그램은 NAVER 및 CHZZK와 공식적으로 제휴하거나 승인받은 제품이 아닙니다.",
+  "CHZZK 또는 브라우저 업데이트에 따라 일부 기능이 일시적으로 정상 작동하지 않을 수 있습니다."
 ]) {
   assertIncludes(readmeSource, token, "README-facing feature wording must remain accurate");
 }
