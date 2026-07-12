@@ -288,21 +288,30 @@ html[data-chzzk-chat-ui-toggle-live-chat-frame="true"][data-chzzk-chat-ui-toggle
   align-self: center !important;
   align-items: center !important;
   justify-content: center !important;
-  width: 28px !important;
-  height: 28px !important;
-  min-width: 28px !important;
-  min-height: 28px !important;
-  margin: 0 2px !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  margin: 0 8px 0 auto !important;
   padding: 0 !important;
-  left: -3px !important;
-  top: 8px !important;
+  left: 0 !important;
+  top: 0 !important;
   border: 0 !important;
-  border-radius: 6px !important;
+  border-radius: 8px !important;
   background: transparent !important;
   color: rgba(32, 36, 40, 0.72) !important;
   box-shadow: none !important;
   cursor: pointer !important;
   z-index: 2147483646 !important;
+}
+
+.chzzk-chat-ui-toggle-guest-chat-toggle
+  + :is(
+    [data-chzzk-chat-ui-toggle-local-only-send-button="true"],
+    button[class*="send_button" i],
+    button[type="submit"]
+  ) {
+  margin-left: 0 !important;
 }
 
 .chzzk-chat-ui-toggle-guest-chat-toggle:hover {

@@ -28,6 +28,7 @@ const LOCAL_ONLY_CHAT_FIELD_ATTR = "data-chzzk-chat-ui-toggle-local-only-field";
 const LOCAL_ONLY_CHAT_ORIGINAL_FIELD_ATTR = "data-chzzk-chat-ui-toggle-local-only-original-field";
 const LOCAL_ONLY_CHAT_SEND_BUTTON_ATTR = "data-chzzk-chat-ui-toggle-local-only-send-button";
 const LOCAL_ONLY_CHAT_ROW_ATTR = "data-chzzk-chat-ui-toggle-local-only-row";
+const GUEST_CHAT_TOGGLE_BUTTON_ID = "chzzk-chat-ui-toggle-guest-chat-toggle";
 
 let browser;
 
@@ -108,6 +109,16 @@ function createLocalOnlyChatDocument() {
       ._input_fixture_59 {
         box-sizing: border-box;
         width: 360px;
+      }
+      ._tools_fixture_125 {
+        display: flex;
+        align-items: center;
+        width: 420px;
+        height: 48px;
+      }
+      ._send_button_fixture_176 {
+        width: 64px;
+        height: 40px;
       }
     </style>
   </head>
@@ -619,6 +630,41 @@ async function setPopupChatWindowSettings(page, mode, fullscreenOnly) {
   );
 }
 
+async function readFixtureGuestChatTogglePlacement(target) {
+  return target.evaluate(({ buttonId, localSendButtonAttr }) => {
+    const button = document.getElementById(buttonId);
+    const localSendButton = document.querySelector(`[${localSendButtonAttr}="true"]`);
+    const originalSendButton = document.getElementById("native-send-button");
+    const sendButton = localSendButton || originalSendButton;
+    const buttonRect = button?.getBoundingClientRect();
+    const sendButtonRect = sendButton?.getBoundingClientRect();
+    const header = document.querySelector("header");
+
+    return {
+      ariaPressed: button?.getAttribute("aria-pressed") || null,
+      buttonCount: document.querySelectorAll(`#${buttonId}`).length,
+      buttonType: button?.getAttribute("type") || null,
+      centerDifference: buttonRect && sendButtonRect
+        ? Math.abs(
+            buttonRect.top + buttonRect.height / 2 -
+            (sendButtonRect.top + sendButtonRect.height / 2)
+          )
+        : null,
+      gap: buttonRect && sendButtonRect ? sendButtonRect.left - buttonRect.right : null,
+      insideForm: Boolean(button?.closest("form")),
+      insideHeader: Boolean(button && header?.contains(button)),
+      localSendButtonCount: document.querySelectorAll(`[${localSendButtonAttr}="true"]`).length,
+      nextIsSendButton: button?.nextElementSibling === sendButton,
+      sameParent: Boolean(button && sendButton && button.parentElement === sendButton.parentElement),
+      sendButtonIsLocal: sendButton === localSendButton,
+      sendButtonNextIsOriginal: localSendButton?.nextElementSibling === originalSendButton
+    };
+  }, {
+    buttonId: GUEST_CHAT_TOGGLE_BUTTON_ID,
+    localSendButtonAttr: LOCAL_ONLY_CHAT_SEND_BUTTON_ATTR
+  });
+}
+
 async function injectContentScripts(target) {
   await target.addStyleTag({ path: CONTENT_STYLE_PATH });
 
@@ -1034,6 +1080,155 @@ test("legacy custom preset chat window values cannot replace the current selecti
       ),
       true
     );
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("나만 보기 전환 버튼은 기본·나만 보기 채팅의 전송 버튼 바로 왼쪽에만 표시된다", { timeout: 30_000 }, async () => {
+  const harness = await createHarness({
+    html: createLocalOnlyChatDocument(),
+    initialOptions: {
+      useGuestChatFrame: false,
+      showGuestChatToggleButton: true
+    }
+  });
+
+  try {
+    const pageButton = harness.page.locator(`#${GUEST_CHAT_TOGGLE_BUTTON_ID}`);
+
+    await pageButton.waitFor({ state: "visible" });
+
+    const defaultPlacement = await readFixtureGuestChatTogglePlacement(harness.page);
+
+    assert.equal(defaultPlacement.buttonCount, 1);
+    assert.equal(defaultPlacement.buttonType, "button");
+    assert.equal(defaultPlacement.ariaPressed, "false");
+    assert.equal(defaultPlacement.insideForm, true);
+    assert.equal(defaultPlacement.insideHeader, false);
+    assert.equal(defaultPlacement.sameParent, true);
+    assert.equal(defaultPlacement.nextIsSendButton, true);
+    assert.equal(defaultPlacement.sendButtonIsLocal, false);
+    assert.ok(defaultPlacement.gap >= 0 && defaultPlacement.gap <= 12);
+    assert.ok(defaultPlacement.centerDifference <= 1);
+
+    await harness.page.evaluate((storageKey) => {
+      window.__storageHarness.emitOptionsChange({
+        ...window.__storageHarness.store[storageKey],
+        showGuestChatToggleButton: false
+      });
+    }, STORAGE_KEY);
+    await harness.page.waitForFunction((buttonId) => !document.getElementById(buttonId), GUEST_CHAT_TOGGLE_BUTTON_ID);
+
+    await harness.page.evaluate((storageKey) => {
+      window.__storageHarness.emitOptionsChange({
+        ...window.__storageHarness.store[storageKey],
+        showGuestChatToggleButton: true
+      });
+    }, STORAGE_KEY);
+    await pageButton.waitFor({ state: "visible" });
+
+    await harness.page.evaluate(() => {
+      window.__guestToggleSiteEvents = { nativeClick: 0, submit: 0 };
+      document.getElementById("native-send-button").addEventListener("click", () => {
+        window.__guestToggleSiteEvents.nativeClick += 1;
+      });
+      document.getElementById("native-chat-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        window.__guestToggleSiteEvents.submit += 1;
+      });
+    });
+
+    await pageButton.click();
+    await harness.page.waitForFunction((storageKey) =>
+      window.__storageHarness.store[storageKey].useGuestChatFrame === true,
+      STORAGE_KEY
+    );
+    assert.deepEqual(await harness.page.evaluate(() => window.__guestToggleSiteEvents), {
+      nativeClick: 0,
+      submit: 0
+    });
+    assert.equal(await harness.page.evaluate(() => window.__inlineSiteSendAttempts || 0), 0);
+
+    const frameDeadline = Date.now() + 5_000;
+    let guestFrame = null;
+
+    while (Date.now() < frameDeadline) {
+      guestFrame = harness.page.frames().find((frame) => {
+        try {
+          return new URL(frame.url()).searchParams.get("chzzkChatUiToggleGuest") === "1";
+        } catch (_error) {
+          return false;
+        }
+      }) || null;
+
+      if (guestFrame) break;
+      await harness.page.waitForTimeout(25);
+    }
+
+    assert.ok(guestFrame, "나만 보기 credentialless frame을 찾을 수 있어야 합니다.");
+    await guestFrame.evaluate((storageKey) => {
+      window.__storageHarness.store[storageKey] = {
+        ...window.__storageHarness.store[storageKey],
+        useGuestChatFrame: true,
+        showGuestChatToggleButton: true
+      };
+    }, STORAGE_KEY);
+    await injectContentScripts(guestFrame);
+    await guestFrame.locator(`[${LOCAL_ONLY_CHAT_FIELD_ATTR}="true"]`).waitFor({ state: "visible" });
+    await guestFrame.locator(`#${GUEST_CHAT_TOGGLE_BUTTON_ID}`).waitFor({ state: "visible" });
+
+    const localOnlyPlacement = await readFixtureGuestChatTogglePlacement(guestFrame);
+
+    assert.equal(localOnlyPlacement.buttonCount, 1);
+    assert.equal(localOnlyPlacement.buttonType, "button");
+    assert.equal(localOnlyPlacement.ariaPressed, "true");
+    assert.equal(localOnlyPlacement.insideForm, true);
+    assert.equal(localOnlyPlacement.insideHeader, false);
+    assert.equal(localOnlyPlacement.sameParent, true);
+    assert.equal(localOnlyPlacement.nextIsSendButton, true);
+    assert.equal(localOnlyPlacement.sendButtonIsLocal, true);
+    assert.equal(localOnlyPlacement.sendButtonNextIsOriginal, true);
+    assert.equal(localOnlyPlacement.localSendButtonCount, 1);
+    assert.ok(localOnlyPlacement.gap >= 0 && localOnlyPlacement.gap <= 12);
+    assert.ok(localOnlyPlacement.centerDifference <= 1);
+
+    await guestFrame.evaluate(() => {
+      window.__guestToggleSiteEvents = { nativeClick: 0, submit: 0 };
+      document.getElementById("native-send-button").addEventListener("click", () => {
+        window.__guestToggleSiteEvents.nativeClick += 1;
+      });
+      document.getElementById("native-chat-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        window.__guestToggleSiteEvents.submit += 1;
+      });
+    });
+    const requestCountBeforeFrameClick = harness.requests.length;
+
+    await guestFrame.locator(`#${GUEST_CHAT_TOGGLE_BUTTON_ID}`).click();
+    await guestFrame.waitForFunction((storageKey) =>
+      window.__storageHarness.store[storageKey].useGuestChatFrame === false,
+      STORAGE_KEY
+    );
+    await guestFrame.evaluate(() => {
+      for (let index = 0; index < 10; index += 1) {
+        syncGuestChatUi();
+      }
+    });
+
+    const repeatedPlacement = await readFixtureGuestChatTogglePlacement(guestFrame);
+
+    assert.equal(repeatedPlacement.buttonCount, 1);
+    assert.equal(repeatedPlacement.localSendButtonCount, 1);
+    assert.equal(repeatedPlacement.nextIsSendButton, true);
+    assert.equal(repeatedPlacement.sendButtonNextIsOriginal, true);
+    assert.deepEqual(await guestFrame.evaluate(() => window.__guestToggleSiteEvents), {
+      nativeClick: 0,
+      submit: 0
+    });
+    assert.equal(await guestFrame.locator(`[${LOCAL_ONLY_CHAT_ROW_ATTR}="true"]`).count(), 0);
+    assert.equal(harness.requests.length, requestCountBeforeFrameClick);
     assertNoPageErrors(harness.pageErrors);
   } finally {
     await harness.close();
@@ -2265,6 +2460,7 @@ test("나만 보는 입력 가로채기는 최상위 페이지와 미니 채팅 
     assert.ok(miniFrame);
     await injectContentScripts(miniFrame);
     assert.equal(await miniFrame.locator(`[${LOCAL_ONLY_CHAT_FIELD_ATTR}="true"]`).count(), 0);
+    assert.equal(await miniFrame.locator(`#${GUEST_CHAT_TOGGLE_BUTTON_ID}`).count(), 0);
     assert.equal(await miniFrame.locator(`#native-chat-input`).isVisible(), true);
     assert.deepEqual(await assertNativeEventsPassThrough(miniFrame), {
       click: 1,
@@ -2330,6 +2526,7 @@ test("나만 보는 입력 가로채기는 최상위 페이지와 미니 채팅 
     assert.equal(await untrustedGuestFrame.locator(`[${LOCAL_ONLY_CHAT_FIELD_ATTR}="true"]`).count(), 0);
     assert.equal(await untrustedGuestFrame.locator(`[${LOCAL_ONLY_CHAT_SEND_BUTTON_ATTR}="true"]`).count(), 0);
     assert.equal(await untrustedGuestFrame.locator(`[${LOCAL_ONLY_CHAT_ROW_ATTR}="true"]`).count(), 0);
+    assert.equal(await untrustedGuestFrame.locator(`#${GUEST_CHAT_TOGGLE_BUTTON_ID}`).count(), 0);
     assert.equal(await untrustedGuestFrame.locator("#native-chat-input").isVisible(), true);
     assert.deepEqual(await assertNativeEventsPassThrough(untrustedGuestFrame), {
       click: 1,
@@ -2943,6 +3140,7 @@ test("실제 background FIFO는 미니 patch 뒤 팝업 patch를 병합해 둘 �
 
 test("게스트 채팅 저장 응답이 늦어도 저장된 최신 상태를 되돌리지 않는다", { timeout: 15_000 }, async () => {
   const harness = await createHarness({
+    html: createLocalOnlyChatDocument(),
     initialOptions: {
       useGuestChatFrame: false,
       showGuestChatToggleButton: true
@@ -2951,14 +3149,18 @@ test("게스트 채팅 저장 응답이 늦어도 저장된 최신 상태를 되
   });
 
   try {
-    await harness.page.evaluate(() => {
-      const button = createGuestChatToggleButton();
-      document.body.append(button);
+    await harness.page.evaluate((buttonId) => {
+      const button = document.getElementById(buttonId);
+
+      if (!(button instanceof HTMLButtonElement)) {
+        throw new Error("guest chat toggle button fixture is missing");
+      }
+
       window.__guestToggleDone = false;
       toggleGuestChatFrame(button).finally(() => {
         window.__guestToggleDone = true;
       });
-    });
+    }, GUEST_CHAT_TOGGLE_BUTTON_ID);
 
     await harness.page.waitForFunction(() => window.__guestToggleDone === true);
 
@@ -2982,6 +3184,7 @@ test("게스트 채팅 저장 응답이 늦어도 저장된 최신 상태를 되
 
 test("늦은 게스트 채팅 READ 응답이 더 최신 storage 변경을 덮지 않는다", { timeout: 15_000 }, async () => {
   const harness = await createHarness({
+    html: createLocalOnlyChatDocument(),
     initialOptions: {
       useGuestChatFrame: false,
       useNicknameFontSize: false,
@@ -2990,9 +3193,13 @@ test("늦은 게스트 채팅 READ 응답이 더 최신 storage 변경을 덮지
   });
 
   try {
-    await harness.page.evaluate((storageKey) => {
-      const button = createGuestChatToggleButton();
-      document.body.append(button);
+    await harness.page.evaluate(({ storageKey, buttonId }) => {
+      const button = document.getElementById(buttonId);
+
+      if (!(button instanceof HTMLButtonElement)) {
+        throw new Error("guest chat toggle button fixture is missing");
+      }
+
       window.__storageHarness.delayNextOptionsRead(180);
       window.__guestReadRaceDone = false;
       toggleGuestChatFrame(button).finally(() => {
@@ -3007,7 +3214,7 @@ test("늦은 게스트 채팅 READ 응답이 더 최신 storage 변경을 덮지
           nicknameFontSizePt: 24
         });
       }, 20);
-    }, STORAGE_KEY);
+    }, { storageKey: STORAGE_KEY, buttonId: GUEST_CHAT_TOGGLE_BUTTON_ID });
 
     await harness.page.waitForFunction(() => window.__guestReadRaceDone === true);
 

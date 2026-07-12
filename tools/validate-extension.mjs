@@ -206,6 +206,7 @@ for (const token of [
   "실제 background FIFO는 미니 patch 뒤 팝업 patch를 병합해 둘 다 보존한다",
   "게스트 채팅 저장 응답이 늦어도 저장된 최신 상태를 되돌리지 않는다",
   "늦은 게스트 채팅 READ 응답이 더 최신 storage 변경을 덮지 않는다",
+  "나만 보기 전환 버튼은 기본·나만 보기 채팅의 전송 버튼 바로 왼쪽에만 표시된다",
   "나만 보는 채팅은 원본 수신 행을 보존하고 사이트 전송 경로 없이 같은 로그에만 추가한다",
   "나만 보는 채팅은 Enter·버튼·submit을 로컬 처리하고 IME·Shift+Enter를 구분한다",
   "나만 보는 채팅은 실제 Edge IME 조합 뒤 첫 Enter 한 번만 로컬 처리한다",
@@ -335,11 +336,29 @@ for (const token of [
   "authoritative: true",
   "stateRevisionAtStart !== optionsStateRevision",
   "optionsStateRevision !== item.stateRevisionAtStart",
-  "header-toggle-reconciled-error",
+  "composer-toggle-reconciled-error",
   "if (!result.ok && !result.uncertain)",
   "const baseOptions = miniChatOptionsOptimisticState || currentOptions;"
 ]) {
   assertIncludes(normalizedContentSource, token, "content script must keep core chat and option wiring");
+}
+
+for (const token of [
+  "function findGuestChatComposerToggleTarget()",
+  "const canRenderHeaderButtons = isGuestChatFrameEligibleContext();",
+  "const canRenderGuestChatToggle = canRenderHeaderButtons || isLocalOnlyChatContext();",
+  "const localOnlySendButton = isLocalOnlyChatContext() ? getLocalOnlyChatSendButton() : null;",
+  "guestButton.nextSibling !== composerTarget.before",
+  "composerTarget.container.insertBefore(guestButton, composerTarget.before);"
+]) {
+  assertIncludes(contentSource, token, "guest toggle must stay beside the active composer send button");
+}
+for (const token of [
+  "margin: 0 8px 0 auto !important;",
+  '[data-chzzk-chat-ui-toggle-local-only-send-button="true"]',
+  'button[class*="send_button" i]'
+]) {
+  assertIncludes(contentCssSource, token, "guest toggle must keep footer alignment beside the send button");
 }
 
 for (const token of [
@@ -700,7 +719,9 @@ for (const token of [
 for (const token of [
   "나만 보는 채팅",
   "원래 입력창 그대로 · 실제 전송되지 않음",
-  "나만 보기 전환 버튼"
+  "나만 보기 전환 버튼",
+  "헤더·하단 아이콘",
+  "하단 채팅 버튼 왼쪽"
 ]) {
   assertIncludes(popupMarkup, token, "popup must describe the renamed local-only chat mode");
 }
@@ -714,6 +735,10 @@ for (const token of [
   "function assertPopupImmediateClosePersistence",
   "function assertDirectGuestMarkerProtection",
   "function assertLocalOnlyChatFlow",
+  "function collectGuestChatComposerTogglePlacement",
+  "function assertGuestChatToggleBesideSendButton",
+  "function assertGuestChatComposerToggleFlow",
+  "await frameToggleButton.click();",
   "CHZZK_VERIFY_LOCAL_ONLY",
   "composerVisibleInViewport",
   "documentScrollTop",
@@ -786,6 +811,9 @@ for (const token of [
   "닉네임, 시간, 채팅 박스, 굵기, 글자색과 글자 크기 설정이 실제 채팅과 같은 방식으로 적용됩니다.",
   "글씨 크기/닉네임 크기 조정(이모티콘 포함)",
   "미니 플로팅 채팅창",
+  "## 빠른 전환 버튼",
+  "나만 보기 전환 버튼은 하단 `채팅` 전송 버튼 바로 왼쪽에 표시됩니다.",
+  "설정 버튼과 미니 채팅 버튼은 채팅 헤더에 표시됩니다.",
   "스타일 프리셋과 나만의 프리셋은 채팅창 설정(기본·나만 보기·미니, 전체화면 전용)을 저장하거나 변경하지 않습니다.",
   "본 확장 프로그램은 NAVER 및 CHZZK와 공식적으로 제휴하거나 승인받은 제품이 아닙니다.",
   "CHZZK 또는 브라우저 업데이트에 따라 일부 기능이 일시적으로 정상 작동하지 않을 수 있습니다."

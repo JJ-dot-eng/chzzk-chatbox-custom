@@ -37,7 +37,6 @@ const LOCAL_ONLY_CHAT_PLACEHOLDER = "나만 보는 채팅, 실제로 전송되�
 const MINI_CHAT_PANEL_ID = "chzzk-chat-ui-toggle-mini-chat-panel";
 const LIVE_CHANNEL_ID_PATTERN = /^[0-9a-f]{32}$/i;
 const HEADER_BUTTON_IDS = [
-  GUEST_CHAT_TOGGLE_BUTTON_ID,
   "chzzk-chat-ui-toggle-header-settings",
   "chzzk-chat-ui-toggle-mini-chat-button"
 ];
@@ -789,7 +788,8 @@ async function collectGuestChatState(page) {
           localOnlyChatOriginalFieldAttr,
           localOnlyChatSendButtonAttr,
           localOnlyChatOriginalSendButtonAttr,
-          localOnlyChatRowAttr
+          localOnlyChatRowAttr,
+          toggleButtonId
         }) => {
           const inputCandidates = [
             ...document.querySelectorAll(
@@ -800,6 +800,7 @@ async function collectGuestChatState(page) {
           const originalField = document.querySelector(`[${localOnlyChatOriginalFieldAttr}="true"]`);
           const localOnlyChatSendButton = document.querySelector(`[${localOnlyChatSendButtonAttr}="true"]`);
           const originalSendButton = document.querySelector(`[${localOnlyChatOriginalSendButtonAttr}="true"]`);
+          const toggleButton = document.getElementById(toggleButtonId);
           const localOnlyChatRows = [...document.querySelectorAll(`[${localOnlyChatRowAttr}="true"]`)];
           const allModernRows = [...document.querySelectorAll('[role="log"] [class*="_item_" i]')];
           const originalRemoteRows = allModernRows.filter(
@@ -895,6 +896,18 @@ async function collectGuestChatState(page) {
                   rect: getRectState(localOnlyChatSendButton)
                 }
               : null,
+            toggleButton: toggleButton instanceof HTMLButtonElement
+              ? {
+                  ariaPressed: toggleButton.getAttribute("aria-pressed"),
+                  immediatelyBeforeLocalSend: toggleButton.nextElementSibling === localOnlyChatSendButton,
+                  insideHeader: Boolean(toggleButton.closest("header")),
+                  sameParentAsLocalSend: Boolean(
+                    localOnlyChatSendButton && toggleButton.parentElement === localOnlyChatSendButton.parentElement
+                  ),
+                  type: toggleButton.type,
+                  rect: getRectState(toggleButton)
+                }
+              : null,
             originalSendButton: originalSendButton instanceof HTMLButtonElement
               ? {
                   className: originalSendButton.className,
@@ -915,7 +928,8 @@ async function collectGuestChatState(page) {
           localOnlyChatOriginalFieldAttr: LOCAL_ONLY_CHAT_ORIGINAL_FIELD_ATTR,
           localOnlyChatSendButtonAttr: LOCAL_ONLY_CHAT_SEND_BUTTON_ATTR,
           localOnlyChatOriginalSendButtonAttr: LOCAL_ONLY_CHAT_ORIGINAL_SEND_BUTTON_ATTR,
-          localOnlyChatRowAttr: LOCAL_ONLY_CHAT_ROW_ATTR
+          localOnlyChatRowAttr: LOCAL_ONLY_CHAT_ROW_ATTR,
+          toggleButtonId: GUEST_CHAT_TOGGLE_BUTTON_ID
         }
       );
     } catch (error) {
@@ -989,6 +1003,79 @@ async function collectHeaderButtonPlacement(page) {
   }, { buttonIds: HEADER_BUTTON_IDS });
 }
 
+async function collectGuestChatComposerTogglePlacement(target) {
+  return await target.evaluate(({ localSendButtonAttr, toggleButtonId }) => {
+    const getRectState = (element) => {
+      if (!(element instanceof HTMLElement)) {
+        return null;
+      }
+
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+
+      return {
+        x: Math.round(rect.x),
+        y: Math.round(rect.y),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+        display: style.display,
+        visibility: style.visibility,
+        opacity: style.opacity
+      };
+    };
+    const isVisible = (element) => {
+      const rect = getRectState(element);
+
+      return Boolean(
+        rect &&
+          rect.width > 0 &&
+          rect.height > 0 &&
+          rect.display !== "none" &&
+          rect.visibility !== "hidden" &&
+          rect.opacity !== "0"
+      );
+    };
+    const toggleButton = document.getElementById(toggleButtonId);
+    const localSendButton = document.querySelector(`[${localSendButtonAttr}="true"]`);
+    const nativeSendButton = [
+      ...document.querySelectorAll(
+        "aside#aside-chatting button[class*='send_button' i], aside#aside-chatting button[type='submit'], aside#aside-chatting button[aria-label*='전송' i]"
+      )
+    ].find((button) => button !== toggleButton && isVisible(button)) || null;
+    const sendButton = isVisible(localSendButton) ? localSendButton : nativeSendButton;
+    const toggleRect = getRectState(toggleButton);
+    const sendRect = getRectState(sendButton);
+    const chatHeader = document.querySelector("aside#aside-chatting")?.firstElementChild || null;
+
+    return {
+      toggle: toggleButton
+        ? {
+            ariaPressed: toggleButton.getAttribute("aria-pressed"),
+            insideChatHeader: Boolean(chatHeader?.contains(toggleButton)),
+            rect: toggleRect,
+            type: toggleButton.getAttribute("type")
+          }
+        : null,
+      sendButton: sendButton
+        ? {
+            isLocalOnly: sendButton === localSendButton,
+            rect: sendRect,
+            text: String(sendButton.textContent || "").replace(/\s+/g, " ").trim()
+          }
+        : null,
+      centerDifference: toggleRect && sendRect
+        ? Math.abs(toggleRect.y + toggleRect.height / 2 - (sendRect.y + sendRect.height / 2))
+        : null,
+      gap: toggleRect && sendRect ? sendRect.x - (toggleRect.x + toggleRect.width) : null,
+      immediatelyBeforeSend: toggleButton?.nextElementSibling === sendButton,
+      sameParent: Boolean(toggleButton && sendButton && toggleButton.parentElement === sendButton.parentElement)
+    };
+  }, {
+    localSendButtonAttr: LOCAL_ONLY_CHAT_SEND_BUTTON_ATTR,
+    toggleButtonId: GUEST_CHAT_TOGGLE_BUTTON_ID
+  });
+}
+
 function isGuestChatOnState(state, liveUrl) {
   if (!state?.page?.frame || !state.frame) {
     return false;
@@ -1045,6 +1132,12 @@ function isGuestChatOnState(state, liveUrl) {
       state.frame.localOnlyChatSendButton?.sameParentAsOriginal === true &&
       state.frame.localOnlyChatSendButton?.className === state.frame.originalSendButton?.className &&
       state.frame.localOnlyChatSendButton?.text === state.frame.originalSendButton?.text &&
+      state.frame.toggleButton?.ariaPressed === "true" &&
+      state.frame.toggleButton?.type === "button" &&
+      state.frame.toggleButton?.sameParentAsLocalSend === true &&
+      state.frame.toggleButton?.immediatelyBeforeLocalSend === true &&
+      state.frame.toggleButton?.insideHeader === false &&
+      isVisibleRect(state.frame.toggleButton?.rect) &&
       !isVisibleRect(state.frame.originalSendButton?.rect) &&
       state.frame.originalSendButton?.disabled === true &&
       state.frame.inputCandidateCount >= 2 &&
@@ -1821,6 +1914,40 @@ function assertHeaderButtonsInChatHeader(label, state) {
   }
 }
 
+function assertGuestChatToggleBesideSendButton(label, state, { expectLocalOnly = false } = {}) {
+  if (!state?.toggle || !isVisibleRect(state.toggle.rect)) {
+    throw new Error(`${label}: 나만 보기 전환 버튼이 보이지 않습니다; state ${JSON.stringify(state).slice(0, 800)}`);
+  }
+
+  if (!state.sendButton || !isVisibleRect(state.sendButton.rect)) {
+    throw new Error(`${label}: 채팅 전송 버튼이 보이지 않습니다; state ${JSON.stringify(state).slice(0, 800)}`);
+  }
+
+  if (
+    state.toggle.type !== "button" ||
+    state.toggle.insideChatHeader ||
+    !state.sameParent ||
+    !state.immediatelyBeforeSend ||
+    state.sendButton.isLocalOnly !== expectLocalOnly
+  ) {
+    throw new Error(
+      `${label}: 나만 보기 버튼이 전송 버튼 바로 왼쪽에 있지 않습니다; state ${JSON.stringify(state).slice(0, 1000)}`
+    );
+  }
+
+  if (
+    !Number.isFinite(state.gap) ||
+    state.gap < 0 ||
+    state.gap > 20 ||
+    !Number.isFinite(state.centerDifference) ||
+    state.centerDifference > 8
+  ) {
+    throw new Error(
+      `${label}: 하단 버튼 정렬이 어긋났습니다; state ${JSON.stringify(state).slice(0, 1000)}`
+    );
+  }
+}
+
 async function createLocalOnlyChatNetworkAudit(context, page) {
   const session = await context.newCDPSession(page);
   const requests = [];
@@ -2366,7 +2493,11 @@ async function assertLocalOnlyChatFlow(page, networkAudit) {
   };
 }
 
-async function assertGuestChatHeaderToggleFlow(page, networkAudit) {
+async function assertGuestChatComposerToggleFlow(page, networkAudit) {
+  assertGuestChatToggleBesideSendButton(
+    "guest chat off composer toggle placement",
+    await collectGuestChatComposerTogglePlacement(page)
+  );
   const toggleButton = page.locator(`#${GUEST_CHAT_TOGGLE_BUTTON_ID}`);
 
   await toggleButton.waitFor({ state: "visible", timeout: 30000 });
@@ -2378,14 +2509,23 @@ async function assertGuestChatHeaderToggleFlow(page, networkAudit) {
 
   await toggleButton.click();
   const guestOn = await waitForGuestChatState(page, { enabled: true });
-  assertGuestChatOn("guest chat header-toggle on state", guestOn, page.url());
+  assertGuestChatOn("guest chat composer-toggle on state", guestOn, page.url());
+  const guestFrame = await waitForGuestChatFrame(page);
+  const frameToggleButton = guestFrame.locator(`#${GUEST_CHAT_TOGGLE_BUTTON_ID}`);
+
+  await frameToggleButton.waitFor({ state: "visible", timeout: 30000 });
+  assertGuestChatToggleBesideSendButton(
+    "guest chat on composer toggle placement",
+    await collectGuestChatComposerTogglePlacement(guestFrame),
+    { expectLocalOnly: true }
+  );
   const localOnlyChat = await assertLocalOnlyChatFlow(page, networkAudit);
 
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-guest-chat-on.png"), fullPage: false });
 
-  await toggleButton.click();
+  await frameToggleButton.click();
   const guestOff = await waitForGuestChatState(page, { enabled: false });
-  assertGuestChatOff("guest chat header-toggle off state", guestOff);
+  assertGuestChatOff("guest chat composer-toggle off state", guestOff);
 
   return { on: guestOn, off: guestOff, localOnlyChat };
 }
@@ -2682,16 +2822,18 @@ async function assertDirectGuestMarkerProtection(context, page) {
     await directPage.waitForTimeout(1000);
 
     const state = await directPage.evaluate(
-      ({ guestEmbedAttr, guestCleanbotDefaultAttr }) => ({
+      ({ guestEmbedAttr, guestCleanbotDefaultAttr, toggleButtonId }) => ({
         url: location.href,
         isTopLevel: window.self === window.top,
         cleanbot: window.localStorage.getItem("cleanbot"),
         guestEmbed: document.documentElement.getAttribute(guestEmbedAttr),
-        guestCleanbotDefault: document.documentElement.getAttribute(guestCleanbotDefaultAttr)
+        guestCleanbotDefault: document.documentElement.getAttribute(guestCleanbotDefaultAttr),
+        toggleButtonCount: document.querySelectorAll(`#${toggleButtonId}`).length
       }),
       {
         guestEmbedAttr: GUEST_CHAT_EMBED_ATTR,
-        guestCleanbotDefaultAttr: GUEST_CHAT_CLEANBOT_DEFAULT_ATTR
+        guestCleanbotDefaultAttr: GUEST_CHAT_CLEANBOT_DEFAULT_ATTR,
+        toggleButtonId: GUEST_CHAT_TOGGLE_BUTTON_ID
       }
     );
 
@@ -2699,7 +2841,8 @@ async function assertDirectGuestMarkerProtection(context, page) {
       !state.isTopLevel ||
       state.cleanbot !== sentinel ||
       state.guestEmbed !== null ||
-      state.guestCleanbotDefault !== null
+      state.guestCleanbotDefault !== null ||
+      state.toggleButtonCount !== 0
     ) {
       throw new Error(`direct guest marker changed top-level storage; state ${JSON.stringify(state)}`);
     }
@@ -2762,7 +2905,7 @@ async function main() {
 
   if (process.env.CHZZK_VERIFY_LOCAL_ONLY === "1") {
     const localOnlyNetworkAudit = await createLocalOnlyChatNetworkAudit(context, page);
-    const guestChatToggle = await assertGuestChatHeaderToggleFlow(page, localOnlyNetworkAudit);
+    const guestChatToggle = await assertGuestChatComposerToggleFlow(page, localOnlyNetworkAudit);
     const verifiedLiveUrl = page.url();
 
     await localOnlyNetworkAudit.dispose();
@@ -2786,7 +2929,7 @@ async function main() {
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-on-before.png"), fullPage: false });
 
   const localOnlyNetworkAudit = await createLocalOnlyChatNetworkAudit(context, page);
-  const guestChatToggle = await assertGuestChatHeaderToggleFlow(page, localOnlyNetworkAudit);
+  const guestChatToggle = await assertGuestChatComposerToggleFlow(page, localOnlyNetworkAudit);
   const directGuestMarker = await assertDirectGuestMarkerProtection(context, page);
 
   await setExtensionOptions(worker, {

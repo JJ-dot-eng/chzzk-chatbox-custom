@@ -1794,6 +1794,30 @@ function findGuestChatToggleTarget() {
   return { before, container, header };
 }
 
+function findGuestChatComposerToggleTarget() {
+  if (!isGuestChatFrameEligibleContext() && !isLocalOnlyChatContext()) {
+    return null;
+  }
+
+  const originalField = findLocalOnlyChatOriginalField();
+  const originalSendButton = findLocalOnlyChatOriginalSendButton(originalField);
+  const localOnlySendButton = isLocalOnlyChatContext() ? getLocalOnlyChatSendButton() : null;
+  const sendButton =
+    localOnlySendButton instanceof HTMLButtonElement && localOnlySendButton.isConnected
+      ? localOnlySendButton
+      : originalSendButton;
+
+  if (!(sendButton instanceof HTMLButtonElement) || !(sendButton.parentElement instanceof HTMLElement)) {
+    return null;
+  }
+
+  return {
+    before: sendButton,
+    container: sendButton.parentElement,
+    sendButton
+  };
+}
+
 function markGuestChatToggleControlHost(header) {
   if (!currentOptions.useGuestChatFrame) {
     clearGuestChatControlHosts();
@@ -1907,9 +1931,9 @@ async function toggleGuestChatFrame(button) {
 
   if (!result.ok) {
     if (!storageStateChanged && result.authoritative && result.options) {
-      applyOptions(result.options, { source: "header-toggle-reconciled-error" });
+      applyOptions(result.options, { source: "composer-toggle-reconciled-error" });
     } else if (!storageStateChanged) {
-      applyOptions(previousOptions, { source: "header-toggle-error" });
+      applyOptions(previousOptions, { source: "composer-toggle-error" });
     }
 
     scan();
@@ -1919,7 +1943,7 @@ async function toggleGuestChatFrame(button) {
   }
 
   if (!storageStateChanged) {
-    applyOptions(result.options, { source: "header-toggle" });
+    applyOptions(result.options, { source: "composer-toggle" });
   }
 
   scan();
@@ -2032,22 +2056,18 @@ function ensureGuestChatToggleButton() {
   const existingButton = document.getElementById(GUEST_CHAT_TOGGLE_BUTTON_ID);
   const existingSettingsButton = document.getElementById(HEADER_SETTINGS_BUTTON_ID);
   const existingMiniChatButton = document.getElementById(MINI_CHAT_BUTTON_ID);
+  const canRenderHeaderButtons = isGuestChatFrameEligibleContext();
+  const canRenderGuestChatToggle = canRenderHeaderButtons || isLocalOnlyChatContext();
 
-  if (!isGuestChatFrameEligibleContext()) {
-    existingButton?.remove();
+  if (!canRenderHeaderButtons) {
     existingSettingsButton?.remove();
     existingMiniChatButton?.remove();
     clearGuestChatControlHosts();
-    return;
   }
 
-  const target = findGuestChatToggleTarget();
+  const headerTarget = canRenderHeaderButtons ? findGuestChatToggleTarget() : null;
 
-  if (!target) {
-    if (existingButton instanceof HTMLButtonElement) {
-      setGuestChatToggleButtonState(existingButton);
-    }
-
+  if (canRenderHeaderButtons && !headerTarget) {
     if (existingSettingsButton instanceof HTMLButtonElement) {
       setHeaderSettingsButtonState(existingSettingsButton);
     }
@@ -2065,10 +2085,9 @@ function ensureGuestChatToggleButton() {
     } else {
       clearGuestChatControlHosts();
     }
-    return;
   }
 
-  const settingsButton = currentOptions.showHeaderSettingsButton && canRenderHeaderSettingsButton()
+  const settingsButton = headerTarget && currentOptions.showHeaderSettingsButton && canRenderHeaderSettingsButton()
     ? existingSettingsButton instanceof HTMLButtonElement
       ? existingSettingsButton
       : createHeaderSettingsButton()
@@ -2077,47 +2096,52 @@ function ensureGuestChatToggleButton() {
   if (settingsButton instanceof HTMLButtonElement) {
     setHeaderSettingsButtonState(settingsButton);
 
-    if (settingsButton.parentElement !== target.container || settingsButton.nextSibling !== target.before) {
-      target.container.insertBefore(settingsButton, target.before);
+    if (
+      settingsButton.parentElement !== headerTarget.container ||
+      settingsButton.nextSibling !== headerTarget.before
+    ) {
+      headerTarget.container.insertBefore(settingsButton, headerTarget.before);
     }
-  } else {
+  } else if (!headerTarget || !currentOptions.showHeaderSettingsButton) {
     existingSettingsButton?.remove();
   }
 
-  let guestButton = null;
+  if (headerTarget && currentOptions.showMiniFloatingChatButton) {
+    const button =
+      existingMiniChatButton instanceof HTMLButtonElement ? existingMiniChatButton : createMiniChatToggleButton();
+    const nextSibling =
+      settingsButton instanceof HTMLButtonElement && settingsButton.isConnected
+        ? settingsButton
+        : headerTarget.before;
 
-  if (currentOptions.showGuestChatToggleButton) {
-    guestButton =
+    setMiniChatToggleButtonState(button);
+
+    if (button.parentElement !== headerTarget.container || button.nextSibling !== nextSibling) {
+      headerTarget.container.insertBefore(button, nextSibling);
+    }
+  } else if (!headerTarget || !currentOptions.showMiniFloatingChatButton) {
+    existingMiniChatButton?.remove();
+  }
+
+  if (headerTarget) {
+    markGuestChatToggleControlHost(headerTarget.header);
+  }
+
+  const composerTarget = canRenderGuestChatToggle ? findGuestChatComposerToggleTarget() : null;
+
+  if (currentOptions.showGuestChatToggleButton && composerTarget) {
+    const guestButton =
       existingButton instanceof HTMLButtonElement ? existingButton : createGuestChatToggleButton();
-    const nextSibling = settingsButton instanceof HTMLButtonElement ? settingsButton : target.before;
 
     setGuestChatToggleButtonState(guestButton);
 
-    if (guestButton.parentElement !== target.container || guestButton.nextSibling !== nextSibling) {
-      target.container.insertBefore(guestButton, nextSibling);
+    if (
+      guestButton.parentElement !== composerTarget.container ||
+      guestButton.nextSibling !== composerTarget.before
+    ) {
+      composerTarget.container.insertBefore(guestButton, composerTarget.before);
     }
   } else {
     existingButton?.remove();
   }
-
-  if (currentOptions.showMiniFloatingChatButton) {
-    const button =
-      existingMiniChatButton instanceof HTMLButtonElement ? existingMiniChatButton : createMiniChatToggleButton();
-    const nextSibling =
-      guestButton instanceof HTMLButtonElement && guestButton.isConnected
-        ? guestButton
-        : settingsButton instanceof HTMLButtonElement
-          ? settingsButton
-          : target.before;
-
-    setMiniChatToggleButtonState(button);
-
-    if (button.parentElement !== target.container || button.nextSibling !== nextSibling) {
-      target.container.insertBefore(button, nextSibling);
-    }
-  } else {
-    existingMiniChatButton?.remove();
-  }
-
-  markGuestChatToggleControlHost(target.header);
 }
