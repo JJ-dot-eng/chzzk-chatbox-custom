@@ -236,7 +236,12 @@ function isMiniChatFrameEmbedUrl(url) {
 }
 
 function applyGuestChatCleanBotDefault() {
-  if (window.self === window.top || !isGuestChatFrameEmbedUrl(window.location.href)) {
+  if (
+    window.self === window.top ||
+    !isGuestChatFrameEmbedUrl(window.location.href) ||
+    typeof isLocalOnlyChatContext !== "function" ||
+    !isLocalOnlyChatContext()
+  ) {
     document.documentElement.removeAttribute(GUEST_CHAT_CLEANBOT_DEFAULT_ATTR);
     return;
   }

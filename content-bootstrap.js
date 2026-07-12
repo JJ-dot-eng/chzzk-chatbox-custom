@@ -1,4 +1,4 @@
-var SCRIPT_VERSION = "0.5.6";
+var SCRIPT_VERSION = "0.6.1";
 var GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 var CHZZK_CHAT_UI_TOGGLE_SHOULD_START = !window[GLOBAL_KEY];
 
@@ -50,6 +50,13 @@ var GUEST_CHAT_CONTROL_HOST_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-control
 var GUEST_CHAT_THEME_ATTR = "data-chzzk-chat-ui-toggle-guest-theme";
 var GUEST_CHAT_EMBED_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-embed";
 var GUEST_CHAT_CLEANBOT_DEFAULT_ATTR = "data-chzzk-chat-ui-toggle-guest-cleanbot-default";
+var LOCAL_ONLY_CHAT_ACTIVE_ATTR = "data-chzzk-chat-ui-toggle-local-only-chat";
+var LOCAL_ONLY_CHAT_FIELD_ATTR = "data-chzzk-chat-ui-toggle-local-only-field";
+var LOCAL_ONLY_CHAT_ORIGINAL_FIELD_ATTR = "data-chzzk-chat-ui-toggle-local-only-original-field";
+var LOCAL_ONLY_CHAT_SEND_BUTTON_ATTR = "data-chzzk-chat-ui-toggle-local-only-send-button";
+var LOCAL_ONLY_CHAT_ORIGINAL_SEND_BUTTON_ATTR = "data-chzzk-chat-ui-toggle-local-only-original-send-button";
+var LOCAL_ONLY_CHAT_ROW_ATTR = "data-chzzk-chat-ui-toggle-local-only-row";
+var LOCAL_ONLY_CHAT_MESSAGE_ID_ATTR = "data-chzzk-chat-ui-toggle-local-only-message-id";
 var MINI_CHAT_EMBED_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-embed";
 var MINI_CHAT_HIDDEN_CONTROL_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-hidden-control";
 var NON_CHAT_PANEL_ATTR = "data-chzzk-chat-ui-toggle-non-chat-panel";
@@ -63,6 +70,9 @@ var GUEST_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleGuest";
 var MINI_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleMini";
 var GUEST_CHAT_CLEANBOT_STORAGE_KEY = "cleanbot";
 var GUEST_CHAT_CLEANBOT_DISABLED_VALUE = "false";
+var LOCAL_ONLY_CHAT_PLACEHOLDER = "나만 보는 채팅, 실제로 전송되지 않음";
+var LOCAL_ONLY_CHAT_MAX_MESSAGE_LENGTH = 200;
+var LOCAL_ONLY_CHAT_MAX_MESSAGES = 100;
 var MINI_CHAT_MIN_WIDTH = 280;
 var MINI_CHAT_MIN_HEIGHT = 28;
 var MINI_CHAT_INPUT_ONLY_HEIGHT = 116;
@@ -223,6 +233,15 @@ var MINI_CHAT_INPUT_CONTAINER_SELECTORS = [
   "[class*='chatting_input' i]"
 ];
 
+var LOCAL_ONLY_CHAT_INPUT_FIELD_SELECTORS = [
+  "aside#aside-chatting textarea",
+  "aside#aside-chatting [contenteditable='true']",
+  "aside#aside-chatting [role='textbox']",
+  "aside:has([role='log']) textarea",
+  "aside:has([role='log']) [contenteditable='true']",
+  "aside:has([role='log']) [role='textbox']"
+];
+
 var NON_CHAT_PANEL_SELECTORS = [
   "[class*='live_chatting_ranking_container' i]",
   "aside#aside-chatting > :has([class*='ranking' i])",
@@ -325,3 +344,23 @@ var miniChatBubbleBounds = null;
 var miniChatRestoreBounds = null;
 var miniChatBoundsSaveTimer = 0;
 var miniChatInputOnlyScrollFrame = 0;
+var localOnlyChatInterceptionConnected = false;
+var localOnlyChatCredentiallessVerificationStarted = false;
+var localOnlyChatCredentiallessVerified = false;
+var localOnlyChatAllowLineBreakUntil = 0;
+var localOnlyChatIsComposing = false;
+var localOnlyChatImeSubmitPending = false;
+var localOnlyChatEnterHandledUntilKeyup = false;
+var localOnlyChatMessageSequence = 0;
+var localOnlyChatMessages = [];
+var localOnlyChatRowTemplate = null;
+var localOnlyChatNativeTimelineInitialized = false;
+var localOnlyChatNativeTimelineBaselineWasEmpty = false;
+var localOnlyChatNativeTimelinePlacementSuspended = false;
+var localOnlyChatNativeTimelineSnapshot = [];
+var localOnlyChatNativeTimelineRowsSnapshot = [];
+var localOnlyChatSuspendedTimelinePlacementAvailable = false;
+var localOnlyChatSuspendedTimelineSnapshot = [];
+var localOnlyChatSuspendedTimelineRowsSnapshot = [];
+var localOnlyChatOriginalFieldStates = new WeakMap();
+var localOnlyChatOriginalSendButtonStates = new WeakMap();

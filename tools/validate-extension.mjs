@@ -76,6 +76,12 @@ const packageScriptSource = await readText(path.join("tools", "package-extension
 const regressionTestSource = await readText(path.join("tests", "extension-regressions.test.cjs"));
 const normalizedContentSource = contentSource.replace(/\r\n/g, "\n");
 const contentSurface = `${contentSource}\n${contentCssSource}`;
+const localOnlyChatStart = contentSource.indexOf("function hasLocalOnlyChatCredentiallessFrameMarker()");
+const localOnlyChatEnd = contentSource.indexOf("function isDonationRankingPanel", localOnlyChatStart);
+const localOnlyChatSource =
+  localOnlyChatStart >= 0 && localOnlyChatEnd > localOnlyChatStart
+    ? contentSource.slice(localOnlyChatStart, localOnlyChatEnd)
+    : "";
 
 const requiredRootFiles = [
   "manifest.json",
@@ -188,6 +194,11 @@ for (const token of [
   "실제 background FIFO는 미니 patch 뒤 팝업 patch를 병합해 둘 다 보존한다",
   "게스트 채팅 저장 응답이 늦어도 저장된 최신 상태를 되돌리지 않는다",
   "늦은 게스트 채팅 READ 응답이 더 최신 storage 변경을 덮지 않는다",
+  "나만 보는 채팅은 원본 수신 행을 보존하고 사이트 전송 경로 없이 같은 로그에만 추가한다",
+  "나만 보는 채팅은 Enter·버튼·submit을 로컬 처리하고 IME·Shift+Enter를 구분한다",
+  "나만 보는 채팅은 실제 Edge IME 조합 뒤 첫 Enter 한 번만 로컬 처리한다",
+  "나만 보는 채팅은 실제 수신 행을 건드리지 않고 로컬 100개만 유지하며 새로고침 시 비운다",
+  "나만 보는 입력 가로채기는 최상위 페이지와 미니 채팅 프레임에 연결되지 않는다",
   "늦은 미니 채팅 성공 응답이 더 최신 storage 변경을 덮지 않는다",
   "완료된 미니 patch는 뒤의 대기 patch에 다시 섞이지 않는다",
   "미니 버블 복원 저장이 미확정 timeout이어도 다시 최소화하지 않는다",
@@ -231,6 +242,10 @@ assert(
     contentScript.css.length === 1 &&
     contentScript.css[0] === "content.css",
   "content script CSS must load content.css."
+);
+assert(
+  !manifest.web_accessible_resources,
+  "local-only chat must not expose a separate extension page or nested composer."
 );
 assert(
   Array.isArray(contentScript.js) &&
@@ -319,7 +334,7 @@ for (const token of [
   'var GUEST_CHAT_CLEANBOT_STORAGE_KEY = "cleanbot";',
   'var GUEST_CHAT_CLEANBOT_DISABLED_VALUE = "false";',
   "function applyGuestChatCleanBotDefault()",
-  "if (window.self === window.top || !isGuestChatFrameEmbedUrl(window.location.href))",
+  "!isLocalOnlyChatContext()",
   "window.localStorage?.setItem(GUEST_CHAT_CLEANBOT_STORAGE_KEY, GUEST_CHAT_CLEANBOT_DISABLED_VALUE);",
   'document.documentElement.setAttribute(GUEST_CHAT_CLEANBOT_DEFAULT_ATTR, "off");',
   "applyGuestChatCleanBotDefault();",
@@ -327,6 +342,173 @@ for (const token of [
   "frameUrl.searchParams.set(GUEST_CHAT_FRAME_MARKER_PARAM, \"1\");"
 ]) {
   assertIncludes(contentSource, token, "guest chat frame must keep iframe-scoped CleanBot display correction");
+}
+
+for (const token of [
+  'var LOCAL_ONLY_CHAT_FIELD_ATTR = "data-chzzk-chat-ui-toggle-local-only-field";',
+  'var LOCAL_ONLY_CHAT_ORIGINAL_FIELD_ATTR = "data-chzzk-chat-ui-toggle-local-only-original-field";',
+  'var LOCAL_ONLY_CHAT_SEND_BUTTON_ATTR = "data-chzzk-chat-ui-toggle-local-only-send-button";',
+  'var LOCAL_ONLY_CHAT_ROW_ATTR = "data-chzzk-chat-ui-toggle-local-only-row";',
+  "var LOCAL_ONLY_CHAT_MAX_MESSAGE_LENGTH = 200;",
+  "var LOCAL_ONLY_CHAT_MAX_MESSAGES = 100;",
+  'var LOCAL_ONLY_CHAT_PLACEHOLDER = "나만 보는 채팅, 실제로 전송되지 않음";',
+  "var LOCAL_ONLY_CHAT_INPUT_FIELD_SELECTORS = [",
+  "var localOnlyChatCredentiallessVerificationStarted = false;",
+  "var localOnlyChatCredentiallessVerified = false;",
+  "var localOnlyChatNativeTimelineInitialized = false;",
+  "var localOnlyChatNativeTimelineBaselineWasEmpty = false;",
+  "var localOnlyChatNativeTimelinePlacementSuspended = false;",
+  "var localOnlyChatNativeTimelineSnapshot = [];",
+  "var localOnlyChatNativeTimelineRowsSnapshot = [];",
+  "var localOnlyChatSuspendedTimelinePlacementAvailable = false;",
+  "var localOnlyChatSuspendedTimelineSnapshot = [];",
+  "var localOnlyChatSuspendedTimelineRowsSnapshot = [];",
+  "function hasLocalOnlyChatCredentiallessFrameMarker()",
+  "function isLocalOnlyChatContext()",
+  "async function verifyLocalOnlyChatCredentiallessContext()",
+  'typeof document.hasStorageAccess !== "function"',
+  "const hasStorageAccess = await document.hasStorageAccess();",
+  "hasStorageAccess !== false",
+  "localOnlyChatCredentiallessVerified = true;",
+  'String(frame.tagName || "").toUpperCase() === "IFRAME"',
+  'frame.hasAttribute("credentialless")',
+  "frame.credentialless === true",
+  "function connectLocalOnlyChatInterception()",
+  'window.addEventListener(eventType, handleLocalOnlyChatCapturedEvent, true);',
+  'event.type === "submit"',
+  'event.type === "beforeinput"',
+  'event.type === "keydown"',
+  'event.type === "click"',
+  "event.stopImmediatePropagation();",
+  "function createLocalOnlyChatField(originalField)",
+  "function stripLocalOnlyChatExecutableAttributes(root)",
+  'attribute.name.toLowerCase().startsWith("on")',
+  "const field = originalField.cloneNode(false);",
+  "function createLocalOnlyChatSendButton(originalButton)",
+  'button.type = "button";',
+  '"button[class*=\'send_button\' i]"',
+  '"button[type=\'submit\']"',
+  "function submitLocalOnlyChatMessage(field = getLocalOnlyChatField())",
+  "function getLocalOnlyChatNativeRows(log)",
+  "function getLocalOnlyChatTimelineSignature(row)",
+  "function matchLocalOnlyChatTimelineEntries(previousEntries, currentEntries)",
+  "function getLocalOnlyChatTimelineDelta(",
+  "function beginLocalOnlyChatSuspendedTimeline(currentSignatures, currentRows)",
+  "function advanceLocalOnlyChatNativeTimeline(nativeRows, mutatedNativeRows = null)",
+  "function getLocalOnlyChatNativeRowsNewestFirst(nativeRows)",
+  "const rowMatch = matchLocalOnlyChatTimelineEntries(",
+  "const newestRowContentChanged = Boolean(",
+  "const hasStableSignatureOverlap = signatureMatch.overlap >= 2;",
+  "const hasRowIdentityOverlap = rowMatch.overlap > 0;",
+  "hasStableSignatureOverlap ? signatureMatch.offset : 0",
+  "hasRowIdentityOverlap ? rowMatch.offset : 0",
+  "localOnlyChatSuspendedTimelinePlacementAvailable",
+  "if (localOnlyChatNativeTimelinePlacementSuspended)",
+  "function findLocalOnlyChatPreviousMessage(",
+  "function getLocalOnlyChatEffectiveRemoteSlot(message, nativeRowCount)",
+  "nativeRowCount: nativeRowsNewestFirst.length",
+  "function placeLocalOnlyChatMessageDuringSuspension(message, log, nativeRows)",
+  "function placeLocalOnlyChatMessage(message, log, nativeRows)",
+  'syncLocalOnlyChatRows({ mutatedNativeRows: nativeContentMutatedRows });',
+  'row.getAttribute(LOCAL_ONLY_CHAT_ROW_ATTR) !== "true"',
+  "ownedElements.some((ownedElement) => !ownedElement.isConnected)",
+  ".filter(isChatMessageRow);",
+  "rowContainer.append(row);",
+  "rowContainer.prepend(row);",
+  "annotateChatRow(row);",
+  "scheduleLargeTextLayoutSync([row]);",
+  "messageText.textContent = message.text;",
+  "connectLocalOnlyChatInterception();",
+  "syncLocalOnlyNativeComposer();"
+]) {
+  assertIncludes(contentSource, token, "guest frame must keep native-looking local-only input with layered send blocking");
+}
+for (const token of [
+  "localOnlyChatField",
+  "localOnlyChatRows",
+  "sentinelNetworkMatches",
+  "webSocketFrameSent",
+  "originalRemoteRowCount",
+  "preservedSnapshotRows",
+  "sameLocalRowNode",
+  "localRowFullyVisible",
+  "receivedFramesWithUrl",
+  "hasStorageAccess",
+  "updatedRemoteBelowLocalCount",
+  "bottommostVisibleRowKind",
+  'LOCAL_ONLY_CHAT_PLACEHOLDER = "나만 보는 채팅, 실제로 전송되지 않음"',
+  "LOCAL_ONLY_BUTTON_"
+]) {
+  assertIncludes(liveVerifySource, token, "live verifier must prove native-looking local insertion and zero sentinel sends");
+}
+
+for (const token of [
+  "LOCAL_ONLY_CHAT_MAX_MESSAGES",
+  "localOnlyChatMessages.push(message);",
+  "removeLocalOnlyChatMessage(expiredMessage);",
+  "message.newerRemoteCount += newEntryCount;",
+  "keyboardEvent.isComposing",
+  "keyboardEvent.keyCode === 229",
+  "localOnlyChatIsComposing",
+  "localOnlyChatImeSubmitPending",
+  "localOnlyChatEnterHandledUntilKeyup",
+  "event.isComposing",
+  "getLocalOnlyChatFieldValue(field)",
+  "setLocalOnlyChatFieldValue(field, \"\");",
+  "localOnlyChatMessages = [];"
+]) {
+  assertIncludes(localOnlyChatSource, token, "local-only chat must keep ephemeral safe rendering and bounded rows");
+}
+for (const forbiddenToken of [
+  "fetch(",
+  "XMLHttpRequest",
+  "WebSocket",
+  "localStorage",
+  "sessionStorage",
+  "chrome.runtime.sendMessage",
+  "navigator.sendBeacon",
+  "innerHTML"
+]) {
+  assertExcludes(localOnlyChatSource, forbiddenToken, "local-only interception must not expose a send or persistence path");
+}
+for (const token of [
+  "data-chzzk-chat-ui-toggle-local-only-original-field",
+  "data-chzzk-chat-ui-toggle-local-only-original-send-button",
+  "data-chzzk-chat-ui-toggle-local-only-field",
+  "data-chzzk-chat-ui-toggle-local-only-send-button",
+  "data-chzzk-chat-ui-toggle-local-only-row",
+  ":placeholder-shown",
+  "overflow-y: hidden !important;"
+]) {
+  assertIncludes(contentCssSource, token, "local-only chat styles must preserve the native composer layout");
+}
+
+for (const token of [
+  "localBuriedAboveViewport",
+  "localHasLayoutBox",
+  "newerRemoteIds",
+  "__repeatSignatureLocalRow",
+  'duplicateNewestSignatureRow.id = "remote-row-duplicate-newest-signature";',
+  "__olderEdgeOwnedMutationCount",
+  'window.observer.disconnect();',
+  'replacementWithSameSignature.id = "remote-row-5";',
+  "remote-row-first-after-empty",
+  "__virtualSliceNativeRows",
+  "__virtualSliceSecondLocalRow",
+  'remoteRow.id = "history-row-new";',
+  'assert.equal(emptyComposerState.placeholder, "나만 보는 채팅, 실제로 전송되지 않음");'
+]) {
+  assertIncludes(regressionTestSource, token, "local-only regression tests must prove timeline burial and compact placeholder layout");
+}
+for (const staleToken of [
+  "chzzk-chat-ui-toggle-local-only-chat-frame",
+  "data-chzzk-chat-ui-toggle-local-only-chat-native-input",
+  "data-chzzk-chat-ui-toggle-local-only-chat-viewport",
+  "--chzzk-chat-ui-toggle-local-only-chat-height",
+  ".local-message__marker",
+  ".local-chat__composer"
+]) {
+  assertExcludes(contentSurface, staleToken, "separate local-only panel artifacts must stay removed");
 }
 
 const cleanBotDefaultStart = contentSource.indexOf("function applyGuestChatCleanBotDefault()");
@@ -337,13 +519,9 @@ const cleanBotDefaultSource =
     : "";
 
 assert(
-  cleanBotDefaultSource.includes(
-    "if (window.self === window.top || !isGuestChatFrameEmbedUrl(window.location.href))"
-  ) &&
+  cleanBotDefaultSource.includes("!isLocalOnlyChatContext()") &&
     cleanBotDefaultSource.indexOf("window.localStorage?.setItem") >
-      cleanBotDefaultSource.indexOf(
-        "if (window.self === window.top || !isGuestChatFrameEmbedUrl(window.location.href))"
-      ),
+      cleanBotDefaultSource.indexOf("!isLocalOnlyChatContext()"),
   "guest cleanbot default must only write localStorage inside the guest iframe guard."
 );
 assert(
@@ -358,7 +536,10 @@ const startFunctionSource =
     ? contentSource.slice(startFunctionStart, startFunctionEnd)
     : "";
 assert(
-  startFunctionSource.indexOf("applyGuestChatCleanBotDefault();") >= 0 &&
+  startFunctionSource.indexOf("verifyLocalOnlyChatCredentiallessContext();") >= 0 &&
+    startFunctionSource.indexOf("verifyLocalOnlyChatCredentiallessContext();") <
+      startFunctionSource.indexOf("applyGuestChatCleanBotDefault();") &&
+    startFunctionSource.indexOf("applyGuestChatCleanBotDefault();") >= 0 &&
     startFunctionSource.indexOf("applyGuestChatCleanBotDefault();") <
       startFunctionSource.indexOf("injectStyle();"),
   "guest cleanbot default must be applied before normal content script initialization."
@@ -491,10 +672,27 @@ for (const token of [
 }
 
 for (const token of [
+  "나만 보는 채팅",
+  "원래 입력창 그대로 · 실제 전송되지 않음",
+  "나만 보기 전환 버튼"
+]) {
+  assertIncludes(popupMarkup, token, "popup must describe the renamed local-only chat mode");
+}
+assertIncludes(popupSource, 'guest: "나만 보는 채팅"', "popup status must use the local-only chat name");
+assertIncludes(manifest.description, "나만 보는 채팅", "manifest description must mention local-only chat");
+assertIncludes(manifest.description, "실제 전송 없이", "manifest description must state the no-send boundary");
+
+for (const token of [
   "function hexToExpectedRgba(hexColor, theme)",
   "function selectPopupView(popup, targetView)",
   "function assertPopupImmediateClosePersistence",
   "function assertDirectGuestMarkerProtection",
+  "function assertLocalOnlyChatFlow",
+  "CHZZK_VERIFY_LOCAL_ONLY",
+  "composerVisibleInViewport",
+  "documentScrollTop",
+  "webSocketFrameSent",
+  "sentinelNetworkMatches",
   "function assertMiniChatDefaultPosition",
   "function waitForMiniChatFrameState",
   "function assertSyntheticNativeTimestamp",
@@ -552,11 +750,26 @@ for (const token of [
 }
 
 for (const token of [
-  "비로그인 상태로 전환하여 읽기 전용 채팅창",
+  "## 나만 보는 채팅",
+  "실제 채팅은 로그인 없이 그대로 볼 수 있습니다.",
+  "원래 채팅 입력창과 같은 위치와 모양을 사용합니다.",
+  "한글 입력 중에도 Enter를 한 번 누르거나",
+  "입력 내용은 치지직 원본 입력·전송 경로와 분리된 로컬 입력에서만 처리됩니다.",
+  "같은 채팅 목록에 실제 채팅처럼 표시되지만 치지직에는 전송되지 않습니다.",
+  "다른 시청자와 스트리머에게는 보이지 않습니다.",
+  "닉네임, 시간, 채팅 박스, 굵기, 글자색과 글자 크기 설정이 실제 채팅과 같은 방식으로 적용됩니다.",
   "글씨 크기/닉네임 크기 조정(이모티콘 포함)",
   "미니 플로팅 채팅창"
 ]) {
   assertIncludes(readmeSource, token, "README-facing feature wording must remain accurate");
+}
+
+for (const token of [
+  '"local-only-chat.html"',
+  '"local-only-chat.css"',
+  '"local-only-chat.js"'
+]) {
+  assertExcludes(packageScriptSource, token, "package script must not include removed nested local-only resources");
 }
 
 for (const token of [

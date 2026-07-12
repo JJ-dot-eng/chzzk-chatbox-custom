@@ -2,7 +2,7 @@ const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const PRESET_STORAGE_KEY = "chzzkChatUiToggleCustomPreset";
 const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
 const UPDATE_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_UPDATE_OPTIONS";
-const CONTENT_VERSION = "0.5.6";
+const CONTENT_VERSION = "0.6.1";
 const POPUP_THEME_FALLBACK = "light";
 
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
@@ -620,7 +620,7 @@ function syncPreview() {
 
   const modeLabels = {
     default: "기본 채팅",
-    guest: "비로그인 채팅",
+    guest: "나만 보는 채팅",
     mini: "미니 플로팅"
   };
   previewModeLabel.textContent = modeLabels[getChatMode()] || modeLabels.default;

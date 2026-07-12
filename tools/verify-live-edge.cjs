@@ -28,6 +28,12 @@ const GUEST_CHAT_CONTROL_HOST_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-contr
 const GUEST_CHAT_EMBED_ATTR = "data-chzzk-chat-ui-toggle-guest-chat-embed";
 const GUEST_CHAT_CLEANBOT_DEFAULT_ATTR = "data-chzzk-chat-ui-toggle-guest-cleanbot-default";
 const GUEST_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleGuest";
+const LOCAL_ONLY_CHAT_FIELD_ATTR = "data-chzzk-chat-ui-toggle-local-only-field";
+const LOCAL_ONLY_CHAT_ORIGINAL_FIELD_ATTR = "data-chzzk-chat-ui-toggle-local-only-original-field";
+const LOCAL_ONLY_CHAT_SEND_BUTTON_ATTR = "data-chzzk-chat-ui-toggle-local-only-send-button";
+const LOCAL_ONLY_CHAT_ORIGINAL_SEND_BUTTON_ATTR = "data-chzzk-chat-ui-toggle-local-only-original-send-button";
+const LOCAL_ONLY_CHAT_ROW_ATTR = "data-chzzk-chat-ui-toggle-local-only-row";
+const LOCAL_ONLY_CHAT_PLACEHOLDER = "나만 보는 채팅, 실제로 전송되지 않음";
 const MINI_CHAT_PANEL_ID = "chzzk-chat-ui-toggle-mini-chat-panel";
 const LIVE_CHANNEL_ID_PATTERN = /^[0-9a-f]{32}$/i;
 const HEADER_BUTTON_IDS = [
@@ -775,41 +781,141 @@ async function collectGuestChatState(page) {
 
     try {
       frameState = await frame.evaluate(
-        ({ guestEmbedAttr, guestCleanbotDefaultAttr, guestMarkerParam }) => ({
-          url: location.href,
-          readyState: document.readyState,
-          title: document.title,
-          marker: new URL(location.href).searchParams.get(guestMarkerParam),
-          embed: document.documentElement.getAttribute(guestEmbedAttr),
-          cleanbotDefault: document.documentElement.getAttribute(guestCleanbotDefaultAttr),
-          localStorageCleanbot: window.localStorage?.getItem("cleanbot") || null,
-          hasStyle: Boolean(document.documentElement.dataset.chzzkChatUiToggleStyleVersion),
-          visibleHeaderCount: [
-            ...new Set([
-              ...document.querySelectorAll(
-                "aside#aside-chatting > :first-child, [class*='live_chatting_header' i], [class*='chatting_header' i]"
-              )
-            ])
-          ].filter((element) => {
+        async ({
+          guestEmbedAttr,
+          guestCleanbotDefaultAttr,
+          guestMarkerParam,
+          localOnlyChatFieldAttr,
+          localOnlyChatOriginalFieldAttr,
+          localOnlyChatSendButtonAttr,
+          localOnlyChatOriginalSendButtonAttr,
+          localOnlyChatRowAttr
+        }) => {
+          const inputCandidates = [
+            ...document.querySelectorAll(
+              "aside#aside-chatting textarea, aside#aside-chatting [contenteditable='true'], aside#aside-chatting [role='textbox'], aside:has([role='log']) textarea, aside:has([role='log']) [contenteditable='true'], aside:has([role='log']) [role='textbox']"
+            )
+          ];
+          const localOnlyChatField = document.querySelector(`[${localOnlyChatFieldAttr}="true"]`);
+          const originalField = document.querySelector(`[${localOnlyChatOriginalFieldAttr}="true"]`);
+          const localOnlyChatSendButton = document.querySelector(`[${localOnlyChatSendButtonAttr}="true"]`);
+          const originalSendButton = document.querySelector(`[${localOnlyChatOriginalSendButtonAttr}="true"]`);
+          const localOnlyChatRows = [...document.querySelectorAll(`[${localOnlyChatRowAttr}="true"]`)];
+          const allModernRows = [...document.querySelectorAll('[role="log"] [class*="_item_" i]')];
+          const originalRemoteRows = allModernRows.filter(
+            (row) => row.getAttribute(localOnlyChatRowAttr) !== "true"
+          );
+          const getRectState = (element) => {
+            if (!(element instanceof HTMLElement)) {
+              return null;
+            }
+
             const rect = element.getBoundingClientRect();
             const style = getComputedStyle(element);
 
-            return (
-              rect.width > 0 &&
-              rect.height > 0 &&
-              style.display !== "none" &&
-              style.visibility !== "hidden" &&
-              style.opacity !== "0"
+            return {
+              width: Math.round(rect.width),
+              height: Math.round(rect.height),
+              display: style.display,
+              visibility: style.visibility,
+              opacity: style.opacity
+            };
+          };
+          const isVisible = (element) => {
+            const rect = getRectState(element);
+
+            return Boolean(
+              rect &&
+                rect.width > 0 &&
+                rect.height > 0 &&
+                rect.display !== "none" &&
+                rect.visibility !== "hidden" &&
+                rect.opacity !== "0"
             );
-          }).length,
-          logCount: document.querySelectorAll('[role="log"]').length,
-          rowCount: document.querySelectorAll('[role="log"] [class*="_item_" i]').length,
-          bodyText: String(document.body?.innerText || "").slice(0, 500)
-        }),
+          };
+
+          return {
+            url: location.href,
+            readyState: document.readyState,
+            title: document.title,
+            hasStorageAccess: typeof document.hasStorageAccess === "function"
+              ? await document.hasStorageAccess()
+              : null,
+            marker: new URL(location.href).searchParams.get(guestMarkerParam),
+            embed: document.documentElement.getAttribute(guestEmbedAttr),
+            cleanbotDefault: document.documentElement.getAttribute(guestCleanbotDefaultAttr),
+            localStorageCleanbot: window.localStorage?.getItem("cleanbot") || null,
+            hasStyle: Boolean(document.documentElement.dataset.chzzkChatUiToggleStyleVersion),
+            visibleHeaderCount: [
+              ...new Set([
+                ...document.querySelectorAll(
+                  "aside#aside-chatting > :first-child, [class*='live_chatting_header' i], [class*='chatting_header' i]"
+                )
+              ])
+            ].filter(isVisible).length,
+            logCount: document.querySelectorAll('[role="log"]').length,
+            rowCount: allModernRows.length,
+            originalRemoteRowCount: originalRemoteRows.length,
+            localOnlyChatRows: localOnlyChatRows.length,
+            bodyText: String(document.body?.innerText || "").slice(0, 500),
+            nestedExtensionFrameCount: document.querySelectorAll('iframe[src^="chrome-extension://"]').length,
+            localOnlyChatField: localOnlyChatField instanceof HTMLElement
+              ? {
+                  clientHeight: localOnlyChatField.clientHeight,
+                  className: localOnlyChatField.className,
+                  overflowY: getComputedStyle(localOnlyChatField).overflowY,
+                  placeholder: localOnlyChatField.getAttribute("placeholder"),
+                  scrollHeight: localOnlyChatField.scrollHeight,
+                  disabled: "disabled" in localOnlyChatField ? localOnlyChatField.disabled : null,
+                  readOnly: "readOnly" in localOnlyChatField ? localOnlyChatField.readOnly : null,
+                  sameParentAsOriginal: Boolean(
+                    originalField && localOnlyChatField.parentElement === originalField.parentElement
+                  ),
+                  rect: getRectState(localOnlyChatField)
+                }
+              : null,
+            originalField: originalField instanceof HTMLElement
+              ? {
+                  className: originalField.className,
+                  disabled: "disabled" in originalField ? originalField.disabled : null,
+                  readOnly: "readOnly" in originalField ? originalField.readOnly : null,
+                  rect: getRectState(originalField)
+                }
+              : null,
+            localOnlyChatSendButton: localOnlyChatSendButton instanceof HTMLButtonElement
+              ? {
+                  className: localOnlyChatSendButton.className,
+                  disabled: localOnlyChatSendButton.disabled,
+                  sameParentAsOriginal: Boolean(
+                    originalSendButton &&
+                    localOnlyChatSendButton.parentElement === originalSendButton.parentElement
+                  ),
+                  text: String(localOnlyChatSendButton.textContent || "").replace(/\s+/g, " ").trim(),
+                  type: localOnlyChatSendButton.type,
+                  rect: getRectState(localOnlyChatSendButton)
+                }
+              : null,
+            originalSendButton: originalSendButton instanceof HTMLButtonElement
+              ? {
+                  className: originalSendButton.className,
+                  disabled: originalSendButton.disabled,
+                  text: String(originalSendButton.textContent || "").replace(/\s+/g, " ").trim(),
+                  rect: getRectState(originalSendButton)
+                }
+              : null,
+            inputCandidateCount: inputCandidates.length,
+            visibleInputCandidateCount: inputCandidates.filter(isVisible).length
+          };
+        },
         {
           guestEmbedAttr: GUEST_CHAT_EMBED_ATTR,
           guestCleanbotDefaultAttr: GUEST_CHAT_CLEANBOT_DEFAULT_ATTR,
-          guestMarkerParam: GUEST_CHAT_FRAME_MARKER_PARAM
+          guestMarkerParam: GUEST_CHAT_FRAME_MARKER_PARAM,
+          localOnlyChatFieldAttr: LOCAL_ONLY_CHAT_FIELD_ATTR,
+          localOnlyChatOriginalFieldAttr: LOCAL_ONLY_CHAT_ORIGINAL_FIELD_ATTR,
+          localOnlyChatSendButtonAttr: LOCAL_ONLY_CHAT_SEND_BUTTON_ATTR,
+          localOnlyChatOriginalSendButtonAttr: LOCAL_ONLY_CHAT_ORIGINAL_SEND_BUTTON_ATTR,
+          localOnlyChatRowAttr: LOCAL_ONLY_CHAT_ROW_ATTR
         }
       );
     } catch (error) {
@@ -915,14 +1021,58 @@ function isGuestChatOnState(state, liveUrl) {
       state.page.frame.credentiallessAttr !== null &&
       state.page.frame.credentiallessProp === true &&
       state.page.nativeVisibleRows === 0 &&
+      state.frame.hasStorageAccess === false &&
       state.frame.marker === "1" &&
       state.frame.embed === "true" &&
       state.frame.cleanbotDefault === "off" &&
       state.frame.localStorageCleanbot === "false" &&
       state.frame.hasStyle === true &&
       state.frame.visibleHeaderCount === 0 &&
+      state.frame.nestedExtensionFrameCount === 0 &&
+      isVisibleRect(state.frame.localOnlyChatField?.rect) &&
+      state.frame.localOnlyChatField?.disabled === false &&
+      state.frame.localOnlyChatField?.readOnly === false &&
+      state.frame.localOnlyChatField?.placeholder === LOCAL_ONLY_CHAT_PLACEHOLDER &&
+      state.frame.localOnlyChatField?.overflowY === "hidden" &&
+      state.frame.localOnlyChatField?.scrollHeight <= state.frame.localOnlyChatField?.clientHeight + 1 &&
+      state.frame.localOnlyChatField?.className === state.frame.originalField?.className &&
+      state.frame.localOnlyChatField?.sameParentAsOriginal === true &&
+      !isVisibleRect(state.frame.originalField?.rect) &&
+      state.frame.originalField?.disabled === true &&
+      state.frame.originalField?.readOnly === true &&
+      isVisibleRect(state.frame.localOnlyChatSendButton?.rect) &&
+      state.frame.localOnlyChatSendButton?.type === "button" &&
+      state.frame.localOnlyChatSendButton?.sameParentAsOriginal === true &&
+      state.frame.localOnlyChatSendButton?.className === state.frame.originalSendButton?.className &&
+      state.frame.localOnlyChatSendButton?.text === state.frame.originalSendButton?.text &&
+      !isVisibleRect(state.frame.originalSendButton?.rect) &&
+      state.frame.originalSendButton?.disabled === true &&
+      state.frame.inputCandidateCount >= 2 &&
+      state.frame.visibleInputCandidateCount === 1 &&
       (state.frame.logCount > 0 || state.frame.bodyText.length > 0)
   );
+}
+
+async function waitForGuestChatFrame(page, timeout = 30000) {
+  const deadline = Date.now() + timeout;
+
+  while (Date.now() < deadline) {
+    const guestFrame = page.frames().find((frame) => {
+      try {
+        return new URL(frame.url()).searchParams.get(GUEST_CHAT_FRAME_MARKER_PARAM) === "1";
+      } catch (_error) {
+        return false;
+      }
+    });
+
+    if (guestFrame) {
+      return guestFrame;
+    }
+
+    await page.waitForTimeout(250);
+  }
+
+  throw new Error("credentialless guest chat frame did not become available");
 }
 
 function isGuestChatOffState(state) {
@@ -1671,7 +1821,552 @@ function assertHeaderButtonsInChatHeader(label, state) {
   }
 }
 
-async function assertGuestChatHeaderToggleFlow(page) {
+async function createLocalOnlyChatNetworkAudit(context, page) {
+  const session = await context.newCDPSession(page);
+  const requests = [];
+  let observedRequestCount = 0;
+  const webSocketFrameSent = [];
+  const webSocketFrameReceived = [];
+  const webSocketUrls = new Map();
+  const stringifyPayload = (payload) => {
+    if (Buffer.isBuffer(payload)) return payload.toString("utf8");
+    if (typeof payload === "string") return payload;
+    return JSON.stringify(payload ?? "");
+  };
+  const createWebSocketFrameRecord = ({ opcode = null, payload = "", requestId = null, url = "" }) => {
+    const rawPayload = stringifyPayload(payload);
+    let decodedPayload = rawPayload;
+
+    if (opcode === 2) {
+      try {
+        decodedPayload = Buffer.from(rawPayload, "base64").toString("utf8");
+      } catch (_error) {
+        decodedPayload = rawPayload;
+      }
+    }
+
+    return {
+      decodedPayload,
+      opcode,
+      rawPayload,
+      requestId,
+      url: url || webSocketUrls.get(requestId) || ""
+    };
+  };
+  const recordRequest = (request) => {
+    observedRequestCount += 1;
+    requests.push({
+      method: request.method(),
+      postData: request.postData() || "",
+      url: request.url()
+    });
+  };
+  const recordWebSocket = (socket) => {
+    socket.on("framesent", (event) => webSocketFrameSent.push(createWebSocketFrameRecord({
+      payload: event.payload,
+      url: socket.url()
+    })));
+    socket.on("framereceived", (event) => webSocketFrameReceived.push(createWebSocketFrameRecord({
+      payload: event.payload,
+      url: socket.url()
+    })));
+  };
+
+  page.on("request", recordRequest);
+  page.on("websocket", recordWebSocket);
+  session.on("Network.requestWillBeSent", (event) => {
+    observedRequestCount += 1;
+    requests.push({
+      method: event.request.method,
+      postData: event.request.postData || "",
+      url: event.request.url
+    });
+  });
+  session.on("Network.webSocketCreated", (event) => {
+    webSocketUrls.set(event.requestId, event.url);
+  });
+  session.on("Network.webSocketFrameSent", (event) => {
+    webSocketFrameSent.push(createWebSocketFrameRecord({
+      opcode: event.response?.opcode ?? null,
+      payload: event.response?.payloadData || "",
+      requestId: event.requestId
+    }));
+  });
+  session.on("Network.webSocketFrameReceived", (event) => {
+    webSocketFrameReceived.push(createWebSocketFrameRecord({
+      opcode: event.response?.opcode ?? null,
+      payload: event.response?.payloadData || "",
+      requestId: event.requestId
+    }));
+  });
+  await session.send("Network.enable");
+
+  return {
+    requests,
+    webSocketFrameReceived,
+    webSocketFrameSent,
+    clear() {
+      requests.length = 0;
+      webSocketFrameReceived.length = 0;
+      webSocketFrameSent.length = 0;
+    },
+    findSentinel(sentinel) {
+      const requestMatches = requests.filter((request) =>
+        `${request.method}\n${request.url}\n${request.postData}`.includes(sentinel)
+      );
+      const webSocketMatches = webSocketFrameSent.filter((frame) =>
+        frame.rawPayload.includes(sentinel) || frame.decodedPayload.includes(sentinel)
+      );
+
+      return { requestMatches, webSocketMatches };
+    },
+    getObservedWebSocketUrls() {
+      return [...new Set([
+        ...webSocketUrls.values(),
+        ...webSocketFrameSent.map((frame) => frame.url),
+        ...webSocketFrameReceived.map((frame) => frame.url)
+      ].filter(Boolean))];
+    },
+    getObservedRequestCount() {
+      return observedRequestCount;
+    },
+    async dispose() {
+      page.off("request", recordRequest);
+      page.off("websocket", recordWebSocket);
+      await session.detach().catch(() => {});
+    }
+  };
+}
+
+async function assertLocalOnlyChatFlow(page, networkAudit) {
+  const guestFrame = await waitForGuestChatFrame(page);
+  const localOnlyChatField = guestFrame.locator(`[${LOCAL_ONLY_CHAT_FIELD_ATTR}="true"]`);
+  const enterMessage = `LOCAL_ONLY_ENTER_${Date.now().toString(36)}`;
+
+  await localOnlyChatField.waitFor({ state: "visible", timeout: 30000 });
+  await guestFrame.waitForFunction(
+    ({ localRowAttr, nativeChatRowSelector }) =>
+      [...document.querySelectorAll(nativeChatRowSelector)]
+        .some((row) => row.getAttribute(localRowAttr) !== "true"),
+    {
+      localRowAttr: LOCAL_ONLY_CHAT_ROW_ATTR,
+      nativeChatRowSelector: NATIVE_CHAT_ROW_SELECTOR
+    },
+    { timeout: 30000 }
+  );
+  const remoteBefore = await guestFrame.evaluate(({ localRowAttr, nativeChatRowSelector }) => {
+    const normalize = (element) => String(element?.textContent || "").replace(/\s+/g, " ").trim();
+    const timelineSignature = (row) => {
+      const nickname = row.querySelector('[data-chzzk-chat-ui-toggle-role~="nickname"]');
+      const message = row.querySelector('[data-chzzk-chat-ui-toggle-message-text="true"]');
+
+      return `${normalize(nickname)}\u001f${normalize(message)}`;
+    };
+    const rows = [...document.querySelectorAll(nativeChatRowSelector)]
+      .filter((row) => row.getAttribute(localRowAttr) !== "true");
+
+    window.__chzzkLocalOnlyVerifierRemoteSnapshot = rows.map((row) => ({
+      row,
+      signature: timelineSignature(row),
+      text: normalize(row)
+    }));
+
+    return {
+      count: rows.length
+    };
+  }, {
+    localRowAttr: LOCAL_ONLY_CHAT_ROW_ATTR,
+    nativeChatRowSelector: NATIVE_CHAT_ROW_SELECTOR
+  });
+  const originalRemoteRowCount = remoteBefore.count;
+
+  if (originalRemoteRowCount <= 0) {
+    throw new Error("local-only live verification requires at least one original remote chat row");
+  }
+
+  networkAudit.clear();
+  await localOnlyChatField.fill(enterMessage);
+  await localOnlyChatField.press("Enter");
+
+  const localOnlyRow = guestFrame
+    .locator(`[${LOCAL_ONLY_CHAT_ROW_ATTR}="true"]`)
+    .filter({ hasText: enterMessage });
+  await localOnlyRow.waitFor({ state: "visible", timeout: 10000 });
+  await guestFrame.waitForTimeout(150);
+  const localState = await localOnlyRow.evaluate(
+    (row, { localRowAttr, message, nativeChatRowSelector }) => {
+      const remoteRows = [...document.querySelectorAll(nativeChatRowSelector)]
+        .filter((candidate) => candidate.getAttribute(localRowAttr) !== "true");
+      const remoteRowContainer = remoteRows[0]?.parentElement;
+      const reverseFlow = remoteRowContainer instanceof HTMLElement &&
+        getComputedStyle(remoteRowContainer).flexDirection.endsWith("reverse");
+      const remoteTemplate = reverseFlow ? remoteRows[0] : remoteRows.at(-1);
+      const messageText = row.querySelector('[data-chzzk-chat-ui-toggle-message-text="true"]');
+      const nickname = row.querySelector('[data-chzzk-chat-ui-toggle-role~="nickname"]');
+      const rect = row.getBoundingClientRect();
+      const composer = document.querySelector('[data-chzzk-chat-ui-toggle-local-only-field="true"]');
+      const composerRect = composer?.getBoundingClientRect();
+      const aside = row.closest("aside#aside-chatting, aside:has([role='log'])");
+      const composerAside = composer?.closest("aside#aside-chatting, aside:has([role='log'])");
+      const snapshot = Array.isArray(window.__chzzkLocalOnlyVerifierRemoteSnapshot)
+        ? window.__chzzkLocalOnlyVerifierRemoteSnapshot
+        : [];
+      const normalize = (element) => String(element?.textContent || "").replace(/\s+/g, " ").trim();
+      const preservedSnapshotRows = snapshot.filter(
+        (entry) => entry.row.isConnected && normalize(entry.row) === entry.text
+      ).length;
+      const mutatedSnapshotRows = snapshot.filter(
+        (entry) => entry.row.isConnected && normalize(entry.row) !== entry.text
+      ).length;
+      const removedSnapshotRows = snapshot.filter((entry) => !entry.row.isConnected).length;
+      const clipRect = {
+        bottom: window.innerHeight,
+        left: 0,
+        right: window.innerWidth,
+        top: 0
+      };
+
+      for (
+        let current = row.parentElement;
+        current instanceof HTMLElement;
+        current = current.parentElement
+      ) {
+        const style = getComputedStyle(current);
+        const currentRect = current.getBoundingClientRect();
+
+        if (/(auto|scroll|hidden|clip)/i.test(style.overflowY)) {
+          clipRect.top = Math.max(clipRect.top, currentRect.top);
+          clipRect.bottom = Math.min(clipRect.bottom, currentRect.bottom);
+        }
+
+        if (/(auto|scroll|hidden|clip)/i.test(style.overflowX)) {
+          clipRect.left = Math.max(clipRect.left, currentRect.left);
+          clipRect.right = Math.min(clipRect.right, currentRect.right);
+        }
+
+        if (current === aside || current === document.body) break;
+      }
+
+      const visibleWidth = Math.max(0, Math.min(rect.right, clipRect.right) - Math.max(rect.left, clipRect.left));
+      const visibleHeight = Math.max(0, Math.min(rect.bottom, clipRect.bottom) - Math.max(rect.top, clipRect.top));
+      const previousPointerEvents = row.style.getPropertyValue("pointer-events");
+      const previousPointerEventsPriority = row.style.getPropertyPriority("pointer-events");
+
+      row.style.setProperty("pointer-events", "auto", "important");
+      const rowCenterElements = document.elementsFromPoint(
+        Math.min(window.innerWidth - 1, Math.max(0, rect.left + rect.width / 2)),
+        Math.min(window.innerHeight - 1, Math.max(0, rect.top + rect.height / 2))
+      );
+
+      if (previousPointerEvents) {
+        row.style.setProperty("pointer-events", previousPointerEvents, previousPointerEventsPriority);
+      } else {
+        row.style.removeProperty("pointer-events");
+      }
+
+      const composerCenterElements = composerRect
+        ? document.elementsFromPoint(
+            Math.min(window.innerWidth - 1, Math.max(0, composerRect.left + composerRect.width / 2)),
+            Math.min(window.innerHeight - 1, Math.max(0, composerRect.top + composerRect.height / 2))
+          )
+        : [];
+      const rowComposerOverlap = Boolean(
+        composerRect &&
+        rect.left < composerRect.right &&
+        rect.right > composerRect.left &&
+        rect.top < composerRect.bottom &&
+        rect.bottom > composerRect.top
+      );
+
+      window.__chzzkLocalOnlyVerifierInsertedRow = row;
+      const rowCenterY = rect.top + rect.height / 2;
+      const newerRemoteCount = remoteRows.filter((remoteRow) => {
+        const remoteRect = remoteRow.getBoundingClientRect();
+
+        return remoteRect.top + remoteRect.height / 2 > rowCenterY + 1;
+      }).length;
+
+      return {
+        classMatchesRemote: Boolean(remoteTemplate && row.className === remoteTemplate.className),
+        insideLog: Boolean(row.closest('[role="log"]')),
+        messageText: messageText?.textContent || "",
+        nicknameText: nickname?.textContent?.trim() || "",
+        parentMatchesRemote: Boolean(remoteTemplate && row.parentElement === remoteTemplate.parentElement),
+        remoteRowCount: remoteRows.length,
+        containsExecutableMarkup: Boolean(row.querySelector("script, img, iframe, form")),
+        inputValue: composer?.value || "",
+        expectedMessage: message,
+        composerVisibleInViewport: Boolean(
+          composerRect &&
+          composerRect.width > 0 &&
+          composerRect.height > 0 &&
+          composerRect.left >= 0 &&
+          composerRect.right <= window.innerWidth &&
+          composerRect.top >= 0 &&
+          composerRect.bottom <= window.innerHeight &&
+          composerCenterElements.some((element) => element === composer || composer.contains(element))
+        ),
+        documentScrollTop: document.scrollingElement?.scrollTop || 0,
+        localRowFullyVisible:
+          rect.width > 0 &&
+          rect.height > 0 &&
+          visibleWidth >= rect.width - 1 &&
+          visibleHeight >= rect.height - 1 &&
+          rowCenterElements.some((element) => element === row || row.contains(element)),
+        clipRect,
+        localText: normalize(row),
+        mutatedSnapshotRows,
+        newerRemoteCount,
+        preservedSnapshotRows,
+        removedSnapshotRows,
+        rowAboveComposer: Boolean(composerRect && rect.bottom <= composerRect.top + 1),
+        rowComposerOverlap,
+        rowRect: {
+          bottom: rect.bottom,
+          height: rect.height,
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+          width: rect.width
+        },
+        sameChatAside: Boolean(aside && aside === composerAside),
+        snapshotRowCount: snapshot.length
+      };
+    },
+    {
+      localRowAttr: LOCAL_ONLY_CHAT_ROW_ATTR,
+      message: enterMessage,
+      nativeChatRowSelector: NATIVE_CHAT_ROW_SELECTOR
+    }
+  );
+
+  if (
+    !localState.insideLog ||
+    !localState.parentMatchesRemote ||
+    !localState.classMatchesRemote ||
+    localState.messageText !== enterMessage ||
+    localState.nicknameText !== "나" ||
+    localState.containsExecutableMarkup ||
+    localState.inputValue !== "" ||
+    !localState.composerVisibleInViewport ||
+    localState.documentScrollTop !== 0 ||
+    !localState.localRowFullyVisible ||
+    !localState.rowAboveComposer ||
+    localState.rowComposerOverlap ||
+    !localState.sameChatAside ||
+    localState.mutatedSnapshotRows !== 0 ||
+    localState.removedSnapshotRows > 1 ||
+    localState.preservedSnapshotRows < Math.max(1, localState.snapshotRowCount - 1) ||
+    localState.remoteRowCount < Math.max(1, originalRemoteRowCount - 1)
+  ) {
+    throw new Error(`local-only chat did not preserve the native chat flow: ${JSON.stringify(localState)}`);
+  }
+
+  try {
+    await guestFrame.waitForFunction(
+      ({ localRowAttr, nativeChatRowSelector }) => {
+        const normalize = (element) => String(element?.textContent || "").replace(/\s+/g, " ").trim();
+        const timelineSignature = (row) => {
+          const nickname = row.querySelector('[data-chzzk-chat-ui-toggle-role~="nickname"]');
+          const message = row.querySelector('[data-chzzk-chat-ui-toggle-message-text="true"]');
+
+          return `${normalize(nickname)}\u001f${normalize(message)}`;
+        };
+        const rows = [...document.querySelectorAll(nativeChatRowSelector)]
+          .filter((row) => row.getAttribute(localRowAttr) !== "true");
+        const snapshot = Array.isArray(window.__chzzkLocalOnlyVerifierRemoteSnapshot)
+          ? window.__chzzkLocalOnlyVerifierRemoteSnapshot
+          : [];
+
+        return rows.some((row) => {
+          const previous = snapshot.find((entry) => entry.row === row);
+
+          return !previous || timelineSignature(row) !== previous.signature;
+        });
+      },
+      {
+        localRowAttr: LOCAL_ONLY_CHAT_ROW_ATTR,
+        nativeChatRowSelector: NATIVE_CHAT_ROW_SELECTOR
+      },
+      { timeout: 30000 }
+    );
+  } catch (_error) {
+    throw new Error("remote chat DOM did not update during the 30-second local-only timeline verification window");
+  }
+
+  const remoteStreamUpdated = true;
+  await page.waitForTimeout(1000);
+  const enterNetworkMatches = networkAudit.findSentinel(enterMessage);
+  const enterNetworkCoverage = {
+    observedWebSocketUrls: networkAudit.getObservedWebSocketUrls(),
+    receivedFramesWithUrl: networkAudit.webSocketFrameReceived.filter((frame) => frame.url).length,
+    requestCount: networkAudit.getObservedRequestCount(),
+    sentFrameCount: networkAudit.webSocketFrameSent.length
+  };
+
+  if (
+    enterNetworkMatches.requestMatches.length > 0 ||
+    enterNetworkMatches.webSocketMatches.length > 0
+  ) {
+    throw new Error(`local-only Enter sentinel escaped to a network send: ${JSON.stringify(enterNetworkMatches)}`);
+  }
+
+  if (
+    enterNetworkCoverage.observedWebSocketUrls.length === 0 ||
+    enterNetworkCoverage.receivedFramesWithUrl === 0 ||
+    enterNetworkCoverage.requestCount === 0
+  ) {
+    throw new Error(`local-only network audit did not observe the guest chat transport: ${JSON.stringify(enterNetworkCoverage)}`);
+  }
+
+  const postStreamState = await guestFrame.evaluate(
+    ({ localRowAttr, message, nativeChatRowSelector }) => {
+      const normalize = (element) => String(element?.textContent || "").replace(/\s+/g, " ").trim();
+      const timelineSignature = (row) => {
+        const nickname = row.querySelector('[data-chzzk-chat-ui-toggle-role~="nickname"]');
+        const messageText = row.querySelector('[data-chzzk-chat-ui-toggle-message-text="true"]');
+
+        return `${normalize(nickname)}\u001f${normalize(messageText)}`;
+      };
+      const rows = [...document.querySelectorAll(`[${localRowAttr}="true"]`)]
+        .filter((row) => String(row.textContent || "").includes(message));
+      const remoteRows = [...document.querySelectorAll(nativeChatRowSelector)]
+        .filter((row) => row.getAttribute(localRowAttr) !== "true");
+      const localRow = rows[0] || null;
+      const localRect = localRow?.getBoundingClientRect() || null;
+      const localCenterY = localRect ? localRect.top + localRect.height / 2 : null;
+      const snapshot = Array.isArray(window.__chzzkLocalOnlyVerifierRemoteSnapshot)
+        ? window.__chzzkLocalOnlyVerifierRemoteSnapshot
+        : [];
+      const updatedRemoteRows = remoteRows.filter((row) => {
+        const previous = snapshot.find((entry) => entry.row === row);
+
+        return !previous || timelineSignature(row) !== previous.signature;
+      });
+      const updatedRemoteBelowLocalCount = localCenterY === null
+        ? 0
+        : updatedRemoteRows.filter((row) => {
+            const rect = row.getBoundingClientRect();
+
+            return rect.top + rect.height / 2 > localCenterY + 1;
+          }).length;
+      const newerRemoteCount = localCenterY === null
+        ? 0
+        : remoteRows.filter((row) => {
+            const rect = row.getBoundingClientRect();
+
+            return rect.top + rect.height / 2 > localCenterY + 1;
+          }).length;
+      const logRect = localRow?.closest('[role="log"]')?.getBoundingClientRect() || null;
+      const visibleRows = [
+        ...remoteRows.map((row) => ({ kind: "remote", row })),
+        ...rows.map((row) => ({ kind: "local", row }))
+      ].filter(({ row }) => {
+        const rect = row.getBoundingClientRect();
+        const clipTop = Math.max(0, logRect?.top ?? 0);
+        const clipBottom = Math.min(window.innerHeight, logRect?.bottom ?? window.innerHeight);
+
+        return rect.width > 0 && rect.height > 0 && rect.bottom > clipTop && rect.top < clipBottom;
+      });
+      const bottommostVisibleRow = visibleRows.sort(
+        (first, second) => second.row.getBoundingClientRect().bottom - first.row.getBoundingClientRect().bottom
+      )[0] || null;
+
+      return {
+        bottommostVisibleRowKind: bottommostVisibleRow?.kind || null,
+        localTop: localRect?.top ?? null,
+        localRowCount: rows.length,
+        newerRemoteCount,
+        remoteRowCount: remoteRows.length,
+        sameLocalRowNode: rows.length === 1 && rows[0] === window.__chzzkLocalOnlyVerifierInsertedRow,
+        updatedRemoteBelowLocalCount,
+        updatedRemoteCount: updatedRemoteRows.length
+      };
+    },
+    {
+      localRowAttr: LOCAL_ONLY_CHAT_ROW_ATTR,
+      message: enterMessage,
+      nativeChatRowSelector: NATIVE_CHAT_ROW_SELECTOR
+    }
+  );
+
+  if (
+    postStreamState.localRowCount !== 1 ||
+    !postStreamState.sameLocalRowNode ||
+    postStreamState.remoteRowCount <= 0 ||
+    postStreamState.updatedRemoteCount <= 0 ||
+    postStreamState.updatedRemoteBelowLocalCount <= 0 ||
+    postStreamState.newerRemoteCount <= localState.newerRemoteCount ||
+    !(postStreamState.localTop < localState.rowRect.top - 1) ||
+    postStreamState.bottommostVisibleRowKind !== "remote"
+  ) {
+    throw new Error(`local-only row did not move up with the remote chat timeline: ${JSON.stringify({ localState, postStreamState })}`);
+  }
+
+  networkAudit.clear();
+  const buttonMessage = `LOCAL_ONLY_BUTTON_${Date.now().toString(36)}`;
+  await localOnlyChatField.fill(buttonMessage);
+  const sendButton = guestFrame.locator(`[${LOCAL_ONLY_CHAT_SEND_BUTTON_ATTR}="true"]`);
+  await sendButton.waitFor({ state: "visible", timeout: 10000 });
+  await sendButton.click();
+  const buttonRow = guestFrame
+    .locator(`[${LOCAL_ONLY_CHAT_ROW_ATTR}="true"]`)
+    .filter({ hasText: buttonMessage });
+  await buttonRow.waitFor({ state: "visible", timeout: 10000 });
+  await page.waitForTimeout(1000);
+  const buttonNetworkMatches = networkAudit.findSentinel(buttonMessage);
+
+  if (
+    buttonNetworkMatches.requestMatches.length > 0 ||
+    buttonNetworkMatches.webSocketMatches.length > 0
+  ) {
+    throw new Error(`local-only button sentinel escaped to a network send: ${JSON.stringify(buttonNetworkMatches)}`);
+  }
+
+  const buttonState = await guestFrame.evaluate(
+    ({ localRowAttr, buttonMessage, enterMessage }) => {
+      const rows = [...document.querySelectorAll(`[${localRowAttr}="true"]`)];
+
+      return {
+        buttonMessageCount: rows.filter((row) => String(row.textContent || "").includes(buttonMessage)).length,
+        composerVisible: Boolean(document.querySelector('[data-chzzk-chat-ui-toggle-local-only-field="true"]')?.getClientRects().length),
+        enterMessageCount: rows.filter((row) => String(row.textContent || "").includes(enterMessage)).length
+      };
+    },
+    { buttonMessage, enterMessage, localRowAttr: LOCAL_ONLY_CHAT_ROW_ATTR }
+  );
+
+  if (
+    buttonState.buttonMessageCount !== 1 ||
+    buttonState.enterMessageCount !== 1 ||
+    !buttonState.composerVisible
+  ) {
+    throw new Error(`local-only button flow did not remain local and visible: ${JSON.stringify(buttonState)}`);
+  }
+
+  const sentinelNetworkMatches = {
+    button: buttonNetworkMatches,
+    enter: enterNetworkMatches
+  };
+
+  return {
+    buttonMessage,
+    buttonState,
+    enterMessage,
+    enterNetworkCoverage,
+    localState,
+    originalRemoteRowCount,
+    postStreamState,
+    remoteStreamUpdated,
+    requestCount: networkAudit.requests.length,
+    sentFrameCount: networkAudit.webSocketFrameSent.length,
+    receivedFrameCount: networkAudit.webSocketFrameReceived.length,
+    observedWebSocketUrls: networkAudit.getObservedWebSocketUrls(),
+    sentinelNetworkMatches
+  };
+}
+
+async function assertGuestChatHeaderToggleFlow(page, networkAudit) {
   const toggleButton = page.locator(`#${GUEST_CHAT_TOGGLE_BUTTON_ID}`);
 
   await toggleButton.waitFor({ state: "visible", timeout: 30000 });
@@ -1684,13 +2379,15 @@ async function assertGuestChatHeaderToggleFlow(page) {
   await toggleButton.click();
   const guestOn = await waitForGuestChatState(page, { enabled: true });
   assertGuestChatOn("guest chat header-toggle on state", guestOn, page.url());
+  const localOnlyChat = await assertLocalOnlyChatFlow(page, networkAudit);
+
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-guest-chat-on.png"), fullPage: false });
 
   await toggleButton.click();
   const guestOff = await waitForGuestChatState(page, { enabled: false });
   assertGuestChatOff("guest chat header-toggle off state", guestOff);
 
-  return { on: guestOn, off: guestOff };
+  return { on: guestOn, off: guestOff, localOnlyChat };
 }
 
 async function collectState(page, label) {
@@ -2063,6 +2760,22 @@ async function main() {
   await setExtensionOptions(worker, onOptions);
   await page.waitForTimeout(1500);
 
+  if (process.env.CHZZK_VERIFY_LOCAL_ONLY === "1") {
+    const localOnlyNetworkAudit = await createLocalOnlyChatNetworkAudit(context, page);
+    const guestChatToggle = await assertGuestChatHeaderToggleFlow(page, localOnlyNetworkAudit);
+    const verifiedLiveUrl = page.url();
+
+    await localOnlyNetworkAudit.dispose();
+    await browser.close();
+    console.log(JSON.stringify({
+      ok: true,
+      liveUrl: verifiedLiveUrl,
+      localOnlyChat: guestChatToggle.localOnlyChat,
+      screenshot: "output/playwright/chzzk-live-guest-chat-on.png"
+    }, null, 2));
+    return;
+  }
+
   const before = await waitForRoleCoverage(page);
   assertSummary("initial on state", before.summary);
   assertOnState(before.summary);
@@ -2072,7 +2785,8 @@ async function main() {
   assertHeaderButtonsInChatHeader("initial header button placement", headerButtonsBefore);
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-on-before.png"), fullPage: false });
 
-  const guestChatToggle = await assertGuestChatHeaderToggleFlow(page);
+  const localOnlyNetworkAudit = await createLocalOnlyChatNetworkAudit(context, page);
+  const guestChatToggle = await assertGuestChatHeaderToggleFlow(page, localOnlyNetworkAudit);
   const directGuestMarker = await assertDirectGuestMarkerProtection(context, page);
 
   await setExtensionOptions(worker, {
@@ -2216,6 +2930,7 @@ async function main() {
   await page.screenshot({ path: path.join(OUTPUT_DIR, "chzzk-live-on-after.png"), fullPage: false });
 
   await popup.close();
+  await localOnlyNetworkAudit.dispose();
   await browser.close();
 
   console.log(

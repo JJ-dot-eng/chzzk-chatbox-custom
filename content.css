@@ -30,6 +30,33 @@ html[data-chzzk-chat-ui-toggle-live-chat-frame="true"][data-chzzk-chat-ui-toggle
   display: none !important;
 }
 
+html[data-chzzk-chat-ui-toggle-live-chat-frame="true"][data-chzzk-chat-ui-toggle-guest-chat-embed="true"][data-chzzk-chat-ui-toggle-local-only-chat="true"]
+  [data-chzzk-chat-ui-toggle-local-only-original-field="true"],
+html[data-chzzk-chat-ui-toggle-live-chat-frame="true"][data-chzzk-chat-ui-toggle-guest-chat-embed="true"][data-chzzk-chat-ui-toggle-local-only-chat="true"]
+  [data-chzzk-chat-ui-toggle-local-only-original-send-button="true"] {
+  display: none !important;
+}
+
+html[data-chzzk-chat-ui-toggle-live-chat-frame="true"][data-chzzk-chat-ui-toggle-guest-chat-embed="true"][data-chzzk-chat-ui-toggle-local-only-chat="true"]
+  [data-chzzk-chat-ui-toggle-local-only-field="true"] {
+  pointer-events: auto !important;
+  cursor: text !important;
+}
+
+html[data-chzzk-chat-ui-toggle-live-chat-frame="true"][data-chzzk-chat-ui-toggle-guest-chat-embed="true"][data-chzzk-chat-ui-toggle-local-only-chat="true"]
+  [data-chzzk-chat-ui-toggle-local-only-field="true"]:placeholder-shown {
+  overflow-y: hidden !important;
+}
+
+html[data-chzzk-chat-ui-toggle-live-chat-frame="true"][data-chzzk-chat-ui-toggle-guest-chat-embed="true"][data-chzzk-chat-ui-toggle-local-only-chat="true"]
+  [data-chzzk-chat-ui-toggle-local-only-send-button="true"] {
+  pointer-events: auto !important;
+}
+
+[data-chzzk-chat-ui-toggle-local-only-row="true"] {
+  pointer-events: none !important;
+}
+
 html[data-chzzk-chat-ui-toggle-live-chat-frame="true"][data-chzzk-chat-ui-toggle-mini-chat-embed="true"] {
   width: 100% !important;
   height: 100% !important;

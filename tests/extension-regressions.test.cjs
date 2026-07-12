@@ -18,6 +18,12 @@ const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
 const UPDATE_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_UPDATE_OPTIONS";
 const LIVE_URL = `https://chzzk.naver.com/live/${"a".repeat(32)}`;
+const GUEST_CHAT_URL = `${LIVE_URL}/chat?chzzkChatUiToggleGuest=1`;
+const MINI_CHAT_URL = `${LIVE_URL}/chat?chzzkChatUiToggleMini=1`;
+const LOCAL_ONLY_CHAT_FIELD_ATTR = "data-chzzk-chat-ui-toggle-local-only-field";
+const LOCAL_ONLY_CHAT_ORIGINAL_FIELD_ATTR = "data-chzzk-chat-ui-toggle-local-only-original-field";
+const LOCAL_ONLY_CHAT_SEND_BUTTON_ATTR = "data-chzzk-chat-ui-toggle-local-only-send-button";
+const LOCAL_ONLY_CHAT_ROW_ATTR = "data-chzzk-chat-ui-toggle-local-only-row";
 
 let browser;
 
@@ -60,6 +66,72 @@ function createChatDocument(message = "안녕하세요", { nativeTimestamp = nul
           </div>
         </div>
       </div>
+    </aside>
+  </body>
+</html>`;
+}
+
+function createLocalOnlyChatDocument() {
+  const createRow = (id, nickname, message) => `
+    <div id="${id}" class="_item_fixture_7">
+      <div class="_container_fixture_1">
+        <div class="_chatting_message_fixture_21">
+          <button type="button" class="_nickname_fixture_37">
+            <span class="_nickname_shell_fixture_57"><span class="_text_fixture_2">${nickname}</span></span>
+          </button>
+          <span class="_text_fixture_1">${message}</span>
+        </div>
+      </div>
+    </div>`;
+
+  return `<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <title>CHZZK local-only chat fixture</title>
+    <style>
+      ._wrapper_log_fixture {
+        display: flex;
+        flex-direction: column-reverse;
+        height: 180px;
+        max-height: 180px;
+        overflow-y: auto;
+      }
+      ._wrapper_log_fixture > * {
+        flex: 0 0 auto;
+        min-height: 30px;
+      }
+      ._input_fixture_59 {
+        box-sizing: border-box;
+        width: 360px;
+      }
+    </style>
+  </head>
+  <body>
+    <aside id="aside-chatting">
+      <header class="_header_fixture">채팅</header>
+      <div class="_container_log_fixture" role="log">
+        <div class="_wrapper_log_fixture">
+          ${createRow("remote-row-1", "시청자1", "원본 채팅 1")}
+          ${createRow("remote-row-2", "시청자2", "원본 채팅 2")}
+        </div>
+      </div>
+      <form id="native-chat-form" class="_area_fixture_49">
+        <div class="_container_input_fixture_2">
+          <textarea
+            id="native-chat-input"
+            class="_input_fixture_59 _default_fixture_77 _not_login_fixture_81"
+            onkeydown="window.__inlineSiteSendAttempts = (window.__inlineSiteSendAttempts || 0) + 1"
+            placeholder="채팅에 참여하려면 로그인 해주세요"
+            style="height: 40px !important;"
+          ></textarea>
+          <button type="button" class="_input_button_fixture_90">이모티콘</button>
+        </div>
+        <div class="_tools_fixture_125">
+          <button type="button" class="_donation_fixture_137">후원하기</button>
+          <button id="native-send-button" type="submit" class="_send_button_fixture_176" onclick="window.__inlineSiteSendAttempts = (window.__inlineSiteSendAttempts || 0) + 1" disabled>채팅</button>
+        </div>
+      </form>
     </aside>
   </body>
 </html>`;
@@ -363,6 +435,110 @@ async function createHarness({
   };
 }
 
+async function injectContentScripts(target) {
+  await target.addStyleTag({ path: CONTENT_STYLE_PATH });
+
+  for (const scriptPath of CONTENT_SCRIPT_PATHS) {
+    await target.addScriptTag({ path: scriptPath });
+  }
+
+  await target.waitForFunction(() =>
+    document.documentElement.dataset.chzzkChatUiToggleReady === "true"
+  );
+}
+
+async function createLocalOnlyChatHarness({ recordLocalOnlyInputEvents = false } = {}) {
+  const harness = await createHarness({
+    html: createLocalOnlyChatDocument(),
+    initialOptions: { useGuestChatFrame: false }
+  });
+
+  await harness.page.evaluate((guestChatUrl) => {
+    const iframe = document.createElement("iframe");
+
+    iframe.id = "guest-chat-test-frame";
+    iframe.src = guestChatUrl;
+    iframe.setAttribute("credentialless", "");
+    iframe.credentialless = true;
+    document.body.append(iframe);
+  }, GUEST_CHAT_URL);
+
+  const deadline = Date.now() + 5_000;
+  let frame = null;
+
+  while (Date.now() < deadline) {
+    frame = harness.page.frames().find((candidate) => candidate.url() === GUEST_CHAT_URL) || null;
+
+    if (frame) {
+      break;
+    }
+
+    await harness.page.waitForTimeout(25);
+  }
+
+  assert.ok(frame, "credentialless guest-chat fixture frame을 찾을 수 있어야 합니다");
+  const credentiallessState = await frame.evaluate(async () => ({
+    attribute: window.frameElement?.hasAttribute("credentialless") === true,
+    property: window.frameElement?.credentialless === true,
+    tagName: window.frameElement?.tagName || null,
+    hasStorageAccess: typeof document.hasStorageAccess === "function"
+      ? await document.hasStorageAccess()
+      : null
+  }));
+  assert.deepEqual(credentiallessState, {
+    attribute: true,
+    property: true,
+    tagName: "IFRAME",
+    hasStorageAccess: false
+  });
+
+  if (recordLocalOnlyInputEvents) {
+    await frame.evaluate((fieldAttr) => {
+      window.__localOnlyInputEvents = [];
+
+      for (const eventType of [
+        "beforeinput",
+        "compositionend",
+        "compositionstart",
+        "compositionupdate",
+        "input",
+        "keydown",
+        "keyup"
+      ]) {
+        window.addEventListener(eventType, (event) => {
+          if (!event.composedPath().some(
+            (node) => node instanceof HTMLElement && node.hasAttribute(fieldAttr)
+          )) {
+            return;
+          }
+
+          window.__localOnlyInputEvents.push({
+            inputType: event.inputType || "",
+            isComposing: event.isComposing === true,
+            isTrusted: event.isTrusted,
+            key: event.key || "",
+            type: event.type
+          });
+        }, true);
+      }
+    }, LOCAL_ONLY_CHAT_FIELD_ATTR);
+  }
+
+  await injectContentScripts(frame);
+  await frame.locator(`[${LOCAL_ONLY_CHAT_FIELD_ATTR}="true"]`).waitFor({ state: "visible" });
+
+  return {
+    ...harness,
+    frame,
+    async reloadGuestFrame() {
+      await frame.goto(GUEST_CHAT_URL, { waitUntil: "domcontentloaded" });
+      await injectContentScripts(frame);
+      await frame.locator(`[${LOCAL_ONLY_CHAT_FIELD_ATTR}="true"]`).waitFor({ state: "visible" });
+      return frame;
+    }
+  };
+}
+
 function createBackgroundHarness({ initialOptions = {}, storageSetDelays = [] } = {}) {
   const clone = (value) => JSON.parse(JSON.stringify(value));
   const source = fs.readFileSync(BACKGROUND_SCRIPT_PATH, "utf8");
@@ -468,6 +644,1308 @@ before(async () => {
 
 after(async () => {
   await browser?.close();
+});
+
+test("나만 보는 채팅은 원본 수신 행을 보존하고 사이트 전송 경로 없이 같은 로그에만 추가한다", { timeout: 20_000 }, async () => {
+  const harness = await createLocalOnlyChatHarness();
+
+  try {
+    const requestCountBeforeInput = harness.requests.length;
+    const input = harness.frame.locator(`[${LOCAL_ONLY_CHAT_FIELD_ATTR}="true"]`);
+
+    const emptyComposerState = await input.evaluate((field) => ({
+      clientHeight: field.clientHeight,
+      overflowY: getComputedStyle(field).overflowY,
+      placeholder: field.getAttribute("placeholder"),
+      scrollHeight: field.scrollHeight
+    }));
+    assert.equal(emptyComposerState.placeholder, "나만 보는 채팅, 실제로 전송되지 않음");
+    assert.equal(emptyComposerState.overflowY, "hidden");
+    assert.ok(emptyComposerState.scrollHeight <= emptyComposerState.clientHeight + 1);
+
+    await harness.frame.evaluate(({ fieldAttr, sendButtonAttr }) => {
+      window.__siteSendAttempts = { click: 0, keydown: 0, submit: 0 };
+      window.addEventListener("keydown", (event) => {
+        if (event.composedPath().some((node) => node instanceof HTMLElement && node.hasAttribute(fieldAttr))) {
+          window.__siteSendAttempts.keydown += 1;
+        }
+      }, true);
+      window.addEventListener("click", (event) => {
+        if (event.composedPath().some((node) => node instanceof HTMLElement && node.hasAttribute(sendButtonAttr))) {
+          window.__siteSendAttempts.click += 1;
+        }
+      }, true);
+      document.getElementById("native-chat-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        window.__siteSendAttempts.submit += 1;
+      });
+    }, {
+      fieldAttr: LOCAL_ONLY_CHAT_FIELD_ATTR,
+      sendButtonAttr: LOCAL_ONLY_CHAT_SEND_BUTTON_ATTR
+    });
+
+    await input.fill("안녕 <img src=x onerror=alert(1)>");
+    await input.press("Enter");
+
+    const rows = harness.frame.locator(`[${LOCAL_ONLY_CHAT_ROW_ATTR}="true"]`);
+    assert.equal(await rows.count(), 1);
+    assert.equal(
+      await rows.first().locator("[data-chzzk-chat-ui-toggle-message-text='true']").textContent(),
+      "안녕 <img src=x onerror=alert(1)>"
+    );
+    assert.equal(await rows.first().locator("img").count(), 0);
+    assert.equal(await harness.frame.locator("#remote-row-1, #remote-row-2").count(), 2);
+    assert.equal(
+      await rows.first().evaluate((row) => row.closest("[role='log']") !== null),
+      true
+    );
+    assert.equal(
+      await rows.first().evaluate((row) => row.parentElement === document.getElementById("remote-row-2").parentElement),
+      true
+    );
+    assert.equal(
+      await harness.frame.locator(`[${LOCAL_ONLY_CHAT_FIELD_ATTR}="true"]`).getAttribute("class"),
+      await harness.frame.locator(`#native-chat-input`).getAttribute("class")
+    );
+    assert.equal(
+      await harness.frame.locator(`#native-chat-input`).getAttribute(LOCAL_ONLY_CHAT_ORIGINAL_FIELD_ATTR),
+      "true"
+    );
+    assert.deepEqual(
+      await harness.frame.evaluate(() => window.__siteSendAttempts),
+      { click: 0, keydown: 0, submit: 0 }
+    );
+    assert.equal(await harness.frame.evaluate(() => window.__inlineSiteSendAttempts || 0), 0);
+    assert.equal(harness.requests.length, requestCountBeforeInput);
+
+    await harness.frame.evaluate((localRowAttr) => {
+      const source = document.getElementById("remote-row-1");
+      const row = source.cloneNode(true);
+      const firstNativeRow = [...source.parentElement.children].find(
+        (candidate) => candidate.getAttribute(localRowAttr) !== "true"
+      );
+
+      row.id = "remote-row-3";
+      row.removeAttribute("data-chzzk-chat-ui-toggle-chat-row");
+      for (const timestamp of row.querySelectorAll("[data-chzzk-chat-ui-toggle-generated-timestamp]")) {
+        timestamp.remove();
+      }
+      row.querySelector("[class*='_chatting_message_'] > [class*='_text_']").textContent = "원본 채팅 3";
+      source.parentElement.insertBefore(row, firstNativeRow || null);
+    }, LOCAL_ONLY_CHAT_ROW_ATTR);
+
+    await harness.frame.waitForFunction(() => document.getElementById("remote-row-3") !== null);
+    assert.equal(await harness.frame.locator("#remote-row-1, #remote-row-2, #remote-row-3").count(), 3);
+    assert.equal(await rows.count(), 1);
+    assert.equal(
+      await rows.first().evaluate((row) => row.previousElementSibling?.id),
+      "remote-row-3"
+    );
+    assert.equal(
+      await rows.first().evaluate((row) => row.nextElementSibling?.id),
+      "remote-row-1"
+    );
+
+    await harness.frame.evaluate((localRowAttr) => {
+      const localRow = document.querySelector(`[${localRowAttr}="true"]`);
+      const source = document.getElementById("remote-row-3");
+      const remoteRow = source.cloneNode(true);
+
+      window.__localOnlyRowBeforeRecovery = localRow;
+      localRow.remove();
+      remoteRow.id = "remote-row-4";
+      remoteRow.removeAttribute(localRowAttr);
+      source.parentElement.insertBefore(remoteRow, source.parentElement.firstElementChild);
+    }, LOCAL_ONLY_CHAT_ROW_ATTR);
+
+    await harness.frame.waitForFunction(
+      (localRowAttr) => document.querySelectorAll(`[${localRowAttr}="true"]`).length === 1,
+      LOCAL_ONLY_CHAT_ROW_ATTR
+    );
+    assert.equal(await harness.frame.locator("#remote-row-1, #remote-row-2, #remote-row-3, #remote-row-4").count(), 4);
+    assert.deepEqual(
+      await rows.first().evaluate((row, localRowAttr) => {
+        const siblings = [...row.parentElement.children];
+        const rowIndex = siblings.indexOf(row);
+
+        return {
+          newerRemoteIds: siblings
+            .slice(0, rowIndex)
+            .filter((candidate) => candidate.getAttribute(localRowAttr) !== "true")
+            .map((candidate) => candidate.id),
+          olderSiblingId: row.nextElementSibling?.id || null,
+          sameNode: row === window.__localOnlyRowBeforeRecovery
+        };
+      }, LOCAL_ONLY_CHAT_ROW_ATTR),
+      {
+        newerRemoteIds: ["remote-row-4", "remote-row-3"],
+        olderSiblingId: "remote-row-1",
+        sameNode: true
+      }
+    );
+    assert.equal(
+      await rows.first().locator("[data-chzzk-chat-ui-toggle-message-text='true']").textContent(),
+      "안녕 <img src=x onerror=alert(1)>"
+    );
+    assert.deepEqual(
+      await harness.frame.evaluate(() => ["remote-row-1", "remote-row-2"].map((id) => {
+        const row = document.getElementById(id);
+        return row.querySelector("[data-chzzk-chat-ui-toggle-message-text='true']")?.textContent || "";
+      })),
+      ["원본 채팅 1", "원본 채팅 2"]
+    );
+
+    await harness.frame.evaluate((localRowAttr) => {
+      const outgoingOldestRow = document.getElementById("remote-row-2");
+      const replacementWithSameSignature = outgoingOldestRow.cloneNode(true);
+      const container = outgoingOldestRow.parentElement;
+
+      replacementWithSameSignature.id = "remote-row-5";
+      outgoingOldestRow.remove();
+      const firstNativeRow = [...container.children].find(
+        (candidate) => candidate.getAttribute(localRowAttr) !== "true"
+      );
+      container.insertBefore(replacementWithSameSignature, firstNativeRow || null);
+    }, LOCAL_ONLY_CHAT_ROW_ATTR);
+    await harness.frame.waitForFunction(() =>
+      document.getElementById("remote-row-5") !== null &&
+      document.getElementById("remote-row-2") === null
+    );
+    assert.deepEqual(
+      await rows.first().evaluate((row, localRowAttr) => {
+        const siblings = [...row.parentElement.children];
+        const rowIndex = siblings.indexOf(row);
+
+        return siblings
+          .slice(0, rowIndex)
+          .filter((candidate) => candidate.getAttribute(localRowAttr) !== "true")
+          .map((candidate) => candidate.id);
+      }, LOCAL_ONLY_CHAT_ROW_ATTR),
+      ["remote-row-5", "remote-row-4", "remote-row-3"]
+    );
+
+    await harness.frame.evaluate((localRowAttr) => {
+      const container = document.getElementById("remote-row-4").parentElement;
+      const source = document.getElementById("remote-row-4");
+
+      for (let index = 6; index <= 16; index += 1) {
+        const remoteRow = source.cloneNode(true);
+        const firstNativeRow = [...container.children].find(
+          (candidate) => candidate.getAttribute(localRowAttr) !== "true"
+        );
+
+        remoteRow.id = `remote-row-${index}`;
+        remoteRow.querySelector("[data-chzzk-chat-ui-toggle-message-text='true']").textContent = `원본 채팅 ${index}`;
+        container.insertBefore(remoteRow, firstNativeRow || null);
+      }
+    }, LOCAL_ONLY_CHAT_ROW_ATTR);
+    await harness.frame.waitForFunction(() => document.getElementById("remote-row-16") !== null);
+    const buriedState = await rows.first().evaluate((row, localRowAttr) => {
+      const wrapper = row.parentElement;
+      const rowRect = row.getBoundingClientRect();
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const newestRemote = document.getElementById("remote-row-16");
+      const siblings = [...wrapper.children];
+      const rowIndex = siblings.indexOf(row);
+
+      return {
+        localHasLayoutBox: rowRect.width > 0 && rowRect.height > 0,
+        localBuriedAboveViewport: rowRect.bottom <= wrapperRect.top + 1,
+        newerRemoteCount: siblings
+          .slice(0, rowIndex)
+          .filter((candidate) => candidate.getAttribute(localRowAttr) !== "true")
+          .length,
+        newestRemoteAtLatestDomEdge: wrapper.firstElementChild === newestRemote
+      };
+    }, LOCAL_ONLY_CHAT_ROW_ATTR);
+    assert.deepEqual(buriedState, {
+      localHasLayoutBox: true,
+      localBuriedAboveViewport: true,
+      newerRemoteCount: 14,
+      newestRemoteAtLatestDomEdge: true
+    });
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("나만 보는 채팅은 반복 지문 한 건의 먼 위치를 수신 개수로 과대 계산하지 않는다", { timeout: 20_000 }, async () => {
+  const harness = await createLocalOnlyChatHarness();
+
+  try {
+    const input = harness.frame.locator(`[${LOCAL_ONLY_CHAT_FIELD_ATTR}="true"]`);
+
+    await harness.frame.evaluate(() => {
+      const newestRow = document.getElementById("remote-row-1");
+      const secondRow = document.getElementById("remote-row-2");
+      const container = newestRow.parentElement;
+      const thirdRow = secondRow.cloneNode(true);
+      const duplicateNewestSignatureRow = newestRow.cloneNode(true);
+      const fifthRow = secondRow.cloneNode(true);
+
+      thirdRow.id = "remote-row-repeat-third";
+      thirdRow.querySelector("[data-chzzk-chat-ui-toggle-message-text='true']").textContent =
+        "반복 지문 사이 채팅";
+      duplicateNewestSignatureRow.id = "remote-row-duplicate-newest-signature";
+      fifthRow.id = "remote-row-repeat-fifth";
+      fifthRow.querySelector("[data-chzzk-chat-ui-toggle-message-text='true']").textContent =
+        "반복 지문 뒤 채팅";
+      container.append(thirdRow, duplicateNewestSignatureRow, fifthRow);
+    });
+    await harness.frame.waitForFunction(() =>
+      document.getElementById("remote-row-repeat-fifth") !== null
+    );
+
+    await input.fill("반복 지문 계산 확인용 로컬 메시지");
+    await input.press("Enter");
+    const localRow = harness.frame.locator(`[${LOCAL_ONLY_CHAT_ROW_ATTR}="true"]`);
+    await localRow.waitFor({ state: "visible" });
+    await localRow.evaluate((row) => {
+      window.__repeatSignatureLocalRow = row;
+    });
+
+    await harness.frame.evaluate(() => {
+      document.getElementById("remote-row-1")
+        .querySelector("[data-chzzk-chat-ui-toggle-message-text='true']")
+        .textContent = "재사용된 최신 실제 채팅";
+    });
+    await harness.frame.waitForFunction((localRowAttr) => {
+      const row = document.querySelector(`[${localRowAttr}="true"]`);
+
+      return Boolean(
+        row &&
+        row.previousElementSibling?.id === "remote-row-1" &&
+        row.nextElementSibling?.id === "remote-row-2"
+      );
+    }, LOCAL_ONLY_CHAT_ROW_ATTR);
+    assert.deepEqual(await localRow.evaluate((row, localRowAttr) => {
+      const siblings = [...row.parentElement.children];
+      const rowIndex = siblings.indexOf(row);
+
+      return {
+        newerRemoteIds: siblings
+          .slice(0, rowIndex)
+          .filter((candidate) => candidate.getAttribute(localRowAttr) !== "true")
+          .map((candidate) => candidate.id),
+        sameNode: row === window.__repeatSignatureLocalRow
+      };
+    }, LOCAL_ONLY_CHAT_ROW_ATTR), {
+      newerRemoteIds: ["remote-row-1"],
+      sameNode: true
+    });
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("나만 보는 채팅은 가상 목록 밖의 서로 다른 시점 메시지를 재동기화해도 행을 왕복 이동하지 않는다", { timeout: 20_000 }, async () => {
+  const harness = await createLocalOnlyChatHarness();
+
+  try {
+    const input = harness.frame.locator(`[${LOCAL_ONLY_CHAT_FIELD_ATTR}="true"]`);
+
+    await harness.frame.evaluate(() => {
+      const outsideButton = document.createElement("button");
+
+      outsideButton.id = "local-only-outside-focus-target";
+      outsideButton.type = "button";
+      outsideButton.textContent = "채팅 밖";
+      document.body.append(outsideButton);
+    });
+    const outsideButton = harness.frame.locator("#local-only-outside-focus-target");
+    const replaceOldestRemote = async (id, text) => {
+      await harness.frame.evaluate(({ id: nextId, localRowAttr, text: nextText }) => {
+        const container = document.getElementById("remote-row-1")?.parentElement ||
+          document.querySelector("._wrapper_log_fixture");
+        const nativeRows = [...container.children].filter(
+          (candidate) => candidate.getAttribute(localRowAttr) !== "true"
+        );
+        const newestRemote = nativeRows[0];
+        const oldestRemote = nativeRows.at(-1);
+        const nextRemote = newestRemote.cloneNode(true);
+
+        nextRemote.id = nextId;
+        nextRemote.querySelector("[data-chzzk-chat-ui-toggle-message-text='true']").textContent =
+          nextText;
+        oldestRemote.remove();
+        const firstNativeRow = [...container.children].find(
+          (candidate) => candidate.getAttribute(localRowAttr) !== "true"
+        );
+        container.insertBefore(nextRemote, firstNativeRow || null);
+      }, { id, localRowAttr: LOCAL_ONLY_CHAT_ROW_ATTR, text });
+      await harness.frame.waitForFunction((nextId) => document.getElementById(nextId) !== null, id);
+    };
+
+    await input.click();
+    await input.fill("먼저 보낸 로컬 메시지");
+    await input.press("Enter");
+    await outsideButton.click();
+    await replaceOldestRemote("remote-row-window-3", "가상 목록 실제 채팅 3");
+    await harness.frame.waitForFunction(() =>
+      window.localOnlyChatMessages?.length === 1 &&
+      window.localOnlyChatMessages[0].newerRemoteCount === 1
+    );
+
+    await input.click();
+    await input.fill("나중에 보낸 로컬 메시지");
+    await input.press("Enter");
+    await outsideButton.click();
+    await replaceOldestRemote("remote-row-window-4", "가상 목록 실제 채팅 4");
+    await harness.frame.waitForFunction(() =>
+      window.localOnlyChatMessages?.length === 2 &&
+      window.localOnlyChatMessages[0].newerRemoteCount === 2 &&
+      window.localOnlyChatMessages[1].newerRemoteCount === 1
+    );
+
+    await harness.frame.evaluate((localRowAttr) => {
+      window.observer.disconnect();
+      const container = document.querySelector(`[${localRowAttr}="true"]`).parentElement;
+
+      window.__olderEdgeLocalNodes = window.localOnlyChatMessages.map((message) => message.row);
+      window.__olderEdgeOwnedMutationCount = 0;
+      window.__olderEdgeMutationObserver = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          const changedNodes = [...mutation.addedNodes, ...mutation.removedNodes];
+
+          if (changedNodes.some(
+            (node) => node instanceof Element && node.getAttribute(localRowAttr) === "true"
+          )) {
+            window.__olderEdgeOwnedMutationCount += 1;
+          }
+        }
+      });
+      window.__olderEdgeMutationObserver.observe(container, { childList: true });
+    }, LOCAL_ONLY_CHAT_ROW_ATTR);
+
+    await replaceOldestRemote("remote-row-window-5", "가상 목록 실제 채팅 5");
+    await harness.frame.evaluate(() => window.syncLocalOnlyChatRows());
+    await harness.frame.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+    await harness.frame.evaluate(() => {
+      window.__olderEdgeOwnedMutationCount = 0;
+      window.syncLocalOnlyChatRows();
+    });
+    await harness.frame.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+
+    assert.deepEqual(await harness.frame.evaluate((localRowAttr) => {
+      const rows = [...document.querySelectorAll(`[${localRowAttr}="true"]`)];
+
+      return {
+        localMessageCounts: window.localOnlyChatMessages.map(
+          (message) => message.newerRemoteCount
+        ),
+        localTextsNewestFirst: rows.map((row) =>
+          row.querySelector("[data-chzzk-chat-ui-toggle-message-text='true']")?.textContent || ""
+        ),
+        sameNodes: window.localOnlyChatMessages.every(
+          (message, index) => message.row === window.__olderEdgeLocalNodes[index]
+        ),
+        secondSyncOwnedMutationCount: window.__olderEdgeOwnedMutationCount
+      };
+    }, LOCAL_ONLY_CHAT_ROW_ATTR), {
+      localMessageCounts: [3, 2],
+      localTextsNewestFirst: ["나중에 보낸 로컬 메시지", "먼저 보낸 로컬 메시지"],
+      sameNodes: true,
+      secondSyncOwnedMutationCount: 0
+    });
+
+    await harness.frame.evaluate(() => {
+      window.__olderEdgeOriginalSync = window.syncLocalOnlyChatRows;
+      window.__olderEdgeSyncCalls = 0;
+      window.__olderEdgeSyncGuardTripped = false;
+      window.syncLocalOnlyChatRows = (...args) => {
+        window.__olderEdgeSyncCalls += 1;
+
+        if (window.__olderEdgeSyncCalls > 25) {
+          window.__olderEdgeSyncGuardTripped = true;
+          window.observer.disconnect();
+          return;
+        }
+
+        return window.__olderEdgeOriginalSync(...args);
+      };
+      window.__olderEdgeHeartbeat = 0;
+      window.__olderEdgeHeartbeatTimer = window.setInterval(() => {
+        window.__olderEdgeHeartbeat += 1;
+      }, 10);
+      window.observer.observe(document.body ?? document.documentElement, {
+        childList: true,
+        characterData: true,
+        subtree: true
+      });
+    });
+
+    await harness.frame.evaluate((localRowAttr) => {
+      const rows = [...document.querySelectorAll(`[${localRowAttr}="true"]`)];
+      const newerLocalRow = rows[0];
+      const olderLocalRow = rows[1];
+
+      newerLocalRow.parentElement.append(newerLocalRow);
+      olderLocalRow.before(newerLocalRow);
+    }, LOCAL_ONLY_CHAT_ROW_ATTR);
+    await harness.frame.waitForTimeout(100);
+    assert.deepEqual(await harness.frame.evaluate(() => ({
+      guardTripped: window.__olderEdgeSyncGuardTripped,
+      syncCalls: window.__olderEdgeSyncCalls
+    })), {
+      guardTripped: false,
+      syncCalls: 0
+    });
+
+    await harness.frame.evaluate(() => {
+      window.__olderEdgeMutationObserver.takeRecords();
+      window.__olderEdgeSyncCalls = 0;
+      window.__olderEdgeOwnedMutationCount = 0;
+    });
+    await replaceOldestRemote("remote-row-window-6", "가상 목록 실제 채팅 6");
+    await harness.frame.waitForTimeout(300);
+    const liveObserverState = await harness.frame.evaluate((localRowAttr) => {
+      const rows = [...document.querySelectorAll(`[${localRowAttr}="true"]`)];
+
+      return {
+        composerCount: document.querySelectorAll(
+          '[data-chzzk-chat-ui-toggle-local-only-field="true"]'
+        ).length,
+        guardTripped: window.__olderEdgeSyncGuardTripped,
+        heartbeat: window.__olderEdgeHeartbeat,
+        localMessageCounts: window.localOnlyChatMessages.map(
+          (message) => message.newerRemoteCount
+        ),
+        localRowCount: rows.length,
+        localTextsNewestFirst: rows.map((row) =>
+          row.querySelector("[data-chzzk-chat-ui-toggle-message-text='true']")?.textContent || ""
+        ),
+        ownedMutationCount: window.__olderEdgeOwnedMutationCount,
+        sendButtonCount: document.querySelectorAll(
+          '[data-chzzk-chat-ui-toggle-local-only-send-button="true"]'
+        ).length,
+        syncCalls: window.__olderEdgeSyncCalls
+      };
+    }, LOCAL_ONLY_CHAT_ROW_ATTR);
+    assert.equal(liveObserverState.guardTripped, false);
+    assert.ok(liveObserverState.heartbeat >= 5);
+    assert.ok(liveObserverState.syncCalls >= 1 && liveObserverState.syncCalls <= 5);
+    assert.deepEqual({
+      composerCount: liveObserverState.composerCount,
+      localMessageCounts: liveObserverState.localMessageCounts,
+      localRowCount: liveObserverState.localRowCount,
+      localTextsNewestFirst: liveObserverState.localTextsNewestFirst,
+      ownedMutationCount: liveObserverState.ownedMutationCount,
+      sendButtonCount: liveObserverState.sendButtonCount
+    }, {
+      composerCount: 1,
+      localMessageCounts: [4, 3],
+      localRowCount: 2,
+      localTextsNewestFirst: ["나중에 보낸 로컬 메시지", "먼저 보낸 로컬 메시지"],
+      ownedMutationCount: 0,
+      sendButtonCount: 1
+    });
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.frame.evaluate(() => {
+      window.__olderEdgeMutationObserver?.disconnect();
+      window.clearInterval(window.__olderEdgeHeartbeatTimer);
+
+      if (window.__olderEdgeOriginalSync) {
+        window.syncLocalOnlyChatRows = window.__olderEdgeOriginalSync;
+      }
+    }).catch(() => {});
+    await harness.close();
+  }
+});
+
+test("나만 보는 채팅은 빈 목록 뒤 첫 실제 채팅에도 밀려 올라간다", { timeout: 20_000 }, async () => {
+  const harness = await createLocalOnlyChatHarness();
+
+  try {
+    const input = harness.frame.locator(`[${LOCAL_ONLY_CHAT_FIELD_ATTR}="true"]`);
+
+    await harness.frame.evaluate(() => {
+      const firstRemote = document.getElementById("remote-row-1");
+      const secondRemote = document.getElementById("remote-row-2");
+
+      window.__emptyTimelineContainer = firstRemote.parentElement;
+      window.__emptyTimelineRemoteTemplate = firstRemote.cloneNode(true);
+      firstRemote.remove();
+      secondRemote.remove();
+    });
+    await harness.frame.waitForFunction(() =>
+      document.querySelectorAll("#remote-row-1, #remote-row-2").length === 0
+    );
+
+    await input.fill("빈 목록에서 쓴 로컬 메시지");
+    await input.press("Enter");
+    const localRow = harness.frame.locator(`[${LOCAL_ONLY_CHAT_ROW_ATTR}="true"]`);
+    await localRow.waitFor({ state: "visible" });
+    await localRow.evaluate((row) => {
+      window.__emptyTimelineLocalRow = row;
+    });
+
+    await harness.frame.evaluate(() => {
+      const remoteRow = window.__emptyTimelineRemoteTemplate;
+
+      remoteRow.id = "remote-row-first-after-empty";
+      remoteRow.querySelector("[data-chzzk-chat-ui-toggle-message-text='true']").textContent = "첫 실제 채팅";
+      window.__emptyTimelineContainer.prepend(remoteRow);
+    });
+    await harness.frame.waitForFunction((localRowAttr) => {
+      const remoteRow = document.getElementById("remote-row-first-after-empty");
+      const row = document.querySelector(`[${localRowAttr}="true"]`);
+
+      return Boolean(
+        remoteRow &&
+        row &&
+        row.parentElement === remoteRow.parentElement &&
+        remoteRow.nextElementSibling === row
+      );
+    }, LOCAL_ONLY_CHAT_ROW_ATTR);
+    assert.deepEqual(await localRow.evaluate((row) => {
+      const remoteRow = document.getElementById("remote-row-first-after-empty");
+      const rowRect = row.getBoundingClientRect();
+      const remoteRect = remoteRow.getBoundingClientRect();
+
+      return {
+        remoteIsVisuallyNewer: remoteRect.top + remoteRect.height / 2 > rowRect.top + rowRect.height / 2,
+        sameNode: row === window.__emptyTimelineLocalRow
+      };
+    }), {
+      remoteIsVisuallyNewer: true,
+      sameNode: true
+    });
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("나만 보는 채팅은 겹치지 않는 과거 가상 목록에 최신 메시지처럼 재배치되지 않는다", { timeout: 20_000 }, async () => {
+  const harness = await createLocalOnlyChatHarness();
+
+  try {
+    const input = harness.frame.locator(`[${LOCAL_ONLY_CHAT_FIELD_ATTR}="true"]`);
+
+    await input.fill("최신 목록의 로컬 메시지");
+    await input.press("Enter");
+    const localRow = harness.frame.locator(`[${LOCAL_ONLY_CHAT_ROW_ATTR}="true"]`);
+    await localRow.waitFor({ state: "visible" });
+
+    await localRow.evaluate((row) => {
+      window.__virtualSliceLocalRow = row;
+    });
+    await harness.frame.evaluate(() => {
+      const firstRemote = document.getElementById("remote-row-1");
+      const secondRemote = document.getElementById("remote-row-2");
+      const container = firstRemote.parentElement;
+      const historyFirst = firstRemote.cloneNode(true);
+      const historySecond = firstRemote.cloneNode(true);
+
+      window.__virtualSliceContainer = container;
+      window.__virtualSliceNativeRows = [firstRemote, secondRemote];
+      historyFirst.id = "history-row-1";
+      historySecond.id = "history-row-2";
+      historyFirst.querySelector("[data-chzzk-chat-ui-toggle-message-text='true']").textContent = "과거 채팅 1";
+      firstRemote.remove();
+      secondRemote.remove();
+      container.append(historyFirst, historySecond);
+    });
+    await harness.frame.waitForFunction((localRowAttr) =>
+      document.querySelectorAll(`[${localRowAttr}="true"]`).length === 0 &&
+      document.getElementById("history-row-1") !== null,
+      LOCAL_ONLY_CHAT_ROW_ATTR
+    );
+    assert.equal(
+      await harness.frame.evaluate(() => window.__virtualSliceLocalRow.isConnected),
+      false
+    );
+
+    await input.fill("과거 목록에서 쓴 두 번째 로컬 메시지");
+    await input.press("Enter");
+    await harness.frame.waitForFunction((localRowAttr) =>
+      document.querySelectorAll(`[${localRowAttr}="true"]`).length === 1,
+      LOCAL_ONLY_CHAT_ROW_ATTR
+    );
+    await harness.frame.locator(`[${LOCAL_ONLY_CHAT_ROW_ATTR}="true"]`).evaluate((row) => {
+      window.__virtualSliceSecondLocalRow = row;
+    });
+    assert.equal(
+      await harness.frame.locator(`[${LOCAL_ONLY_CHAT_ROW_ATTR}="true"]`).locator(
+        "[data-chzzk-chat-ui-toggle-message-text='true']"
+      ).textContent(),
+      "과거 목록에서 쓴 두 번째 로컬 메시지"
+    );
+
+    await harness.frame.evaluate((localRowAttr) => {
+      const container = document.getElementById("history-row-1").parentElement;
+      const remoteRow = document.getElementById("history-row-1").cloneNode(true);
+      const firstNativeRow = [...container.children].find(
+        (candidate) => candidate.getAttribute(localRowAttr) !== "true"
+      );
+
+      remoteRow.id = "history-row-new";
+      remoteRow.querySelector("[data-chzzk-chat-ui-toggle-message-text='true']").textContent =
+        "과거 목록 뒤 새로 들어온 실제 채팅";
+      container.insertBefore(remoteRow, firstNativeRow || null);
+    }, LOCAL_ONLY_CHAT_ROW_ATTR);
+    await harness.frame.waitForFunction(() => {
+      const remoteRow = document.getElementById("history-row-new");
+
+      return Boolean(
+        remoteRow &&
+        remoteRow.nextElementSibling === window.__virtualSliceSecondLocalRow &&
+        window.__virtualSliceSecondLocalRow.nextElementSibling?.id === "history-row-1"
+      );
+    });
+    assert.deepEqual(await harness.frame.evaluate(() => {
+      const remoteRow = document.getElementById("history-row-new");
+      const remoteRect = remoteRow.getBoundingClientRect();
+      const localRect = window.__virtualSliceSecondLocalRow.getBoundingClientRect();
+
+      return {
+        localSameNode: window.__virtualSliceSecondLocalRow.isConnected,
+        remoteIsVisuallyNewer:
+          remoteRect.top + remoteRect.height / 2 > localRect.top + localRect.height / 2
+      };
+    }), {
+      localSameNode: true,
+      remoteIsVisuallyNewer: true
+    });
+
+    await harness.frame.evaluate(() => {
+      window.__virtualSliceSecondLocalRow.remove();
+    });
+    await harness.frame.waitForFunction((localRowAttr) => {
+      const row = document.querySelector(`[${localRowAttr}="true"]`);
+
+      return Boolean(
+        row === window.__virtualSliceSecondLocalRow &&
+        row.isConnected &&
+        document.getElementById("history-row-new")?.nextElementSibling === row
+      );
+    }, LOCAL_ONLY_CHAT_ROW_ATTR);
+
+    await harness.frame.evaluate(() => {
+      document.getElementById("history-row-new").remove();
+      document.getElementById("history-row-1").remove();
+      document.getElementById("history-row-2").remove();
+      window.__virtualSliceContainer.append(...window.__virtualSliceNativeRows);
+    });
+    await harness.frame.waitForFunction((localRowAttr) => {
+      const rows = [...document.querySelectorAll(`[${localRowAttr}="true"]`)];
+
+      return Boolean(
+        rows.length === 2 &&
+        window.__virtualSliceSecondLocalRow.nextElementSibling === window.__virtualSliceLocalRow &&
+        window.__virtualSliceLocalRow.nextElementSibling?.id === "remote-row-1"
+      );
+    }, LOCAL_ONLY_CHAT_ROW_ATTR);
+    assert.deepEqual(await harness.frame.evaluate((localRowAttr) => ({
+      localRowCount: document.querySelectorAll(`[${localRowAttr}="true"]`).length,
+      originalLocalSameNode: window.__virtualSliceLocalRow.isConnected,
+      secondLocalSameNode: window.__virtualSliceSecondLocalRow.isConnected,
+      secondLocalBeforeOriginalLocal:
+        window.__virtualSliceSecondLocalRow.nextElementSibling === window.__virtualSliceLocalRow,
+      originalLocalBesideOriginalTimeline:
+        window.__virtualSliceLocalRow.nextElementSibling?.id === "remote-row-1"
+    }), LOCAL_ONLY_CHAT_ROW_ATTR), {
+      localRowCount: 2,
+      originalLocalSameNode: true,
+      secondLocalSameNode: true,
+      secondLocalBeforeOriginalLocal: true,
+      originalLocalBesideOriginalTimeline: true
+    });
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("나만 보는 채팅은 Enter·버튼·submit을 로컬 처리하고 IME·Shift+Enter를 구분한다", { timeout: 20_000 }, async () => {
+  const harness = await createLocalOnlyChatHarness();
+
+  try {
+    const input = harness.frame.locator(`[${LOCAL_ONLY_CHAT_FIELD_ATTR}="true"]`);
+    const rows = harness.frame.locator(`[${LOCAL_ONLY_CHAT_ROW_ATTR}="true"]`);
+    const requestCountBeforeInput = harness.requests.length;
+
+    await harness.frame.evaluate(({ fieldAttr, sendButtonAttr }) => {
+      window.__siteSendAttempts = {
+        beforeinput: 0,
+        click: 0,
+        compositionend: 0,
+        compositionstart: 0,
+        keydown: 0,
+        keypress: 0,
+        keyup: 0,
+        submit: 0
+      };
+      for (const eventType of [
+        "beforeinput",
+        "compositionend",
+        "compositionstart",
+        "keydown",
+        "keypress",
+        "keyup"
+      ]) {
+        window.addEventListener(eventType, (event) => {
+          if (event.composedPath().some((node) => node instanceof HTMLElement && node.hasAttribute(fieldAttr))) {
+            window.__siteSendAttempts[eventType] += 1;
+          }
+        }, true);
+      }
+      window.addEventListener("click", (event) => {
+        if (event.composedPath().some((node) => node instanceof HTMLElement && node.hasAttribute(sendButtonAttr))) {
+          window.__siteSendAttempts.click += 1;
+        }
+      }, true);
+      window.addEventListener("submit", () => {
+        window.__siteSendAttempts.submit += 1;
+      }, true);
+    }, {
+      fieldAttr: LOCAL_ONLY_CHAT_FIELD_ATTR,
+      sendButtonAttr: LOCAL_ONLY_CHAT_SEND_BUTTON_ATTR
+    });
+
+    await input.fill("첫 줄");
+    await input.press("Shift+Enter");
+    await input.type("둘째 줄");
+    assert.equal(await rows.count(), 0);
+    assert.equal(await input.inputValue(), "첫 줄\n둘째 줄");
+    assert.notEqual(await input.evaluate((field) => getComputedStyle(field).overflowY), "hidden");
+
+    await input.press("Enter");
+    assert.equal(await rows.count(), 1);
+    assert.equal(await input.evaluate((field) => getComputedStyle(field).overflowY), "hidden");
+    assert.equal(
+      await rows.first().locator("[data-chzzk-chat-ui-toggle-message-text='true']").textContent(),
+      "첫 줄\n둘째 줄"
+    );
+
+    assert.equal(await harness.frame.evaluate(() => {
+      const originalSubmit = window.submitLocalOnlyChatMessage;
+
+      if (typeof originalSubmit !== "function") {
+        return false;
+      }
+
+      window.__localOnlySubmitCalls = 0;
+      window.submitLocalOnlyChatMessage = (...args) => {
+        window.__localOnlySubmitCalls += 1;
+        return originalSubmit(...args);
+      };
+      return true;
+    }), true);
+
+    await input.fill("조합 종료 직후");
+    const immediateEnterState = await input.evaluate((element) => {
+      window.__localOnlySubmitCalls = 0;
+      element.dispatchEvent(new CompositionEvent("compositionstart", {
+        bubbles: true,
+        composed: true
+      }));
+      element.dispatchEvent(new CompositionEvent("compositionend", {
+        bubbles: true,
+        composed: true
+      }));
+      const submitCallsAfterCompositionEnd = window.__localOnlySubmitCalls;
+      const inputValueAfterCompositionEnd = element.value;
+      const keydownCanceled = !element.dispatchEvent(new KeyboardEvent("keydown", {
+        key: "Enter",
+        keyCode: 13,
+        bubbles: true,
+        cancelable: true
+      }));
+      const submitCallsAfterKeydown = window.__localOnlySubmitCalls;
+      const keypressCanceled = !element.dispatchEvent(new KeyboardEvent("keypress", {
+        key: "Enter",
+        keyCode: 13,
+        bubbles: true,
+        cancelable: true
+      }));
+      const beforeinputCanceled = !element.dispatchEvent(new InputEvent("beforeinput", {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        inputType: "insertParagraph"
+      }));
+      const keyupCanceled = !element.dispatchEvent(new KeyboardEvent("keyup", {
+        key: "Enter",
+        keyCode: 13,
+        bubbles: true,
+        cancelable: true
+      }));
+
+      return {
+        beforeinputCanceled,
+        inputValueAfterCompositionEnd,
+        finalInputValue: element.value,
+        finalSubmitCalls: window.__localOnlySubmitCalls,
+        keydownCanceled,
+        keypressCanceled,
+        keyupCanceled,
+        submitCallsAfterCompositionEnd,
+        submitCallsAfterKeydown
+      };
+    });
+    assert.deepEqual(immediateEnterState, {
+      beforeinputCanceled: true,
+      inputValueAfterCompositionEnd: "조합 종료 직후",
+      finalInputValue: "",
+      finalSubmitCalls: 1,
+      keydownCanceled: true,
+      keypressCanceled: true,
+      keyupCanceled: true,
+      submitCallsAfterCompositionEnd: 0,
+      submitCallsAfterKeydown: 1
+    });
+    assert.equal(await rows.count(), 2);
+    assert.equal(
+      await rows.filter({ hasText: "조합 종료 직후" })
+        .locator("[data-chzzk-chat-ui-toggle-message-text='true']")
+        .textContent(),
+      "조합 종료 직후"
+    );
+
+    await input.fill("조합 중 줄바꿈");
+    const composingShiftEnterState = await input.evaluate((element) => {
+      window.__localOnlySubmitCalls = 0;
+      element.dispatchEvent(new CompositionEvent("compositionstart", {
+        bubbles: true,
+        composed: true
+      }));
+      element.dispatchEvent(new KeyboardEvent("keydown", {
+        key: "Enter",
+        keyCode: 229,
+        isComposing: true,
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true
+      }));
+      const composingLineBreakCanceled = !element.dispatchEvent(new InputEvent("beforeinput", {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        inputType: "insertLineBreak",
+        isComposing: true
+      }));
+      element.dispatchEvent(new CompositionEvent("compositionend", {
+        bubbles: true,
+        composed: true
+      }));
+      const trailingLineBreakCanceled = !element.dispatchEvent(new InputEvent("beforeinput", {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        inputType: "insertLineBreak"
+      }));
+      element.dispatchEvent(new KeyboardEvent("keyup", {
+        key: "Enter",
+        keyCode: 13,
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true
+      }));
+
+      return {
+        composingLineBreakCanceled,
+        inputValue: element.value,
+        submitCalls: window.__localOnlySubmitCalls,
+        trailingLineBreakCanceled
+      };
+    });
+    assert.deepEqual(composingShiftEnterState, {
+      composingLineBreakCanceled: false,
+      inputValue: "조합 중 줄바꿈",
+      submitCalls: 0,
+      trailingLineBreakCanceled: false
+    });
+    assert.equal(await rows.count(), 2);
+
+    await input.fill("한글 마지");
+    const imeCycleState = await input.evaluate((element) => {
+      window.__localOnlySubmitCalls = 0;
+      element.dispatchEvent(new CompositionEvent("compositionstart", {
+        bubbles: true,
+        composed: true
+      }));
+      element.dispatchEvent(new KeyboardEvent("keydown", {
+        key: "Enter",
+        keyCode: 229,
+        isComposing: true,
+        bubbles: true,
+        cancelable: true
+      }));
+      const composingKeypressCanceled = !element.dispatchEvent(new KeyboardEvent("keypress", {
+        key: "Enter",
+        keyCode: 229,
+        isComposing: true,
+        bubbles: true,
+        cancelable: true
+      }));
+      element.dispatchEvent(new InputEvent("beforeinput", {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        data: "막",
+        inputType: "insertCompositionText",
+        isComposing: true
+      }));
+      element.value = "한글 마지막";
+      element.dispatchEvent(new InputEvent("input", {
+        bubbles: true,
+        composed: true,
+        data: "막",
+        inputType: "insertCompositionText",
+        isComposing: true
+      }));
+      element.dispatchEvent(new CompositionEvent("compositionend", {
+        bubbles: true,
+        composed: true,
+        data: "막"
+      }));
+      const trailingLineBreakCanceled = !element.dispatchEvent(new InputEvent("beforeinput", {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        inputType: "insertParagraph"
+      }));
+      element.dispatchEvent(new KeyboardEvent("keyup", {
+        key: "Enter",
+        keyCode: 13,
+        bubbles: true,
+        cancelable: true
+      }));
+
+      return {
+        composingKeypressCanceled,
+        inputValue: element.value,
+        submitCalls: window.__localOnlySubmitCalls,
+        trailingLineBreakCanceled
+      };
+    });
+    assert.deepEqual(imeCycleState, {
+      composingKeypressCanceled: false,
+      inputValue: "",
+      submitCalls: 1,
+      trailingLineBreakCanceled: true
+    });
+    assert.equal(await rows.count(), 3);
+    assert.equal(
+      await rows.filter({ hasText: "한글 마지막" })
+        .locator("[data-chzzk-chat-ui-toggle-message-text='true']")
+        .textContent(),
+      "한글 마지막"
+    );
+    await harness.frame.waitForTimeout(500);
+    assert.equal(await rows.count(), 3);
+    assert.equal(await harness.frame.evaluate(() => window.__localOnlySubmitCalls), 1);
+
+    await input.fill("버튼 전송");
+    await harness.frame.locator(`[${LOCAL_ONLY_CHAT_SEND_BUTTON_ATTR}="true"]`).click();
+    assert.equal(await rows.count(), 4);
+
+    await input.fill("모바일 입력");
+    await input.evaluate((element) => {
+      element.dispatchEvent(new InputEvent("beforeinput", {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        inputType: "insertParagraph"
+      }));
+    });
+    assert.equal(await rows.count(), 5);
+
+    await input.fill("submit 우회");
+    const submitWasCanceled = await harness.frame.evaluate(() => {
+      const form = document.getElementById("native-chat-form");
+
+      return !form.dispatchEvent(new SubmitEvent("submit", {
+        bubbles: true,
+        cancelable: true,
+        submitter: document.querySelector("[data-chzzk-chat-ui-toggle-local-only-send-button='true']")
+      }));
+    });
+    assert.equal(submitWasCanceled, true);
+    assert.equal(await rows.count(), 6);
+    assert.deepEqual(
+      await harness.frame.evaluate(() => window.__siteSendAttempts),
+      {
+        beforeinput: 0,
+        click: 0,
+        compositionend: 0,
+        compositionstart: 0,
+        keydown: 0,
+        keypress: 0,
+        keyup: 0,
+        submit: 0
+      }
+    );
+    assert.equal(await harness.frame.evaluate(() => window.__inlineSiteSendAttempts || 0), 0);
+    assert.equal(harness.requests.length, requestCountBeforeInput);
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("나만 보는 채팅은 실제 Edge IME 조합 뒤 첫 Enter 한 번만 로컬 처리한다", { timeout: 20_000 }, async () => {
+  const harness = await createLocalOnlyChatHarness({ recordLocalOnlyInputEvents: true });
+  let cdp = null;
+
+  try {
+    const input = harness.frame.locator(`[${LOCAL_ONLY_CHAT_FIELD_ATTR}="true"]`);
+    const rows = harness.frame.locator(`[${LOCAL_ONLY_CHAT_ROW_ATTR}="true"]`);
+    const message = `한글 조합 Enter ${Date.now().toString(36)}`;
+    const requestCountBeforeInput = harness.requests.length;
+
+    cdp = await harness.context.newCDPSession(harness.page);
+    await input.focus();
+    await cdp.send("Input.imeSetComposition", {
+      text: message,
+      selectionStart: message.length,
+      selectionEnd: message.length
+    });
+    await cdp.send("Input.dispatchKeyEvent", {
+      type: "rawKeyDown",
+      key: "Enter",
+      code: "Enter",
+      windowsVirtualKeyCode: 13,
+      nativeVirtualKeyCode: 13
+    });
+    await cdp.send("Input.insertText", { text: message });
+    await cdp.send("Input.dispatchKeyEvent", {
+      type: "keyUp",
+      key: "Enter",
+      code: "Enter",
+      windowsVirtualKeyCode: 13,
+      nativeVirtualKeyCode: 13
+    });
+
+    await harness.frame.waitForFunction(
+      (localRowAttr) => document.querySelectorAll(`[${localRowAttr}="true"]`).length === 1,
+      LOCAL_ONLY_CHAT_ROW_ATTR
+    );
+    assert.equal(await input.inputValue(), "");
+    assert.equal(await rows.count(), 1);
+    assert.equal(
+      await rows.locator("[data-chzzk-chat-ui-toggle-message-text='true']").textContent(),
+      message
+    );
+
+    await harness.frame.waitForTimeout(350);
+    assert.equal(await rows.count(), 1);
+    assert.equal(await harness.frame.locator("#remote-row-1, #remote-row-2").count(), 2);
+    assert.equal(harness.requests.length, requestCountBeforeInput);
+
+    const events = await harness.frame.evaluate(() => window.__localOnlyInputEvents);
+    const compositionStartIndex = events.findIndex((event) => event.type === "compositionstart");
+    const enterKeydownIndex = events.findIndex(
+      (event) => event.type === "keydown" && event.key === "Enter"
+    );
+    const compositionEndIndex = events.findIndex((event) => event.type === "compositionend");
+    const enterKeyupIndex = events.findIndex(
+      (event) => event.type === "keyup" && event.key === "Enter"
+    );
+    const composingBeforeInput = events.find(
+      (event) => event.type === "beforeinput" && event.isComposing
+    );
+    const composingInput = events.find(
+      (event) => event.type === "input" && event.isComposing
+    );
+
+    assert.ok(compositionStartIndex >= 0);
+    assert.ok(compositionStartIndex < enterKeydownIndex);
+    assert.ok(enterKeydownIndex < compositionEndIndex);
+    assert.ok(compositionEndIndex < enterKeyupIndex);
+    assert.equal(events[compositionStartIndex].isTrusted, true);
+    assert.equal(events[enterKeydownIndex].isTrusted, true);
+    assert.equal(events[enterKeydownIndex].isComposing, true);
+    assert.equal(events[enterKeyupIndex].isTrusted, true);
+    assert.equal(events[enterKeyupIndex].isComposing, false);
+    assert.equal(composingBeforeInput?.isTrusted, true);
+    assert.equal(composingInput?.isTrusted, true);
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await cdp?.detach().catch(() => {});
+    await harness.close();
+  }
+});
+
+test("나만 보는 채팅은 실제 수신 행을 건드리지 않고 로컬 100개만 유지하며 새로고침 시 비운다", { timeout: 25_000 }, async () => {
+  const harness = await createLocalOnlyChatHarness();
+
+  try {
+    await harness.frame.evaluate((fieldAttr) => {
+      const input = document.querySelector(`[${fieldAttr}="true"]`);
+
+      for (let index = 0; index <= 100; index += 1) {
+        input.value = `메시지 ${index}`;
+        input.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+        input.dispatchEvent(new KeyboardEvent("keydown", {
+          key: "Enter",
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        }));
+      }
+    }, LOCAL_ONLY_CHAT_FIELD_ATTR);
+
+    const rows = harness.frame.locator(`[${LOCAL_ONLY_CHAT_ROW_ATTR}="true"]`);
+    assert.equal(await rows.count(), 100);
+    assert.equal(
+      await rows.first().locator("[data-chzzk-chat-ui-toggle-message-text='true']").textContent(),
+      "메시지 100"
+    );
+    assert.equal(
+      await rows.last().locator("[data-chzzk-chat-ui-toggle-message-text='true']").textContent(),
+      "메시지 1"
+    );
+    assert.equal(await harness.frame.locator("#remote-row-1, #remote-row-2").count(), 2);
+
+    await harness.reloadGuestFrame();
+    assert.equal(await harness.frame.locator(`[${LOCAL_ONLY_CHAT_ROW_ATTR}="true"]`).count(), 0);
+    assert.equal(await harness.frame.locator("#remote-row-1, #remote-row-2").count(), 2);
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("나만 보는 입력 가로채기는 최상위 페이지와 미니 채팅 프레임에 연결되지 않는다", { timeout: 20_000 }, async () => {
+  const harness = await createHarness({ html: createLocalOnlyChatDocument() });
+
+  try {
+    assert.equal(await harness.page.locator(`[${LOCAL_ONLY_CHAT_FIELD_ATTR}="true"]`).count(), 0);
+    assert.equal(await harness.page.locator(`#native-chat-input`).isVisible(), true);
+    assert.equal(await harness.page.locator(`[${LOCAL_ONLY_CHAT_SEND_BUTTON_ATTR}="true"]`).count(), 0);
+    assert.equal(await harness.page.locator(`[${LOCAL_ONLY_CHAT_ROW_ATTR}="true"]`).count(), 0);
+
+    const assertNativeEventsPassThrough = async (target) => target.evaluate(() => {
+      const input = document.getElementById("native-chat-input");
+      const button = document.getElementById("native-send-button");
+      const form = document.getElementById("native-chat-form");
+      const counts = { click: 0, keydown: 0, submit: 0 };
+
+      input.addEventListener("keydown", () => { counts.keydown += 1; });
+      button.addEventListener("click", () => { counts.click += 1; });
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        counts.submit += 1;
+      });
+      button.disabled = false;
+      button.type = "button";
+      input.dispatchEvent(new KeyboardEvent("keydown", {
+        key: "Enter",
+        bubbles: true,
+        cancelable: true
+      }));
+      button.click();
+      form.dispatchEvent(new SubmitEvent("submit", { bubbles: true, cancelable: true }));
+
+      return counts;
+    });
+
+    assert.deepEqual(await assertNativeEventsPassThrough(harness.page), {
+      click: 1,
+      keydown: 1,
+      submit: 1
+    });
+
+    await harness.page.evaluate((miniChatUrl) => {
+      const iframe = document.createElement("iframe");
+
+      iframe.id = "mini-chat-test-frame";
+      iframe.src = miniChatUrl;
+      document.body.append(iframe);
+    }, MINI_CHAT_URL);
+
+    const deadline = Date.now() + 5_000;
+    let miniFrame = null;
+
+    while (Date.now() < deadline) {
+      miniFrame = harness.page.frames().find((candidate) => candidate.url() === MINI_CHAT_URL) || null;
+      if (miniFrame) break;
+      await harness.page.waitForTimeout(25);
+    }
+
+    assert.ok(miniFrame);
+    await injectContentScripts(miniFrame);
+    assert.equal(await miniFrame.locator(`[${LOCAL_ONLY_CHAT_FIELD_ATTR}="true"]`).count(), 0);
+    assert.equal(await miniFrame.locator(`#native-chat-input`).isVisible(), true);
+    assert.deepEqual(await assertNativeEventsPassThrough(miniFrame), {
+      click: 1,
+      keydown: 1,
+      submit: 1
+    });
+
+    const untrustedGuestUrl = `${GUEST_CHAT_URL}&untrusted=1`;
+    await harness.page.evaluate((url) => {
+      const iframe = document.createElement("iframe");
+
+      iframe.id = "untrusted-guest-chat-test-frame";
+      iframe.src = url;
+      document.body.append(iframe);
+    }, untrustedGuestUrl);
+
+    let untrustedGuestFrame = null;
+    const untrustedDeadline = Date.now() + 5_000;
+
+    while (Date.now() < untrustedDeadline) {
+      untrustedGuestFrame = harness.page.frames().find((candidate) => candidate.url() === untrustedGuestUrl) || null;
+      if (untrustedGuestFrame) break;
+      await harness.page.waitForTimeout(25);
+    }
+
+    assert.ok(untrustedGuestFrame);
+    const spoofedIsolationState = await untrustedGuestFrame.evaluate(async () => {
+      const frameElement = window.frameElement;
+
+      if (!frameElement || String(frameElement.tagName || "").toUpperCase() !== "IFRAME") {
+        return null;
+      }
+
+      const nativeHasAttribute = frameElement.hasAttribute.bind(frameElement);
+
+      Object.defineProperty(frameElement, "hasAttribute", {
+        configurable: true,
+        value(attributeName) {
+          return attributeName === "credentialless" || nativeHasAttribute(attributeName);
+        }
+      });
+      Object.defineProperty(frameElement, "credentialless", {
+        configurable: true,
+        value: true
+      });
+      Object.defineProperty(document, "hasStorageAccess", {
+        configurable: true,
+        value: async () => true
+      });
+
+      return {
+        attribute: frameElement.hasAttribute("credentialless"),
+        property: frameElement.credentialless,
+        hasStorageAccess: await document.hasStorageAccess()
+      };
+    });
+    assert.deepEqual(spoofedIsolationState, {
+      attribute: true,
+      property: true,
+      hasStorageAccess: true
+    });
+    await injectContentScripts(untrustedGuestFrame);
+    assert.equal(await untrustedGuestFrame.locator(`[${LOCAL_ONLY_CHAT_FIELD_ATTR}="true"]`).count(), 0);
+    assert.equal(await untrustedGuestFrame.locator(`[${LOCAL_ONLY_CHAT_SEND_BUTTON_ATTR}="true"]`).count(), 0);
+    assert.equal(await untrustedGuestFrame.locator(`[${LOCAL_ONLY_CHAT_ROW_ATTR}="true"]`).count(), 0);
+    assert.equal(await untrustedGuestFrame.locator("#native-chat-input").isVisible(), true);
+    assert.deepEqual(await assertNativeEventsPassThrough(untrustedGuestFrame), {
+      click: 1,
+      keydown: 1,
+      submit: 1
+    });
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
 });
 
 test("본문의 HH:mm은 timestamp가 아니며 timestamp 숨김에서도 보인다", { timeout: 15_000 }, async () => {

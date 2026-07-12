@@ -5,6 +5,7 @@ function syncGuestChatUi() {
   }
 
   syncMiniFloatingChatPanel();
+  syncLocalOnlyNativeComposer();
   syncGuestChatFrame();
   ensureGuestChatToggleButton();
 }
@@ -30,17 +31,39 @@ function connectObserver() {
   observer = new MutationObserver((mutations) => {
     const hasAddedNodes = hasNonGeneratedAddedNodes(mutations);
     const hasGlobalUiAddedNodes = hasNonGeneratedAddedNodesOutsideChatRows(mutations);
+    const needsLocalOnlyChatSync = localOnlyChatMutationNeedsSync(mutations);
     const { rows: changedRows, contentMutatedRows } = collectChangedChatRowDetails(mutations);
+    const nativeChangedRows = changedRows.filter(
+      (row) => row.getAttribute(LOCAL_ONLY_CHAT_ROW_ATTR) !== "true"
+    );
+    const nativeContentMutatedRows = new Set(
+      [...contentMutatedRows].filter(
+        (row) => row.getAttribute(LOCAL_ONLY_CHAT_ROW_ATTR) !== "true"
+      )
+    );
 
-    if (changedRows.length > 0) {
-      scanRows(changedRows, { contentMutatedRows });
+    if (nativeChangedRows.length > 0) {
+      scanRows(nativeChangedRows, { contentMutatedRows: nativeContentMutatedRows });
+      syncLocalOnlyChatRows({ mutatedNativeRows: nativeContentMutatedRows });
 
       if (hasGlobalUiAddedNodes) {
         annotateNonChatPanels();
         annotateMiniChatHiddenControls();
+      }
+
+      if (hasGlobalUiAddedNodes || needsLocalOnlyChatSync) {
         scheduleGuestChatUiSync();
       }
-    } else if (hasAddedNodes) {
+    } else if (changedRows.length > 0) {
+      if (hasGlobalUiAddedNodes) {
+        annotateNonChatPanels();
+        annotateMiniChatHiddenControls();
+      }
+
+      if (hasGlobalUiAddedNodes || needsLocalOnlyChatSync) {
+        scheduleGuestChatUiSync();
+      }
+    } else if (hasAddedNodes || needsLocalOnlyChatSync) {
       scheduleScan();
     }
   });
@@ -191,7 +214,9 @@ async function loadStoredOptions(attempt = 1, { allowFallback = false } = {}) {
 }
 
 function start() {
+  verifyLocalOnlyChatCredentiallessContext();
   applyGuestChatCleanBotDefault();
+  connectLocalOnlyChatInterception();
   injectStyle();
   connectMessages();
   connectStorageListener();

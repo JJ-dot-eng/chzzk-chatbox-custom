@@ -654,6 +654,10 @@ function removeGuestChatFrame() {
   document.getElementById(GUEST_CHAT_FRAME_CONTAINER_ID)?.remove();
   clearGuestChatHosts();
   clearGuestChatControlHosts();
+
+  if (!isLocalOnlyChatContext()) {
+    document.documentElement.removeAttribute(LOCAL_ONLY_CHAT_ACTIVE_ATTR);
+  }
 }
 
 function removeMiniFloatingChatPanel({ resetMinimized = false } = {}) {
