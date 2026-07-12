@@ -71,6 +71,8 @@ const popupMarkup = await readText("popup.html");
 const popupStyles = await readText("popup.css");
 const popupSource = await readText("popup.js");
 const readmeSource = await readText("README.md");
+const projectDirectionSource = await readText(path.join("docs", "project", "project-direction.md"));
+const projectAfterDirectionSource = await readText(path.join("docs", "project", "project-after-direction.md"));
 const liveVerifySource = await readText(path.join("tools", "verify-live-edge.cjs"));
 const packageScriptSource = await readText(path.join("tools", "package-extension.ps1"));
 const regressionTestSource = await readText(path.join("tests", "extension-regressions.test.cjs"));
@@ -126,6 +128,16 @@ assert(
 );
 assertIncludes(contentSource, `var SCRIPT_VERSION = "${manifest.version}";`, "content script version must match manifest version");
 assertIncludes(popupSource, `const CONTENT_VERSION = "${manifest.version}";`, "popup content version must match manifest version");
+assertIncludes(
+  projectDirectionSource,
+  `현재 확장 버전: \`${manifest.version}\``,
+  "project direction version must match manifest version"
+);
+assertIncludes(
+  projectAfterDirectionSource,
+  `현재 확장 버전: \`${manifest.version}\``,
+  "project after direction version must match manifest version"
+);
 
 const defaultOptionContracts = [
   [backgroundSource, "const DEFAULT_OPTIONS = {", "background"],
@@ -202,6 +214,9 @@ for (const token of [
   "늦은 미니 채팅 성공 응답이 더 최신 storage 변경을 덮지 않는다",
   "완료된 미니 patch는 뒤의 대기 patch에 다시 섞이지 않는다",
   "미니 버블 복원 저장이 미확정 timeout이어도 다시 최소화하지 않는다",
+  "style presets preserve every chat window selection",
+  "custom preset save and load exclude chat window settings",
+  "legacy custom preset chat window values cannot replace the current selection",
   "optionsUpdateResponseDelays: [900]",
   "vm.runInContext(source, context"
 ]) {
@@ -640,6 +655,17 @@ for (const token of [
 ]) {
   assertIncludes(popupSource, token, "popup must keep durable ordered storage and top-frame status routing");
 }
+for (const token of [
+  "const PRESET_EXCLUDED_OPTION_KEYS = new Set([",
+  "function createChatWindowOptionsPatch(options = currentOptions)",
+  "function createPresetSnapshot(options)",
+  "!PRESET_EXCLUDED_OPTION_KEYS.has(key)",
+  "function applyPresetSnapshot(snapshot, optionsToPreserve = currentOptions)",
+  "const nextCustomPresetSnapshot = createPresetSnapshot(currentOptions);",
+  "? createPresetSnapshot(local[PRESET_STORAGE_KEY])"
+]) {
+  assertIncludes(popupSource, token, "popup presets must exclude and preserve chat window settings");
+}
 assertExcludes(popupSource, "chrome.scripting", "popup must not use scripting permission.");
 assertExcludes(popupSource, "executeScript", "popup must not dynamically inject content scripts.");
 assertIncludes(
@@ -760,6 +786,7 @@ for (const token of [
   "닉네임, 시간, 채팅 박스, 굵기, 글자색과 글자 크기 설정이 실제 채팅과 같은 방식으로 적용됩니다.",
   "글씨 크기/닉네임 크기 조정(이모티콘 포함)",
   "미니 플로팅 채팅창",
+  "스타일 프리셋과 나만의 프리셋은 채팅창 설정(기본·나만 보기·미니, 전체화면 전용)을 저장하거나 변경하지 않습니다.",
   "본 확장 프로그램은 NAVER 및 CHZZK와 공식적으로 제휴하거나 승인받은 제품이 아닙니다.",
   "CHZZK 또는 브라우저 업데이트에 따라 일부 기능이 일시적으로 정상 작동하지 않을 수 있습니다."
 ]) {

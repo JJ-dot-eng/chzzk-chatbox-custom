@@ -14,7 +14,11 @@ const CONTENT_SCRIPT_PATHS = MANIFEST.content_scripts[0].js.map((file) =>
 );
 const CONTENT_STYLE_PATH = path.join(REPO_ROOT, MANIFEST.content_scripts[0].css[0]);
 const BACKGROUND_SCRIPT_PATH = path.join(REPO_ROOT, MANIFEST.background.service_worker);
+const POPUP_HTML_PATH = path.join(REPO_ROOT, MANIFEST.action.default_popup);
+const POPUP_STYLE_PATH = path.join(REPO_ROOT, "popup.css");
+const POPUP_SCRIPT_PATH = path.join(REPO_ROOT, "popup.js");
 const STORAGE_KEY = "chzzkChatUiToggleOptions";
+const PRESET_STORAGE_KEY = "chzzkChatUiToggleCustomPreset";
 const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
 const UPDATE_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_UPDATE_OPTIONS";
 const LIVE_URL = `https://chzzk.naver.com/live/${"a".repeat(32)}`;
@@ -435,6 +439,186 @@ async function createHarness({
   };
 }
 
+async function createPopupHarness({ initialOptions = {}, customPreset = null } = {}) {
+  const context = await browser.newContext({ viewport: { width: 460, height: 760 } });
+  const page = await context.newPage();
+  const pageErrors = [];
+
+  page.on("pageerror", (error) => pageErrors.push(error));
+
+  await context.route("https://popup.test/**", async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+
+    if (pathname === "/popup.js") {
+      await route.fulfill({
+        status: 200,
+        contentType: "text/javascript; charset=utf-8",
+        body: fs.readFileSync(POPUP_SCRIPT_PATH, "utf8")
+      });
+      return;
+    }
+
+    if (pathname === "/popup.css") {
+      await route.fulfill({
+        status: 200,
+        contentType: "text/css; charset=utf-8",
+        body: fs.readFileSync(POPUP_STYLE_PATH, "utf8")
+      });
+      return;
+    }
+
+    if (pathname === "/popup.html" || pathname === "/") {
+      await route.fulfill({
+        status: 200,
+        contentType: "text/html; charset=utf-8",
+        body: fs.readFileSync(POPUP_HTML_PATH, "utf8")
+      });
+      return;
+    }
+
+    await route.abort("blockedbyclient");
+  });
+
+  await page.addInitScript(
+    ({ options, preset, storageKey, presetStorageKey, readOptionsMessage, updateOptionsMessage }) => {
+      const clone = (value) => JSON.parse(JSON.stringify(value));
+      const store = { [storageKey]: clone(options) };
+
+      if (preset) {
+        store[presetStorageKey] = clone(preset);
+      }
+
+      const state = {
+        store,
+        writes: []
+      };
+
+      const getResult = (keys) => {
+        if (typeof keys === "string") {
+          return Object.prototype.hasOwnProperty.call(store, keys)
+            ? { [keys]: clone(store[keys]) }
+            : {};
+        }
+
+        if (Array.isArray(keys)) {
+          return Object.fromEntries(
+            keys
+              .filter((key) => Object.prototype.hasOwnProperty.call(store, key))
+              .map((key) => [key, clone(store[key])])
+          );
+        }
+
+        return clone(store);
+      };
+
+      globalThis.chrome = {
+        runtime: {
+          lastError: null,
+          sendMessage(message, callback) {
+            if (message?.type === readOptionsMessage) {
+              window.setTimeout(() => callback?.({
+                ok: true,
+                found: true,
+                options: clone(store[storageKey])
+              }), 0);
+              return;
+            }
+
+            if (message?.type === updateOptionsMessage) {
+              const nextOptions = {
+                ...clone(store[storageKey]),
+                ...clone(message.patch || {})
+              };
+
+              store[storageKey] = nextOptions;
+              state.writes.push({ key: storageKey, value: clone(nextOptions) });
+              window.setTimeout(() => callback?.({ ok: true, options: clone(nextOptions) }), 0);
+              return;
+            }
+
+            window.setTimeout(() => callback?.(null), 0);
+          }
+        },
+        storage: {
+          local: {
+            get(keys, callback) {
+              window.setTimeout(() => callback(getResult(keys)), 0);
+            },
+            set(items, callback) {
+              for (const [key, value] of Object.entries(items)) {
+                store[key] = clone(value);
+                state.writes.push({ key, value: clone(value) });
+              }
+
+              window.setTimeout(() => callback?.(), 0);
+            }
+          }
+        },
+        tabs: {
+          query(_query, callback) {
+            callback([{ id: 1, url: "https://example.test/" }]);
+          },
+          sendMessage(_tabId, _message, _options, callback) {
+            const response = typeof _options === "function" ? _options : callback;
+            response?.(null);
+          }
+        }
+      };
+      globalThis.__popupHarness = state;
+    },
+    {
+      options: initialOptions,
+      preset: customPreset,
+      storageKey: STORAGE_KEY,
+      presetStorageKey: PRESET_STORAGE_KEY,
+      readOptionsMessage: READ_OPTIONS_MESSAGE,
+      updateOptionsMessage: UPDATE_OPTIONS_MESSAGE
+    }
+  );
+
+  await page.goto("https://popup.test/popup.html", { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() =>
+    document.querySelector("[data-view='home']")?.classList.contains("view--active") &&
+    document.getElementById("statusLabel")?.textContent === "치지직 탭 아님"
+  );
+
+  return {
+    context,
+    page,
+    pageErrors,
+    async close() {
+      await context.close();
+    }
+  };
+}
+
+async function setPopupChatWindowSettings(page, mode, fullscreenOnly) {
+  await page.evaluate(({ nextMode, nextFullscreenOnly }) => {
+    const radio = document.querySelector(`input[name="chatMode"][value="${nextMode}"]`);
+    const fullscreen = document.querySelector('[data-option="miniFloatingChatFullscreenOnly"]');
+
+    radio.checked = true;
+    radio.dispatchEvent(new Event("change", { bubbles: true }));
+    fullscreen.checked = nextFullscreenOnly;
+    fullscreen.dispatchEvent(new Event("change", { bubbles: true }));
+  }, { nextMode: mode, nextFullscreenOnly: fullscreenOnly });
+
+  await page.waitForFunction(
+    ({ storageKey, nextMode, nextFullscreenOnly }) => {
+      const options = window.__popupHarness.store[storageKey];
+      const currentMode = options.useMiniFloatingChat
+        ? "mini"
+        : options.useGuestChatFrame
+          ? "guest"
+          : "default";
+
+      return currentMode === nextMode &&
+        (options.miniFloatingChatFullscreenOnly === true) === nextFullscreenOnly;
+    },
+    { storageKey: STORAGE_KEY, nextMode: mode, nextFullscreenOnly: fullscreenOnly }
+  );
+}
+
 async function injectContentScripts(target) {
   await target.addStyleTag({ path: CONTENT_STYLE_PATH });
 
@@ -644,6 +828,216 @@ before(async () => {
 
 after(async () => {
   await browser?.close();
+});
+
+test("style presets preserve every chat window selection", { timeout: 30_000 }, async () => {
+  const harness = await createPopupHarness();
+  const chatWindowScenarios = [
+    { mode: "default", fullscreenOnly: false },
+    { mode: "guest", fullscreenOnly: true },
+    { mode: "mini", fullscreenOnly: true }
+  ];
+  const presetScenarios = [
+    {
+      id: "default",
+      expected: {
+        showNicknames: true,
+        showBadges: true,
+        showChatBoxes: true,
+        showNonChatPanels: false
+      }
+    },
+    {
+      id: "clean",
+      expected: {
+        showNicknames: false,
+        showBadges: false,
+        showChatBoxes: true,
+        showBoldText: true
+      }
+    },
+    {
+      id: "minimal",
+      expected: {
+        showNicknames: true,
+        showBadges: false,
+        showChatBoxes: false,
+        showBoldText: false
+      }
+    }
+  ];
+
+  try {
+    for (const chatWindow of chatWindowScenarios) {
+      await setPopupChatWindowSettings(
+        harness.page,
+        chatWindow.mode,
+        chatWindow.fullscreenOnly
+      );
+
+      for (const preset of presetScenarios) {
+        await harness.page.locator(`[data-preset="${preset.id}"]`).click();
+        await harness.page.waitForFunction(
+          ({ storageKey, presetId, expected, mode, fullscreenOnly }) => {
+            const options = window.__popupHarness.store[storageKey];
+            const currentMode = options.useMiniFloatingChat
+              ? "mini"
+              : options.useGuestChatFrame
+                ? "guest"
+                : "default";
+            const activePreset = document.querySelector("[data-preset].is-active")?.dataset.preset;
+
+            return currentMode === mode &&
+              (options.miniFloatingChatFullscreenOnly === true) === fullscreenOnly &&
+              activePreset === presetId &&
+              Object.entries(expected).every(([key, value]) =>
+                document.querySelector(`[data-option="${key}"]`)?.checked === value
+              );
+          },
+          {
+            storageKey: STORAGE_KEY,
+            presetId: preset.id,
+            expected: preset.expected,
+            mode: chatWindow.mode,
+            fullscreenOnly: chatWindow.fullscreenOnly
+          }
+        );
+
+        const result = await harness.page.evaluate((storageKey) => ({
+          options: window.__popupHarness.store[storageKey],
+          checkedMode: document.querySelector('input[name="chatMode"]:checked')?.value,
+          fullscreenOnly: document.querySelector(
+            '[data-option="miniFloatingChatFullscreenOnly"]'
+          )?.checked,
+          activePreset: document.querySelector("[data-preset].is-active")?.dataset.preset
+        }), STORAGE_KEY);
+
+        assert.equal(result.checkedMode, chatWindow.mode);
+        assert.equal(result.fullscreenOnly, chatWindow.fullscreenOnly);
+        assert.equal(result.activePreset, preset.id);
+      }
+    }
+
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("custom preset save and load exclude chat window settings", { timeout: 20_000 }, async () => {
+  const harness = await createPopupHarness({
+    initialOptions: {
+      useMiniFloatingChat: true,
+      miniFloatingChatFullscreenOnly: true,
+      showBadges: true
+    }
+  });
+
+  try {
+    await harness.page.evaluate(() => {
+      const badges = document.querySelector('[data-option="showBadges"]');
+      badges.checked = false;
+      badges.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await harness.page.waitForFunction((storageKey) =>
+      window.__popupHarness.store[storageKey].showBadges === false,
+      STORAGE_KEY
+    );
+
+    await harness.page.locator("#saveCustomPresetButton").click();
+    await harness.page.waitForFunction((presetStorageKey) =>
+      window.__popupHarness.store[presetStorageKey]?.showBadges === false,
+      PRESET_STORAGE_KEY
+    );
+
+    const savedPreset = await harness.page.evaluate(
+      (presetStorageKey) => window.__popupHarness.store[presetStorageKey],
+      PRESET_STORAGE_KEY
+    );
+    assert.equal(Object.hasOwn(savedPreset, "useGuestChatFrame"), false);
+    assert.equal(Object.hasOwn(savedPreset, "useMiniFloatingChat"), false);
+    assert.equal(Object.hasOwn(savedPreset, "miniFloatingChatFullscreenOnly"), false);
+    assert.equal(savedPreset.showBadges, false);
+
+    await setPopupChatWindowSettings(harness.page, "guest", false);
+    assert.equal(
+      await harness.page.locator('[data-preset="custom"]').evaluate((button) =>
+        button.classList.contains("is-active")
+      ),
+      true
+    );
+
+    await harness.page.locator('[data-preset="default"]').click();
+    await harness.page.waitForFunction((storageKey) =>
+      window.__popupHarness.store[storageKey].showBadges === true,
+      STORAGE_KEY
+    );
+    await harness.page.locator('[data-preset="custom"]').click();
+    await harness.page.waitForFunction((storageKey) => {
+      const options = window.__popupHarness.store[storageKey];
+      return options.showBadges === false &&
+        options.useGuestChatFrame === true &&
+        options.useMiniFloatingChat === false &&
+        options.miniFloatingChatFullscreenOnly === false;
+    }, STORAGE_KEY);
+
+    assert.equal(
+      await harness.page.locator('input[name="chatMode"]:checked').getAttribute("value"),
+      "guest"
+    );
+    assert.equal(
+      await harness.page.locator('[data-preset="custom"]').evaluate((button) =>
+        button.classList.contains("is-active")
+      ),
+      true
+    );
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("legacy custom preset chat window values cannot replace the current selection", { timeout: 20_000 }, async () => {
+  const harness = await createPopupHarness({
+    initialOptions: {
+      useGuestChatFrame: false,
+      useMiniFloatingChat: true,
+      miniFloatingChatFullscreenOnly: true
+    },
+    customPreset: {
+      useGuestChatFrame: true,
+      useMiniFloatingChat: false,
+      miniFloatingChatFullscreenOnly: false,
+      showBadges: false,
+      showChatBoxes: false
+    }
+  });
+
+  try {
+    await harness.page.locator('[data-preset="custom"]').click();
+    await harness.page.waitForFunction((storageKey) => {
+      const options = window.__popupHarness.store[storageKey];
+      return options.showBadges === false &&
+        options.showChatBoxes === false &&
+        options.useGuestChatFrame === false &&
+        options.useMiniFloatingChat === true &&
+        options.miniFloatingChatFullscreenOnly === true;
+    }, STORAGE_KEY);
+
+    assert.equal(
+      await harness.page.locator('input[name="chatMode"]:checked').getAttribute("value"),
+      "mini"
+    );
+    assert.equal(
+      await harness.page.locator('[data-preset="custom"]').evaluate((button) =>
+        button.classList.contains("is-active")
+      ),
+      true
+    );
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
 });
 
 test("나만 보는 채팅은 원본 수신 행을 보존하고 사이트 전송 경로 없이 같은 로그에만 추가한다", { timeout: 20_000 }, async () => {

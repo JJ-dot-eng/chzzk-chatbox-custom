@@ -2,7 +2,7 @@ const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const PRESET_STORAGE_KEY = "chzzkChatUiToggleCustomPreset";
 const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
 const UPDATE_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_UPDATE_OPTIONS";
-const CONTENT_VERSION = "0.6.1";
+const CONTENT_VERSION = "0.6.2";
 const POPUP_THEME_FALLBACK = "light";
 
 const DEFAULT_CHAT_BOX_COLOR = "#808080";
@@ -103,6 +103,12 @@ const PRESET_DEFINITIONS = {
     useNicknameColorForMessage: false
   }
 };
+
+const PRESET_EXCLUDED_OPTION_KEYS = new Set([
+  "useGuestChatFrame",
+  "useMiniFloatingChat",
+  "miniFloatingChatFullscreenOnly"
+]);
 
 const app = document.getElementById("app");
 const statusDot = document.getElementById("statusDot");
@@ -373,6 +379,35 @@ function getChatMode(options = currentOptions) {
   }
 
   return "default";
+}
+
+function createChatWindowOptionsPatch(options = currentOptions) {
+  const normalized = normalizeOptions(options);
+  const mode = getChatMode(normalized);
+
+  return {
+    useGuestChatFrame: mode === "guest",
+    useMiniFloatingChat: mode === "mini",
+    miniFloatingChatFullscreenOnly: normalized.miniFloatingChatFullscreenOnly
+  };
+}
+
+function createPresetSnapshot(options) {
+  const normalized = normalizeOptions(options);
+
+  return Object.fromEntries(
+    Object.keys(DEFAULT_OPTIONS)
+      .filter((key) => !PRESET_EXCLUDED_OPTION_KEYS.has(key))
+      .map((key) => [key, normalized[key]])
+  );
+}
+
+function applyPresetSnapshot(snapshot, optionsToPreserve = currentOptions) {
+  return normalizeOptions({
+    ...DEFAULT_OPTIONS,
+    ...snapshot,
+    ...createChatWindowOptionsPatch(optionsToPreserve)
+  });
 }
 
 function setChatMode(mode) {
@@ -738,16 +773,19 @@ function syncPresetButtons() {
 }
 
 function detectPreset(options) {
-  const normalized = normalizeOptions(options);
+  const snapshot = createPresetSnapshot(options);
 
-  if (customPresetSnapshot && JSON.stringify(normalized) === JSON.stringify(customPresetSnapshot)) {
+  if (
+    customPresetSnapshot &&
+    JSON.stringify(snapshot) === JSON.stringify(createPresetSnapshot(customPresetSnapshot))
+  ) {
     return "custom";
   }
 
   for (const [presetId, patch] of Object.entries(PRESET_DEFINITIONS)) {
-    const candidate = normalizeOptions({ ...DEFAULT_OPTIONS, ...patch });
+    const candidate = createPresetSnapshot({ ...DEFAULT_OPTIONS, ...patch });
 
-    if (JSON.stringify(normalized) === JSON.stringify(candidate)) {
+    if (JSON.stringify(snapshot) === JSON.stringify(candidate)) {
       return presetId;
     }
   }
@@ -766,14 +804,19 @@ function loadCustomPreset() {
 }
 
 function applyPreset(presetId) {
+  const chatWindowOptions = createChatWindowOptionsPatch(currentOptions);
+
   if (presetId === "custom") {
     if (!customPresetSnapshot) {
       return;
     }
 
-    currentOptions = normalizeOptions(customPresetSnapshot);
+    currentOptions = applyPresetSnapshot(customPresetSnapshot, chatWindowOptions);
   } else {
-    currentOptions = normalizeOptions({ ...DEFAULT_OPTIONS, ...PRESET_DEFINITIONS[presetId] });
+    currentOptions = applyPresetSnapshot(
+      { ...DEFAULT_OPTIONS, ...PRESET_DEFINITIONS[presetId] },
+      chatWindowOptions
+    );
   }
 
   activePreset = presetId;
@@ -783,7 +826,7 @@ function applyPreset(presetId) {
 }
 
 async function saveCustomPreset() {
-  const nextCustomPresetSnapshot = normalizeOptions(currentOptions);
+  const nextCustomPresetSnapshot = createPresetSnapshot(currentOptions);
 
   try {
     await setLocalStorage({ [PRESET_STORAGE_KEY]: nextCustomPresetSnapshot });
@@ -899,7 +942,7 @@ async function getStoredOptions() {
   return {
     options: backgroundOptions || normalizeOptions(local?.[STORAGE_KEY] ?? DEFAULT_OPTIONS),
     customPreset: local?.[PRESET_STORAGE_KEY]
-      ? normalizeOptions(local[PRESET_STORAGE_KEY])
+      ? createPresetSnapshot(local[PRESET_STORAGE_KEY])
       : null
   };
 }
