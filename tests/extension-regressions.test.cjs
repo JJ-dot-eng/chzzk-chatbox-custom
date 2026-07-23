@@ -914,6 +914,12 @@ test("style presets preserve every chat window selection", { timeout: 30_000 }, 
   ];
 
   try {
+    assert.equal(
+      await harness.page.locator('[data-preset="default"]').textContent(),
+      "정돈",
+      "초기화의 기본값과 구분되도록 기본 스타일 프리셋은 정돈으로 표시되어야 합니다"
+    );
+
     for (const chatWindow of chatWindowScenarios) {
       await setPopupChatWindowSettings(
         harness.page,
