@@ -164,6 +164,22 @@
                 <div class="color-strip__chips" id="boxColorChips"></div>
                 <button type="button" class="color-strip__custom" data-open-color="box">직접 고르기</button>
               </div>
+              <div class="slider-block" data-when="showChatBoxes">
+                <div class="slider-block__head">
+                  <span>채팅 박스 불투명도</span>
+                  <output id="chatBoxOpacityValue" for="chatBoxOpacity">100%</output>
+                </div>
+                <input
+                  type="range"
+                  id="chatBoxOpacity"
+                  data-option="chatBoxOpacity"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value="100"
+                  aria-label="채팅 박스 불투명도"
+                >
+              </div>
             </div>
 
             <div class="setting-block">

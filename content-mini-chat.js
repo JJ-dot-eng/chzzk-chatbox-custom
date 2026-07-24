@@ -679,37 +679,9 @@ function setMiniFloatingChatPanelState(panel) {
   const scale = currentOptions.miniFloatingChatScale;
   const minimizeButton = panel.querySelector(`.${MINI_CHAT_PANEL_MINIMIZE_CLASS}`);
   const closeButton = panel.querySelector(`.${MINI_CHAT_PANEL_CLOSE_CLASS}`);
-  const inputOnlyButton = panel.querySelector(`.${MINI_CHAT_PANEL_INPUT_ONLY_CLASS}`);
-  const scaleValue = panel.querySelector(`.${MINI_CHAT_PANEL_SCALE_VALUE_CLASS}`);
-  const scaleDownButton = panel.querySelector(`[data-mini-chat-scale-delta="-${MINI_CHAT_SCALE_STEP}"]`);
-  const scaleUpButton = panel.querySelector(`[data-mini-chat-scale-delta="${MINI_CHAT_SCALE_STEP}"]`);
 
   panel.dataset.inputOnly = String(isInputOnly);
   panel.dataset.scale = String(scale);
-
-  if (scaleValue instanceof HTMLElement) {
-    scaleValue.textContent = `${scale}%`;
-    scaleValue.title = `채팅 배율 ${scale}%`;
-  }
-
-  if (scaleDownButton instanceof HTMLButtonElement) {
-    scaleDownButton.disabled = scale <= MINI_CHAT_SCALE_MIN;
-    scaleDownButton.title = `채팅 배율 줄이기 (${Math.max(MINI_CHAT_SCALE_MIN, scale - MINI_CHAT_SCALE_STEP)}%)`;
-    scaleDownButton.setAttribute("aria-label", scaleDownButton.title);
-  }
-
-  if (scaleUpButton instanceof HTMLButtonElement) {
-    scaleUpButton.disabled = scale >= MINI_CHAT_SCALE_MAX;
-    scaleUpButton.title = `채팅 배율 키우기 (${Math.min(MINI_CHAT_SCALE_MAX, scale + MINI_CHAT_SCALE_STEP)}%)`;
-    scaleUpButton.setAttribute("aria-label", scaleUpButton.title);
-  }
-
-  if (inputOnlyButton instanceof HTMLButtonElement) {
-    inputOnlyButton.textContent = "ㅁ";
-    inputOnlyButton.title = isInputOnly ? "채팅 목록 보기" : "입력창만 보기";
-    inputOnlyButton.setAttribute("aria-label", inputOnlyButton.title);
-    inputOnlyButton.setAttribute("aria-pressed", String(isInputOnly));
-  }
 
   if (minimizeButton instanceof HTMLButtonElement) {
     minimizeButton.textContent = "−";
@@ -875,12 +847,7 @@ function handleMiniChatResizeEnd(event) {
 function createMiniFloatingChatPanel() {
   const panel = document.createElement("section");
   const controlsBar = document.createElement("div");
-  const scaleControls = document.createElement("div");
-  const scaleDownButton = document.createElement("button");
-  const scaleValue = document.createElement("span");
-  const scaleUpButton = document.createElement("button");
-  const modeControls = document.createElement("div");
-  const inputOnlyButton = document.createElement("button");
+  const dragHandle = document.createElement("div");
   const actions = document.createElement("div");
   const minimizeButton = document.createElement("button");
   const closeButton = document.createElement("button");
@@ -893,47 +860,18 @@ function createMiniFloatingChatPanel() {
   panel.setAttribute("aria-label", "미니 채팅");
 
   controlsBar.className = MINI_CHAT_PANEL_CONTROLS_CLASS;
-  controlsBar.addEventListener("pointerdown", handleMiniChatDragStart);
-  controlsBar.addEventListener("pointermove", handleMiniChatDragMove);
-  controlsBar.addEventListener("pointerup", handleMiniChatDragEnd);
-  controlsBar.addEventListener("pointercancel", handleMiniChatDragEnd);
+  dragHandle.className = MINI_CHAT_PANEL_DRAG_HANDLE_CLASS;
+  dragHandle.setAttribute("role", "separator");
+  dragHandle.setAttribute("aria-orientation", "vertical");
+  dragHandle.setAttribute("aria-label", "미니 채팅창 이동 손잡이");
+  dragHandle.title = "미니 채팅창 이동";
+  dragHandle.addEventListener("pointerdown", handleMiniChatDragStart);
+  dragHandle.addEventListener("pointermove", handleMiniChatDragMove);
+  dragHandle.addEventListener("pointerup", handleMiniChatDragEnd);
+  dragHandle.addEventListener("pointercancel", handleMiniChatDragEnd);
 
+  actions.className = MINI_CHAT_PANEL_ACTIONS_CLASS;
   actions.dataset.miniChatActions = "true";
-  modeControls.className = MINI_CHAT_PANEL_MODE_CLASS;
-  modeControls.dataset.miniChatMode = "true";
-  scaleControls.className = MINI_CHAT_PANEL_SCALE_CLASS;
-  scaleControls.dataset.miniChatScaleControls = "true";
-
-  scaleDownButton.type = "button";
-  scaleDownButton.className = MINI_CHAT_PANEL_SCALE_BUTTON_CLASS;
-  scaleDownButton.dataset.miniChatScaleDelta = String(-MINI_CHAT_SCALE_STEP);
-  scaleDownButton.textContent = "-";
-  scaleDownButton.addEventListener("click", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    updateMiniChatScale(-MINI_CHAT_SCALE_STEP);
-  });
-
-  scaleValue.className = MINI_CHAT_PANEL_SCALE_VALUE_CLASS;
-  scaleValue.setAttribute("aria-live", "polite");
-
-  scaleUpButton.type = "button";
-  scaleUpButton.className = MINI_CHAT_PANEL_SCALE_BUTTON_CLASS;
-  scaleUpButton.dataset.miniChatScaleDelta = String(MINI_CHAT_SCALE_STEP);
-  scaleUpButton.textContent = "+";
-  scaleUpButton.addEventListener("click", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    updateMiniChatScale(MINI_CHAT_SCALE_STEP);
-  });
-
-  inputOnlyButton.type = "button";
-  inputOnlyButton.className = MINI_CHAT_PANEL_INPUT_ONLY_CLASS;
-  inputOnlyButton.addEventListener("click", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    toggleMiniChatInputOnly();
-  });
 
   minimizeButton.type = "button";
   minimizeButton.className = MINI_CHAT_PANEL_MINIMIZE_CLASS;
@@ -965,15 +903,14 @@ function createMiniFloatingChatPanel() {
 
   resizeHandle.className = MINI_CHAT_PANEL_RESIZE_CLASS;
   resizeHandle.setAttribute("role", "presentation");
+  resizeHandle.setAttribute("aria-hidden", "true");
   resizeHandle.addEventListener("pointerdown", handleMiniChatResizeStart);
   resizeHandle.addEventListener("pointermove", handleMiniChatResizeMove);
   resizeHandle.addEventListener("pointerup", handleMiniChatResizeEnd);
   resizeHandle.addEventListener("pointercancel", handleMiniChatResizeEnd);
 
-  scaleControls.append(scaleDownButton, scaleValue, scaleUpButton);
-  modeControls.append(inputOnlyButton);
   actions.append(minimizeButton, closeButton);
-  controlsBar.append(scaleControls, modeControls, actions);
+  controlsBar.append(dragHandle, actions);
   panel.append(body, controlsBar, resizeHandle);
   setMiniFloatingChatPanelState(panel);
 

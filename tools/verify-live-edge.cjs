@@ -11,7 +11,7 @@ const ROLE_ATTR = "data-chzzk-chat-ui-toggle-role";
 const CHAT_ROW_ATTR = "data-chzzk-chat-ui-toggle-chat-row";
 const NATIVE_CHAT_ROW_SELECTOR = `:is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i]):has(:is([class*="live_chatting_message_container" i], [class*="_chatting_message_" i]))`;
 const OUTPUT_DIR = path.join(process.cwd(), "output", "playwright");
-const DEFAULT_CHAT_BOX_COLOR = "#808080";
+const DEFAULT_CHAT_BOX_COLOR = "#dfdfdf";
 const DEFAULT_CHAT_TEXT_COLOR = "#101418";
 const CHAT_FONT_SIZE_PT_DEFAULT = 13;
 const CHAT_BOX_ALPHA = 0.18;

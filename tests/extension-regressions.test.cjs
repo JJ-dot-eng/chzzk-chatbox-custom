@@ -152,6 +152,139 @@ function createLocalOnlyChatDocument() {
 </html>`;
 }
 
+function createMiniChatDocument() {
+  return `<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <title>CHZZK mini chat transparency fixture</title>
+    <style>
+      html,
+      body,
+      #mini-app-root,
+      #mini-chat-shell,
+      #mini-log-shell,
+      #mini-chat-log {
+        background: rgb(249, 250, 251);
+      }
+      html,
+      body,
+      #mini-app-root,
+      #aside-chatting,
+      #mini-chat-shell {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+      }
+      #mini-chat-shell {
+        display: flex;
+        flex-direction: column;
+      }
+      #mini-native-header {
+        display: flex;
+        flex: 0 0 58px;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        background: rgb(255, 255, 255);
+      }
+      #mini-native-header strong {
+        margin-right: auto;
+      }
+      #mini-log-shell {
+        display: flex;
+        flex: 1 1 auto;
+        min-height: 0;
+      }
+      #mini-chat-log {
+        flex: 1 1 auto;
+        min-height: 0;
+      }
+      #mini-chat-row {
+        background: rgb(217, 222, 228);
+      }
+      #mini-system-notice {
+        background: rgb(238, 240, 243);
+      }
+      #mini-input-surface {
+        flex: 0 0 auto;
+        padding: 12px 0;
+        background: rgb(255, 255, 255);
+      }
+      #mini-native-input {
+        flex: 0 0 72px;
+        padding: 10px;
+        background: rgb(229, 232, 236);
+      }
+      #mini-native-input button {
+        flex: 0 0 32px;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        position: relative;
+        top: 8px;
+      }
+      #mini-native-input button img {
+        width: 20px;
+        height: 20px;
+      }
+      #mini-chat-input {
+        flex: 1 1 auto;
+        min-width: 0;
+        width: auto;
+        height: 40px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="mini-app-root">
+      <aside id="aside-chatting">
+        <section id="mini-header-decoy" class="_header_notice_fixture_12">
+          <strong>채팅 랭킹</strong>
+          <button type="button">주간</button>
+          <button type="button">닫기</button>
+        </section>
+        <header id="mini-native-header" class="_header_fixture_42">
+          <strong>채팅</strong>
+          <button type="button">−</button>
+          <span>100%</span>
+          <button type="button">+</button>
+          <button type="button" aria-label="채팅 설정">⋮</button>
+        </header>
+        <div id="mini-chat-shell">
+          <div id="mini-log-shell">
+            <div id="mini-chat-log" role="log">
+              <div id="mini-chat-row" class="_item_fixture_7">
+                <div class="_chatting_message_fixture_21">
+                  <span id="mini-native-timestamp" class="_time_fixture_3">22:05</span>
+                  <button type="button" class="_nickname_fixture_37">
+                    <img id="mini-badge" class="_badge_fixture_8" alt="배지" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">
+                    <span id="mini-nickname" class="_text_fixture_2">테스터</span>
+                  </button>
+                  <span id="mini-message" class="_text_fixture_1">투명 미니 채팅</span>
+                </div>
+              </div>
+              <div id="mini-system-notice">안내 메시지</div>
+            </div>
+          </div>
+          <div id="mini-input-surface">
+            <form id="mini-native-input">
+              <button id="mini-profile-button" class="_setting_button_fixture_9" type="button" aria-label="프로필">
+                <img id="mini-profile-image" alt="" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">
+              </button>
+              <textarea id="mini-chat-input" placeholder="채팅을 입력해주세요"></textarea>
+              <button id="mini-emoji-button" class="_emoji_button_fixture_5" type="button" aria-label="이모티콘">
+                <img id="mini-emoji-image" alt="" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">
+              </button>
+            </form>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </body>
+</html>`;
+}
+
 async function createHarness({
   html = createChatDocument(),
   initialOptions = {},
@@ -1086,6 +1219,59 @@ test("legacy custom preset chat window values cannot replace the current selecti
       ),
       true
     );
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("채팅 박스 불투명도는 기본 100%이고 옵션과 미리보기에 즉시 반영된다", { timeout: 20_000 }, async () => {
+  const harness = await createPopupHarness({
+    initialOptions: {
+      showChatBoxes: true,
+      chatBoxColor: "#808080"
+    }
+  });
+
+  try {
+    await harness.page.locator('[data-goto="style"]').click();
+    const slider = harness.page.locator("#chatBoxOpacity");
+    const output = harness.page.locator("#chatBoxOpacityValue");
+
+    await slider.waitFor({ state: "visible" });
+    assert.equal(await slider.inputValue(), "100");
+    assert.equal(await output.textContent(), "100%");
+    assert.equal(
+      await harness.page.locator('#boxColorChips .color-chip[aria-label="#dfdfdf"]').evaluate((button) =>
+        button.classList.contains("is-active")
+      ),
+      true
+    );
+    assert.equal(
+      await harness.page.locator("#chatPreview").evaluate((element) =>
+        getComputedStyle(element).getPropertyValue("--preview-box").trim()
+      ),
+      "rgba(223, 223, 223, 1)"
+    );
+
+    await slider.evaluate((element) => {
+      element.value = "35";
+      element.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    assert.equal(await output.textContent(), "35%");
+    assert.equal(
+      await harness.page.locator("#chatPreview").evaluate((element) =>
+        getComputedStyle(element).getPropertyValue("--preview-box").trim()
+      ),
+      "rgba(223, 223, 223, 0.35)"
+    );
+
+    await slider.dispatchEvent("change");
+    await harness.page.waitForFunction(
+      (storageKey) => window.__popupHarness.store[storageKey]?.chatBoxOpacity === 35,
+      STORAGE_KEY
+    );
+
     assertNoPageErrors(harness.pageErrors);
   } finally {
     await harness.close();
@@ -2545,6 +2731,369 @@ test("나만 보는 입력 가로채기는 최상위 페이지와 미니 채팅 
   }
 });
 
+test("미니 채팅은 외피와 빈 영역만 투명화하고 기존 채팅 스타일과 입력을 유지한다", { timeout: 30_000 }, async () => {
+  const harness = await createHarness({
+    html: createMiniChatDocument(),
+    initialOptions: {
+      useMiniFloatingChat: true,
+      miniFloatingChatBounds: {
+        left: 40,
+        top: 40,
+        width: 475,
+        height: 686
+      },
+      showChatBoxes: false,
+      showNicknames: true,
+      showBadges: true,
+      showTimestamps: true,
+      showLargeText: true,
+      chatFontSizePt: 18,
+      useNicknameFontSize: true,
+      nicknameFontSizePt: 16,
+      showBoldText: true,
+      useChatTextColor: true,
+      chatTextColor: "#123456"
+    }
+  });
+
+  try {
+    const panel = harness.page.locator("#chzzk-chat-ui-toggle-mini-chat-panel");
+    const frameElement = panel.locator("#chzzk-chat-ui-toggle-mini-chat-frame");
+
+    await panel.waitFor({ state: "visible" });
+
+    const deadline = Date.now() + 5_000;
+    let miniFrame = null;
+
+    while (Date.now() < deadline) {
+      miniFrame = harness.page.frames().find((candidate) =>
+        candidate.url().includes("chzzkChatUiToggleMini=1")
+      ) || null;
+      if (miniFrame) break;
+      await harness.page.waitForTimeout(25);
+    }
+
+    assert.ok(miniFrame);
+    await injectContentScripts(miniFrame);
+    await miniFrame.waitForFunction(() =>
+      document.documentElement.dataset.chzzkChatUiToggleMiniChatEmbed === "true" &&
+      document.querySelector("#mini-native-header")
+        ?.getAttribute("data-chzzk-chat-ui-toggle-mini-chat-hidden-control") === "true"
+    );
+
+    const outerState = await panel.evaluate((element) => {
+      const style = getComputedStyle(element);
+      const controlsElement = element.querySelector(".chzzk-chat-ui-toggle-mini-chat__controls");
+      const controlsStyle = controlsElement ? getComputedStyle(controlsElement) : null;
+      const dragHandle = element.querySelector(".chzzk-chat-ui-toggle-mini-chat__drag-handle");
+      const actions = element.querySelector(".chzzk-chat-ui-toggle-mini-chat__actions");
+      const minimizeButton = element.querySelector(".chzzk-chat-ui-toggle-mini-chat__minimize");
+      const resizeHandle = element.querySelector(".chzzk-chat-ui-toggle-mini-chat__resize");
+      const resizeStyle = resizeHandle ? getComputedStyle(resizeHandle) : null;
+
+      return {
+        background: style.backgroundColor,
+        borderColor: style.borderColor,
+        boxShadow: style.boxShadow,
+        controlsBackground: controlsStyle?.backgroundColor || null,
+        controlsDisplay: controlsStyle?.display || null,
+        controlsHeight: controlsElement?.getBoundingClientRect().height || 0,
+        controlsPosition: controlsStyle?.position || null,
+        controlsBottom: controlsStyle?.bottom || null,
+        controlsRight: controlsStyle?.right || null,
+        dragHandleHeight: dragHandle?.getBoundingClientRect().height || 0,
+        dragHandleWidth: dragHandle?.getBoundingClientRect().width || 0,
+        actionsDirection: actions ? getComputedStyle(actions).flexDirection : null,
+        actionsHeight: actions?.getBoundingClientRect().height || 0,
+        actionsWidth: actions?.getBoundingClientRect().width || 0,
+        actionButtonHeight: minimizeButton?.getBoundingClientRect().height || 0,
+        actionButtonWidth: minimizeButton?.getBoundingClientRect().width || 0,
+        actionButtonFontSize: minimizeButton
+          ? getComputedStyle(minimizeButton).fontSize
+          : null,
+        scaleControlCount: element.querySelectorAll("[data-mini-chat-scale-delta]").length,
+        resizeHandleCount: element.querySelectorAll(".chzzk-chat-ui-toggle-mini-chat__resize").length,
+        resizeBackground: resizeStyle?.backgroundColor || null,
+        resizeHeight: resizeHandle?.getBoundingClientRect().height || 0,
+        resizeWidth: resizeHandle?.getBoundingClientRect().width || 0
+      };
+    });
+    const frameBackground = await frameElement.evaluate((element) => getComputedStyle(element).backgroundColor);
+    const innerState = await miniFrame.evaluate(() => {
+      const ids = [
+        "mini-app-root",
+        "aside-chatting",
+        "mini-chat-shell",
+        "mini-log-shell",
+        "mini-chat-log"
+      ];
+      const backgroundById = Object.fromEntries(ids.map((id) => {
+        const element = document.getElementById(id);
+        return [id, element ? getComputedStyle(element).backgroundColor : null];
+      }));
+      const input = document.getElementById("mini-chat-input");
+      const inputSurface = document.getElementById("mini-input-surface");
+      const inputContainer = document.getElementById("mini-native-input");
+      const profileButton = document.getElementById("mini-profile-button");
+      const profileImage = document.getElementById("mini-profile-image");
+      const emojiButton = document.getElementById("mini-emoji-button");
+      const emojiImage = document.getElementById("mini-emoji-image");
+      const message = document.getElementById("mini-message");
+      const nickname = document.getElementById("mini-nickname");
+      const badge = document.getElementById("mini-badge");
+      const timestamp = document.getElementById("mini-native-timestamp");
+      const row = document.getElementById("mini-chat-row");
+      const notice = document.getElementById("mini-system-notice");
+      const header = document.getElementById("mini-native-header");
+      const inputCenterY = inputContainer
+        ? inputContainer.getBoundingClientRect().top + inputContainer.getBoundingClientRect().height / 2
+        : 0;
+      const centerOffset = (element) => {
+        if (!element) {
+          return null;
+        }
+
+        const rect = element.getBoundingClientRect();
+        return rect.top + rect.height / 2 - inputCenterY;
+      };
+
+      return {
+        backgroundById,
+        rootBackground: getComputedStyle(document.documentElement).backgroundColor,
+        bodyBackground: getComputedStyle(document.body).backgroundColor,
+        embed: document.documentElement.dataset.chzzkChatUiToggleMiniChatEmbed,
+        headerDisplay: header ? getComputedStyle(header).display : null,
+        headerHeight: header?.getBoundingClientRect().height || 0,
+        headerDecoyDisplay: getComputedStyle(document.getElementById("mini-header-decoy")).display,
+        headerDecoyMarked: document.getElementById("mini-header-decoy")
+          ?.getAttribute("data-chzzk-chat-ui-toggle-mini-chat-hidden-control") || null,
+        inputSurfaceBackground: inputSurface
+          ? getComputedStyle(inputSurface).backgroundColor
+          : null,
+        inputBackground: inputContainer ? getComputedStyle(inputContainer).backgroundColor : null,
+        inputBorderRadius: inputContainer ? getComputedStyle(inputContainer).borderRadius : null,
+        inputHeight: inputContainer?.getBoundingClientRect().height || 0,
+        inputPaddingLeft: inputContainer ? getComputedStyle(inputContainer).paddingLeft : null,
+        inputPaddingRight: inputContainer ? getComputedStyle(inputContainer).paddingRight : null,
+        inputHorizontalInset: inputSurface && inputContainer
+          ? inputSurface.getBoundingClientRect().width - inputContainer.getBoundingClientRect().width
+          : null,
+        profileButtonCenterOffset: centerOffset(profileButton),
+        profileImageCenterOffset: centerOffset(profileImage),
+        profileButtonTop: profileButton ? getComputedStyle(profileButton).top : null,
+        emojiButtonCenterOffset: centerOffset(emojiButton),
+        emojiImageCenterOffset: centerOffset(emojiImage),
+        emojiButtonTop: emojiButton ? getComputedStyle(emojiButton).top : null,
+        inputVisible: Boolean(input && input.getBoundingClientRect().height > 0),
+        messageColor: message ? getComputedStyle(message).color : null,
+        messageFontSize: message ? Number.parseFloat(getComputedStyle(message).fontSize) : null,
+        messageFontWeight: message ? getComputedStyle(message).fontWeight : null,
+        nicknameFontSize: nickname ? Number.parseFloat(getComputedStyle(nickname).fontSize) : null,
+        nicknameVisible: Boolean(nickname && getComputedStyle(nickname).display !== "none"),
+        badgeVisible: Boolean(badge && getComputedStyle(badge).display !== "none"),
+        timestampVisible: Boolean(timestamp && getComputedStyle(timestamp).display !== "none"),
+        noticeBackground: notice ? getComputedStyle(notice).backgroundColor : null,
+        rowBackground: row ? getComputedStyle(row).backgroundColor : null,
+        boxOpacity: document.documentElement.dataset.chzzkChatUiToggleChatBoxOpacity,
+        rowMarkedTransparent: row?.hasAttribute(
+          "data-chzzk-chat-ui-toggle-mini-chat-transparent-surface"
+        ) || false,
+        noticeMarkedTransparent: notice?.hasAttribute(
+          "data-chzzk-chat-ui-toggle-mini-chat-transparent-surface"
+        ) || false,
+        transparentSurfaceCount: document.querySelectorAll(
+          '[data-chzzk-chat-ui-toggle-mini-chat-transparent-surface="true"]'
+        ).length
+      };
+    });
+
+    const actionsBox = await panel.locator(".chzzk-chat-ui-toggle-mini-chat__actions").boundingBox();
+    const emojiButtonBox = await miniFrame.locator("#mini-emoji-button").boundingBox();
+    const transparent = "rgba(0, 0, 0, 0)";
+
+    assert.ok(actionsBox && emojiButtonBox);
+    assert.ok(
+      actionsBox.x >= emojiButtonBox.x + emojiButtonBox.width - 0.1,
+      JSON.stringify({ actionsBox, emojiButtonBox })
+    );
+    assert.equal(outerState.background, transparent);
+    assert.equal(outerState.borderColor, transparent);
+    assert.equal(outerState.boxShadow, "none");
+    assert.equal(outerState.controlsBackground, transparent);
+    assert.equal(outerState.controlsDisplay, "flex");
+    assert.ok(Math.abs(outerState.controlsHeight - 52) <= 0.1);
+    assert.equal(outerState.controlsPosition, "absolute");
+    assert.equal(outerState.controlsBottom, "8px");
+    assert.equal(outerState.controlsRight, "0px");
+    assert.ok(Math.abs(outerState.dragHandleHeight - 24) <= 0.1);
+    assert.ok(Math.abs(outerState.dragHandleWidth - 8) <= 0.1);
+    assert.equal(outerState.actionsDirection, "column");
+    assert.ok(Math.abs(outerState.actionsHeight - 32) <= 0.1);
+    assert.ok(Math.abs(outerState.actionsWidth - 16) <= 0.1);
+    assert.ok(Math.abs(outerState.actionButtonHeight - 16) <= 0.1);
+    assert.ok(Math.abs(outerState.actionButtonWidth - 16) <= 0.1);
+    assert.equal(outerState.actionButtonFontSize, "12px");
+    assert.equal(outerState.scaleControlCount, 0);
+    assert.equal(outerState.resizeHandleCount, 1);
+    assert.equal(outerState.resizeBackground, transparent);
+    assert.ok(Math.abs(outerState.resizeHeight - 10) <= 0.1);
+    assert.ok(Math.abs(outerState.resizeWidth - 10) <= 0.1);
+    assert.equal(frameBackground, transparent);
+    assert.equal(innerState.embed, "true");
+    assert.equal(innerState.rootBackground, transparent);
+    assert.equal(innerState.bodyBackground, transparent);
+    assert.deepEqual(
+      Object.values(innerState.backgroundById),
+      Array(Object.keys(innerState.backgroundById).length).fill(transparent)
+    );
+    assert.equal(innerState.headerDisplay, "none");
+    assert.equal(innerState.headerHeight, 0);
+    assert.notEqual(innerState.headerDecoyDisplay, "none");
+    assert.equal(innerState.headerDecoyMarked, null);
+    assert.equal(innerState.rowBackground, "rgb(217, 222, 228)");
+    assert.equal(innerState.noticeBackground, "rgb(238, 240, 243)");
+    assert.equal(innerState.rowMarkedTransparent, false);
+    assert.equal(innerState.noticeMarkedTransparent, false);
+    assert.equal(innerState.messageColor, "rgb(18, 52, 86)");
+    assert.ok(Math.abs(innerState.messageFontSize - 24) <= 0.1);
+    assert.equal(innerState.messageFontWeight, "650");
+    assert.ok(Math.abs(innerState.nicknameFontSize - (16 * 4 / 3)) <= 0.1);
+    assert.equal(innerState.nicknameVisible, true);
+    assert.equal(innerState.badgeVisible, true);
+    assert.equal(innerState.timestampVisible, true);
+    assert.equal(innerState.boxOpacity, "100");
+    assert.equal(innerState.inputSurfaceBackground, transparent);
+    assert.equal(innerState.inputBackground, "rgba(226, 227, 232, 0.98)");
+    assert.equal(innerState.inputBorderRadius, "10px");
+    assert.ok(Math.abs(innerState.inputHeight - 52) <= 0.1);
+    assert.equal(innerState.inputPaddingLeft, "8px");
+    assert.equal(innerState.inputPaddingRight, "8px");
+    assert.ok(Math.abs(innerState.inputHorizontalInset - 20) <= 0.1);
+    assert.ok(Math.abs(innerState.profileButtonCenterOffset) <= 0.1);
+    assert.ok(Math.abs(innerState.profileImageCenterOffset) <= 0.1);
+    assert.equal(innerState.profileButtonTop, "0px");
+    assert.ok(Math.abs(innerState.emojiButtonCenterOffset) <= 0.1);
+    assert.ok(Math.abs(innerState.emojiImageCenterOffset) <= 0.1);
+    assert.equal(innerState.emojiButtonTop, "0px");
+    assert.equal(innerState.inputVisible, true);
+    assert.ok(innerState.transparentSurfaceCount >= 5);
+
+    await miniFrame.locator("#mini-chat-input").fill("입력 유지 확인");
+    assert.equal(await miniFrame.locator("#mini-chat-input").inputValue(), "입력 유지 확인");
+    await miniFrame.locator("#mini-chat-input").click();
+    assert.equal(
+      await miniFrame.evaluate(() => document.activeElement?.id),
+      "mini-chat-input"
+    );
+
+    await miniFrame.evaluate((storageKey) => {
+      const nextOptions = {
+        ...window.__storageHarness.store[storageKey],
+        showChatBoxes: true,
+        chatBoxColor: "#4b8bff",
+        chatBoxOpacity: 40
+      };
+
+      window.__storageHarness.emitOptionsChange(nextOptions);
+    }, STORAGE_KEY);
+    await miniFrame.waitForFunction(() =>
+      document.documentElement.dataset.chzzkChatUiToggleChatBoxes === "on"
+    );
+    const chatBoxState = await miniFrame.locator("#mini-chat-row").evaluate((element) => ({
+      background: getComputedStyle(element).backgroundColor,
+      backgroundVariable: getComputedStyle(document.documentElement)
+        .getPropertyValue("--chzzk-chat-ui-toggle-box-bg")
+        .trim(),
+      configuredColor: document.documentElement.dataset.chzzkChatUiToggleChatBoxColor,
+      configuredOpacity: document.documentElement.dataset.chzzkChatUiToggleChatBoxOpacity,
+      markedTransparent: element.hasAttribute(
+        "data-chzzk-chat-ui-toggle-mini-chat-transparent-surface"
+      )
+    }));
+    assert.equal(chatBoxState.background, "rgba(75, 139, 255, 0.4)");
+    assert.equal(chatBoxState.background, chatBoxState.backgroundVariable);
+    assert.equal(chatBoxState.configuredColor, "#4b8bff");
+    assert.equal(chatBoxState.configuredOpacity, "40");
+    assert.equal(chatBoxState.markedTransparent, false);
+    assert.equal(
+      await miniFrame.locator("#mini-message").evaluate((element) => getComputedStyle(element).color),
+      "rgb(18, 52, 86)"
+    );
+
+    await miniFrame.evaluate(() => {
+      const replacement = document.createElement("div");
+
+      replacement.id = "mini-replaced-header";
+      replacement.className = "_header_replacement_9";
+      replacement.innerHTML = "<strong>채팅</strong><button type='button'>−</button><span>100%</span><button type='button'>+</button>";
+      document.getElementById("mini-native-header").replaceWith(replacement);
+    });
+    await miniFrame.waitForFunction(() =>
+      document.getElementById("mini-replaced-header")
+        ?.getAttribute("data-chzzk-chat-ui-toggle-mini-chat-hidden-control") === "true"
+    );
+    assert.equal(
+      await miniFrame.locator("#mini-replaced-header").evaluate((element) =>
+        getComputedStyle(element).display
+      ),
+      "none"
+    );
+
+    const beforeDrag = await panel.boundingBox();
+    const dragHandleBox = await panel.locator(".chzzk-chat-ui-toggle-mini-chat__drag-handle").boundingBox();
+    assert.ok(beforeDrag && dragHandleBox);
+    await harness.page.mouse.move(
+      dragHandleBox.x + dragHandleBox.width / 2,
+      dragHandleBox.y + dragHandleBox.height / 2
+    );
+    await harness.page.mouse.down();
+    await harness.page.mouse.move(
+      dragHandleBox.x + dragHandleBox.width / 2 + 30,
+      dragHandleBox.y + dragHandleBox.height / 2 + 20
+    );
+    await harness.page.mouse.up();
+    const afterDrag = await panel.boundingBox();
+    assert.ok(afterDrag);
+    assert.ok(afterDrag.x > beforeDrag.x + 20);
+
+    const beforeResize = await panel.boundingBox();
+    const resizeHandle = panel.locator(".chzzk-chat-ui-toggle-mini-chat__resize");
+    const resizeBox = await resizeHandle.boundingBox();
+    assert.ok(beforeResize && resizeBox);
+    await harness.page.mouse.move(
+      resizeBox.x + resizeBox.width / 2,
+      resizeBox.y + resizeBox.height / 2
+    );
+    await harness.page.mouse.down();
+    await harness.page.mouse.move(
+      resizeBox.x + resizeBox.width / 2 + 24,
+      resizeBox.y + resizeBox.height / 2 - 24
+    );
+    await harness.page.mouse.up();
+    const afterResize = await panel.boundingBox();
+    assert.ok(afterResize);
+    assert.ok(afterResize.width > beforeResize.width + 15);
+    assert.ok(afterResize.height < beforeResize.height - 15);
+
+    await panel.locator(".chzzk-chat-ui-toggle-mini-chat__minimize").click();
+    const bubble = harness.page.locator("#chzzk-chat-ui-toggle-mini-chat-bubble");
+    await bubble.waitFor({ state: "visible" });
+    assert.equal(await panel.count(), 0);
+    await bubble.click();
+    const restoredPanel = harness.page.locator("#chzzk-chat-ui-toggle-mini-chat-panel");
+    await restoredPanel.waitFor({ state: "visible" });
+    assert.equal(await bubble.count(), 0);
+    await restoredPanel.locator(".chzzk-chat-ui-toggle-mini-chat__close").click();
+    await harness.page.waitForFunction((storageKey) =>
+      window.__storageHarness.store[storageKey]?.useMiniFloatingChat === false &&
+      !document.getElementById("chzzk-chat-ui-toggle-mini-chat-panel")
+    , STORAGE_KEY);
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
 test("본문의 HH:mm은 timestamp가 아니며 timestamp 숨김에서도 보인다", { timeout: 15_000 }, async () => {
   const harness = await createHarness({
     html: createChatDocument("12:34"),
@@ -2886,19 +3435,13 @@ test("미니 채팅 배율 + 연속 입력은 두 단계 증가하고 저장 순
 
   try {
     await harness.page.waitForFunction(() =>
-      document.querySelector(
-        '#chzzk-chat-ui-toggle-mini-chat-panel [data-mini-chat-scale-delta="10"]'
-      ) instanceof HTMLButtonElement
+      document.getElementById("chzzk-chat-ui-toggle-mini-chat-panel") instanceof HTMLElement
     );
 
     await harness.page.evaluate(() => {
       window.__storageHarness.resetLogs();
-      const scaleUp = document.querySelector(
-        '#chzzk-chat-ui-toggle-mini-chat-panel [data-mini-chat-scale-delta="10"]'
-      );
-
-      scaleUp.click();
-      scaleUp.click();
+      updateMiniChatScale(10);
+      updateMiniChatScale(10);
     });
 
     await harness.page.waitForFunction(() =>
@@ -2953,9 +3496,7 @@ test("팝업 닉네임 크기 저장 직후 미니 채팅을 조작해도 새 �
 
   try {
     await harness.page.waitForFunction(() =>
-      document.querySelector(
-        '#chzzk-chat-ui-toggle-mini-chat-panel [data-mini-chat-scale-delta="10"]'
-      ) instanceof HTMLButtonElement
+      document.getElementById("chzzk-chat-ui-toggle-mini-chat-panel") instanceof HTMLElement
     );
 
     await harness.page.evaluate(({ updateOptionsMessage }) => {
@@ -2969,9 +3510,7 @@ test("팝업 닉네임 크기 저장 직후 미니 채팅을 조작해도 새 �
         type: updateOptionsMessage,
         patch: popupPatch
       }, () => {});
-      document.querySelector(
-        '#chzzk-chat-ui-toggle-mini-chat-panel [data-mini-chat-scale-delta="10"]'
-      ).click();
+      updateMiniChatScale(10);
     }, {
       updateOptionsMessage: UPDATE_OPTIONS_MESSAGE
     });
@@ -3018,16 +3557,12 @@ test("외부 설정으로 rebase한 미니 저장이 실패해도 최신 닉네�
 
   try {
     await harness.page.waitForFunction(() =>
-      document.querySelector(
-        '#chzzk-chat-ui-toggle-mini-chat-panel [data-mini-chat-scale-delta="10"]'
-      ) instanceof HTMLButtonElement
+      document.getElementById("chzzk-chat-ui-toggle-mini-chat-panel") instanceof HTMLElement
     );
 
     await harness.page.evaluate((storageKey) => {
       window.__storageHarness.failNextOptionsUpdate(80);
-      document.querySelector(
-        '#chzzk-chat-ui-toggle-mini-chat-panel [data-mini-chat-scale-delta="10"]'
-      ).click();
+      updateMiniChatScale(10);
       window.__storageHarness.emitOptionsChange({
         ...window.__storageHarness.store[storageKey],
         useNicknameFontSize: true,
@@ -3257,16 +3792,12 @@ test("늦은 미니 채팅 성공 응답이 더 최신 storage 변경을 덮지 
 
   try {
     await harness.page.waitForFunction(() =>
-      document.querySelector(
-        '#chzzk-chat-ui-toggle-mini-chat-panel [data-mini-chat-scale-delta="10"]'
-      ) instanceof HTMLButtonElement
+      document.getElementById("chzzk-chat-ui-toggle-mini-chat-panel") instanceof HTMLElement
     );
 
     await harness.page.evaluate((storageKey) => {
       window.__storageHarness.delayNextOptionsRead(180);
-      document.querySelector(
-        '#chzzk-chat-ui-toggle-mini-chat-panel [data-mini-chat-scale-delta="10"]'
-      ).click();
+      updateMiniChatScale(10);
 
       window.setTimeout(() => {
         window.__storageHarness.emitOptionsChange({

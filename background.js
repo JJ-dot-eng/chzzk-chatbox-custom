@@ -6,7 +6,8 @@ const READ_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_GUEST_CHAT_THEM
 const SET_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_GUEST_CHAT_THEME";
 const APPLY_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_APPLY_GUEST_CHAT_THEME";
 const LIVE_CHANNEL_ID_PATTERN = /^[0-9a-f]{32}$/i;
-const DEFAULT_CHAT_BOX_COLOR = "#808080";
+const DEFAULT_CHAT_BOX_COLOR = "#dfdfdf";
+const CHAT_BOX_COLOR_DEFAULT_REVISION = 2;
 const MINI_CHAT_MIN_WIDTH = 280;
 const MINI_CHAT_MIN_HEIGHT = 28;
 const MINI_CHAT_INPUT_ONLY_HEIGHT = 116;
@@ -21,6 +22,9 @@ const MINI_CHAT_SCALE_DEFAULT = 100;
 const CHAT_FONT_SIZE_PT_MIN = 8;
 const CHAT_FONT_SIZE_PT_MAX = 36;
 const CHAT_FONT_SIZE_PT_DEFAULT = 13;
+const CHAT_BOX_OPACITY_MIN = 0;
+const CHAT_BOX_OPACITY_MAX = 100;
+const CHAT_BOX_OPACITY_DEFAULT = 100;
 const DEFAULT_CHAT_TEXT_COLOR = "#101418";
 const NAMED_CHAT_BOX_COLORS = {
   gray: "#808080",
@@ -61,7 +65,9 @@ const DEFAULT_OPTIONS = {
   useChatTextColor: false,
   chatTextColor: DEFAULT_CHAT_TEXT_COLOR,
   useNicknameColorForMessage: false,
-  chatBoxColor: DEFAULT_CHAT_BOX_COLOR
+  chatBoxColor: DEFAULT_CHAT_BOX_COLOR,
+  chatBoxColorDefaultRevision: CHAT_BOX_COLOR_DEFAULT_REVISION,
+  chatBoxOpacity: CHAT_BOX_OPACITY_DEFAULT
 };
 
 const guestChatThemesByTab = new Map();
@@ -91,6 +97,12 @@ function normalizeOptions(options) {
   const legacyBoldText = options?.showBoldText === undefined && options?.showLargeText === true;
   const miniFloatingChatInputOnly = options?.miniFloatingChatInputOnly === true;
   const useChatTextColor = options?.useChatTextColor === true;
+  const normalizedChatBoxColor = normalizeHexColor(options?.chatBoxColor, DEFAULT_CHAT_BOX_COLOR);
+  const chatBoxColor =
+    Number(options?.chatBoxColorDefaultRevision) >= CHAT_BOX_COLOR_DEFAULT_REVISION ||
+    normalizedChatBoxColor !== "#808080"
+      ? normalizedChatBoxColor
+      : DEFAULT_CHAT_BOX_COLOR;
   const showNonChatPanels =
     options?.showNonChatPanels !== undefined
       ? options.showNonChatPanels !== false
@@ -124,7 +136,9 @@ function normalizeOptions(options) {
     useChatTextColor,
     chatTextColor: normalizeHexColor(options?.chatTextColor, DEFAULT_CHAT_TEXT_COLOR),
     useNicknameColorForMessage: useChatTextColor && options?.useNicknameColorForMessage === true,
-    chatBoxColor: normalizeHexColor(options?.chatBoxColor, DEFAULT_CHAT_BOX_COLOR)
+    chatBoxColor,
+    chatBoxColorDefaultRevision: CHAT_BOX_COLOR_DEFAULT_REVISION,
+    chatBoxOpacity: normalizeChatBoxOpacity(options?.chatBoxOpacity)
   };
 }
 
@@ -173,6 +187,15 @@ function normalizeChatFontSizePt(value) {
     CHAT_FONT_SIZE_PT_MAX,
     CHAT_FONT_SIZE_PT_DEFAULT
   );
+}
+
+function normalizeChatBoxOpacity(value) {
+  return Math.round(clampNumber(
+    value,
+    CHAT_BOX_OPACITY_MIN,
+    CHAT_BOX_OPACITY_MAX,
+    CHAT_BOX_OPACITY_DEFAULT
+  ));
 }
 
 function normalizeOptionalCoordinate(value) {

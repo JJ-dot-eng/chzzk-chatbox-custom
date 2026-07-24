@@ -66,6 +66,7 @@ function removeAnnotations(element) {
   element.removeAttribute(NICKNAME_COLOR_MESSAGE_ATTR);
   element.removeAttribute(AUTO_CONTRAST_ATTR);
   element.removeAttribute(MINI_CHAT_HIDDEN_CONTROL_ATTR);
+  element.removeAttribute(MINI_CHAT_TRANSPARENT_SURFACE_ATTR);
   element.removeAttribute(NON_CHAT_PANEL_ATTR);
   element.removeAttribute(MINI_CHAT_COMPACT_INPUT_ATTR);
   element.removeAttribute(MINI_CHAT_INPUT_ONLY_PATH_ATTR);
@@ -103,6 +104,76 @@ function markMiniChatHiddenControl(element) {
   if (element instanceof HTMLElement) {
     element.setAttribute(MINI_CHAT_HIDDEN_CONTROL_ATTR, "true");
   }
+}
+
+function markMiniChatTransparentSurfaces() {
+  const chatLog = queryAllSafe(document, [
+    "aside#aside-chatting [role='log']",
+    "aside:has([role='log']) [role='log']",
+    "[role='log']"
+  ]).find((element) => element instanceof HTMLElement);
+
+  for (
+    let current = chatLog, depth = 0;
+    current instanceof HTMLElement && current !== document.body && depth < 12;
+    current = current.parentElement, depth += 1
+  ) {
+    current.setAttribute(MINI_CHAT_TRANSPARENT_SURFACE_ATTR, "true");
+  }
+}
+
+function findMiniChatNativeHeader() {
+  const knownHeader =
+    typeof findChatHeaderTarget === "function"
+      ? findChatHeaderTarget({ includeHidden: true })
+      : null;
+
+  if (knownHeader instanceof HTMLElement) {
+    return knownHeader;
+  }
+
+  const chatLog = queryAllSafe(document, [
+    "aside#aside-chatting [role='log']",
+    "aside:has([role='log']) [role='log']",
+    "[role='log']"
+  ]).find((element) => element instanceof HTMLElement);
+  const chatAside = chatLog?.closest("aside#aside-chatting, aside");
+
+  if (!(chatLog instanceof HTMLElement) || !(chatAside instanceof HTMLElement)) {
+    return null;
+  }
+
+  let logBranch = chatLog;
+
+  while (logBranch.parentElement && logBranch.parentElement !== chatAside) {
+    logBranch = logBranch.parentElement;
+  }
+
+  for (
+    let candidate = logBranch.previousElementSibling;
+    candidate instanceof HTMLElement;
+    candidate = candidate.previousElementSibling
+  ) {
+    const text = getCompactText(candidate);
+    const controlCount = getMiniChatActionControls(candidate).length;
+    const hasExactChatTitle = [candidate, ...candidate.querySelectorAll(
+      "h1, h2, h3, strong, [class*='title' i], [class*='text' i]"
+    )].some((element) => getCompactText(element) === "채팅");
+    const hasNestedChatUi = Boolean(
+      candidate.querySelector("[role='log'], textarea, input, [contenteditable='true'], [role='textbox']")
+    );
+
+    if (
+      !hasNestedChatUi &&
+      text.startsWith("채팅") &&
+      hasExactChatTitle &&
+      (candidate.tagName === "HEADER" || controlCount >= 2 || /header/i.test(getClassName(candidate)))
+    ) {
+      return candidate;
+    }
+  }
+
+  return null;
 }
 
 function markNonChatPanel(element) {
@@ -510,6 +581,10 @@ function annotateMiniChatHiddenControls() {
     element.removeAttribute(MINI_CHAT_HIDDEN_CONTROL_ATTR);
   }
 
+  for (const element of document.querySelectorAll(`[${MINI_CHAT_TRANSPARENT_SURFACE_ATTR}]`)) {
+    element.removeAttribute(MINI_CHAT_TRANSPARENT_SURFACE_ATTR);
+  }
+
   for (const element of document.querySelectorAll(`[${MINI_CHAT_COMPACT_INPUT_ATTR}]`)) {
     element.removeAttribute(MINI_CHAT_COMPACT_INPUT_ATTR);
   }
@@ -525,6 +600,9 @@ function annotateMiniChatHiddenControls() {
   for (const element of document.querySelectorAll(`[${MINI_CHAT_INPUT_ONLY_HIDDEN_ATTR}]`)) {
     element.removeAttribute(MINI_CHAT_INPUT_ONLY_HIDDEN_ATTR);
   }
+
+  markMiniChatHiddenControl(findMiniChatNativeHeader());
+  markMiniChatTransparentSurfaces();
 
   const controls = getMiniChatActionControls();
   const donationControls = controls.filter((control) => getCompactText(control).includes("후원하기"));
@@ -1057,7 +1135,11 @@ function getChatBoxContrastBackgroundRgb() {
     ? getCurrentChatBoxTheme()
     : "light";
 
-  return getChatBoxEffectiveBackgroundRgb(currentOptions.chatBoxColor, theme);
+  return getChatBoxEffectiveBackgroundRgb(
+    currentOptions.chatBoxColor,
+    theme,
+    currentOptions.chatBoxOpacity
+  );
 }
 
 function getThemeBackdropRgb() {

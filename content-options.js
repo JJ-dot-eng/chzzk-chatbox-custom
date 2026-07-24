@@ -42,57 +42,27 @@ function hexToRgba(hexColor, alpha) {
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }
 
-function clampRatio(value) {
-  return Math.max(0, Math.min(1, value));
-}
-
 function getChatBoxBackdropRgb(theme) {
   return theme === "dark"
     ? { red: 16, green: 20, blue: 24 }
     : { red: 255, green: 255, blue: 255 };
 }
 
-function getChatBoxLuminance(color) {
-  const channels = [color.red, color.green, color.blue].map((channel) => {
-    const normalized = channel / 255;
-
-    return normalized <= 0.03928
-      ? normalized / 12.92
-      : ((normalized + 0.055) / 1.055) ** 2.4;
-  });
-
-  return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
-}
-
-function getChatBoxContrastRatio(firstColor, secondColor) {
-  const first = getChatBoxLuminance(firstColor);
-  const second = getChatBoxLuminance(secondColor);
-
-  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
-}
-
-function getChatBoxAlpha(hexColor, theme, { hover = false } = {}) {
-  const boxColor = hexToRgb(hexColor);
-  const backdrop = getChatBoxBackdropRgb(theme);
-  const contrast = getChatBoxContrastRatio(boxColor, backdrop);
-  const progress = clampRatio(
-    (contrast - CHAT_BOX_ALPHA_CONTRAST_START) /
-    (CHAT_BOX_ALPHA_CONTRAST_END - CHAT_BOX_ALPHA_CONTRAST_START)
-  );
-  const alpha = CHAT_BOX_ALPHA + progress * (CHAT_BOX_ALPHA_MAX - CHAT_BOX_ALPHA);
+function getChatBoxAlpha(opacity, { hover = false } = {}) {
+  const alpha = normalizeChatBoxOpacity(opacity) / 100;
   const hoverAlpha = hover ? alpha + CHAT_BOX_HOVER_ALPHA_BONUS : alpha;
 
-  return Math.min(CHAT_BOX_ALPHA_MAX, hoverAlpha);
+  return Math.min(1, hoverAlpha);
 }
 
-function getChatBoxBackgroundColor(hexColor, theme, { hover = false } = {}) {
-  return hexToRgba(hexColor, Number(getChatBoxAlpha(hexColor, theme, { hover }).toFixed(2)));
+function getChatBoxBackgroundColor(hexColor, opacity, { hover = false } = {}) {
+  return hexToRgba(hexColor, Number(getChatBoxAlpha(opacity, { hover }).toFixed(2)));
 }
 
-function getChatBoxEffectiveBackgroundRgb(hexColor, theme) {
+function getChatBoxEffectiveBackgroundRgb(hexColor, theme, opacity) {
   const boxColor = hexToRgb(hexColor);
   const backdrop = getChatBoxBackdropRgb(theme);
-  const alpha = getChatBoxAlpha(hexColor, theme);
+  const alpha = getChatBoxAlpha(opacity);
 
   return {
     red: boxColor.red * alpha + backdrop.red * (1 - alpha),
@@ -194,10 +164,25 @@ function normalizeChatFontSizePt(value) {
   );
 }
 
+function normalizeChatBoxOpacity(value) {
+  return Math.round(clampNumber(
+    value,
+    CHAT_BOX_OPACITY_MIN,
+    CHAT_BOX_OPACITY_MAX,
+    CHAT_BOX_OPACITY_DEFAULT
+  ));
+}
+
 function normalizeOptions(options) {
   const legacyBoldText = options?.showBoldText === undefined && options?.showLargeText === true;
   const miniFloatingChatInputOnly = options?.miniFloatingChatInputOnly === true;
   const useChatTextColor = options?.useChatTextColor === true;
+  const normalizedChatBoxColor = normalizeHexColor(options?.chatBoxColor, DEFAULT_OPTIONS.chatBoxColor);
+  const chatBoxColor =
+    Number(options?.chatBoxColorDefaultRevision) >= CHAT_BOX_COLOR_DEFAULT_REVISION ||
+    normalizedChatBoxColor !== "#808080"
+      ? normalizedChatBoxColor
+      : DEFAULT_OPTIONS.chatBoxColor;
   const showNonChatPanels =
     options?.showNonChatPanels !== undefined
       ? options.showNonChatPanels !== false
@@ -231,7 +216,9 @@ function normalizeOptions(options) {
     useChatTextColor,
     chatTextColor: normalizeHexColor(options?.chatTextColor, DEFAULT_OPTIONS.chatTextColor),
     useNicknameColorForMessage: useChatTextColor && options?.useNicknameColorForMessage === true,
-    chatBoxColor: normalizeHexColor(options?.chatBoxColor, DEFAULT_OPTIONS.chatBoxColor)
+    chatBoxColor,
+    chatBoxColorDefaultRevision: CHAT_BOX_COLOR_DEFAULT_REVISION,
+    chatBoxOpacity: normalizeChatBoxOpacity(options?.chatBoxOpacity)
   };
 }
 

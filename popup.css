@@ -25,7 +25,7 @@ html[data-popup-theme="light"] {
   --radius: 12px;
   --radius-sm: 8px;
   --font: system-ui, -apple-system, "Segoe UI", sans-serif;
-  --preview-box: rgba(128, 128, 128, 0.18);
+  --preview-box: rgba(223, 223, 223, 1);
   --preview-text: #101418;
   --preview-font: 13px;
 }
@@ -53,7 +53,7 @@ html[data-popup-theme="dark"] {
   --switch-thumb-shadow: 0 1px 4px rgba(0, 0, 0, 0.28);
   --status-idle-ring: rgba(139, 151, 168, 0.14);
   --chip-ring: #ffffff;
-  --preview-box: rgba(128, 128, 128, 0.22);
+  --preview-box: rgba(223, 223, 223, 1);
   --preview-text: #eef2f7;
 }
 

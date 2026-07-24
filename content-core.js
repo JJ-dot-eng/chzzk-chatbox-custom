@@ -35,15 +35,15 @@ function getCurrentChatBoxTheme() {
 }
 
 function syncChatBoxColorVariables() {
-  const theme = getCurrentChatBoxTheme();
-
   document.documentElement.style.setProperty(
     "--chzzk-chat-ui-toggle-box-bg",
-    getChatBoxBackgroundColor(currentOptions.chatBoxColor, theme)
+    getChatBoxBackgroundColor(currentOptions.chatBoxColor, currentOptions.chatBoxOpacity)
   );
   document.documentElement.style.setProperty(
     "--chzzk-chat-ui-toggle-box-bg-hover",
-    getChatBoxBackgroundColor(currentOptions.chatBoxColor, theme, { hover: true })
+    getChatBoxBackgroundColor(currentOptions.chatBoxColor, currentOptions.chatBoxOpacity, {
+      hover: true
+    })
   );
 }
 
@@ -60,6 +60,8 @@ function applyOptions(options, { markAsReady = true, cache = true, source = "dir
 
   document.documentElement.dataset.chzzkChatUiToggleVersion = SCRIPT_VERSION;
   document.documentElement.dataset.chzzkChatUiToggleChatBoxColor = currentOptions.chatBoxColor;
+  document.documentElement.dataset.chzzkChatUiToggleChatBoxOpacity =
+    String(currentOptions.chatBoxOpacity);
   document.documentElement.dataset.chzzkChatUiToggleChatTextColor = currentOptions.chatTextColor;
   document.documentElement.dataset.chzzkChatUiToggleChatFontSizePt =
     String(currentOptions.chatFontSizePt);

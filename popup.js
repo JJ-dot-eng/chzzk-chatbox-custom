@@ -2,10 +2,11 @@ const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const PRESET_STORAGE_KEY = "chzzkChatUiToggleCustomPreset";
 const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
 const UPDATE_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_UPDATE_OPTIONS";
-const CONTENT_VERSION = "0.6.2";
+const CONTENT_VERSION = "0.6.5";
 const POPUP_THEME_FALLBACK = "light";
 
-const DEFAULT_CHAT_BOX_COLOR = "#808080";
+const DEFAULT_CHAT_BOX_COLOR = "#dfdfdf";
+const CHAT_BOX_COLOR_DEFAULT_REVISION = 2;
 const DEFAULT_CHAT_TEXT_COLOR = "#101418";
 const MINI_CHAT_MIN_WIDTH = 280;
 const MINI_CHAT_MIN_HEIGHT = 28;
@@ -21,14 +22,13 @@ const MINI_CHAT_SCALE_DEFAULT = 100;
 const CHAT_FONT_SIZE_PT_MIN = 8;
 const CHAT_FONT_SIZE_PT_MAX = 36;
 const CHAT_FONT_SIZE_PT_DEFAULT = 13;
-const CHAT_BOX_ALPHA = 0.18;
-const CHAT_BOX_ALPHA_MAX = 0.88;
-const CHAT_BOX_ALPHA_CONTRAST_START = 3;
-const CHAT_BOX_ALPHA_CONTRAST_END = 12;
+const CHAT_BOX_OPACITY_MIN = 0;
+const CHAT_BOX_OPACITY_MAX = 100;
+const CHAT_BOX_OPACITY_DEFAULT = 100;
 const CHAT_BOX_HOVER_ALPHA_BONUS = 0.08;
 
 const COLOR_CHIPS = [
-  { id: "gray", hex: "#808080" },
+  { id: "gray", hex: "#dfdfdf" },
   { id: "green", hex: "#00c471" },
   { id: "blue", hex: "#4b8bff" },
   { id: "purple", hex: "#8b5cf6" },
@@ -78,7 +78,9 @@ const DEFAULT_OPTIONS = {
   useChatTextColor: false,
   chatTextColor: DEFAULT_CHAT_TEXT_COLOR,
   useNicknameColorForMessage: false,
-  chatBoxColor: DEFAULT_CHAT_BOX_COLOR
+  chatBoxColor: DEFAULT_CHAT_BOX_COLOR,
+  chatBoxColorDefaultRevision: CHAT_BOX_COLOR_DEFAULT_REVISION,
+  chatBoxOpacity: CHAT_BOX_OPACITY_DEFAULT
 };
 
 const PRESET_DEFINITIONS = {
@@ -125,6 +127,7 @@ const boxColorChips = document.getElementById("boxColorChips");
 const textColorChips = document.getElementById("textColorChips");
 const nicknameColorRow = document.getElementById("nicknameColorRow");
 const nicknameColorOption = document.getElementById("useNicknameColorForMessage");
+const chatBoxOpacityValue = document.getElementById("chatBoxOpacityValue");
 const chatFontSizeValue = document.getElementById("chatFontSizePtValue");
 const nicknameFontSizeValue = document.getElementById("nicknameFontSizePtValue");
 const colorPickerTitle = document.getElementById("colorPickerTitle");
@@ -247,10 +250,25 @@ function normalizeChatFontSizePt(value) {
   );
 }
 
+function normalizeChatBoxOpacity(value) {
+  return Math.round(clampNumber(
+    value,
+    CHAT_BOX_OPACITY_MIN,
+    CHAT_BOX_OPACITY_MAX,
+    CHAT_BOX_OPACITY_DEFAULT
+  ));
+}
+
 function normalizeOptions(options) {
   const legacyBoldText = options?.showBoldText === undefined && options?.showLargeText === true;
   const miniFloatingChatInputOnly = options?.miniFloatingChatInputOnly === true;
   const useChatTextColor = options?.useChatTextColor === true;
+  const normalizedChatBoxColor = normalizeHexColor(options?.chatBoxColor, DEFAULT_CHAT_BOX_COLOR);
+  const chatBoxColor =
+    Number(options?.chatBoxColorDefaultRevision) >= CHAT_BOX_COLOR_DEFAULT_REVISION ||
+    normalizedChatBoxColor !== "#808080"
+      ? normalizedChatBoxColor
+      : DEFAULT_CHAT_BOX_COLOR;
   const showNonChatPanels =
     options?.showNonChatPanels !== undefined
       ? options.showNonChatPanels !== false
@@ -284,7 +302,9 @@ function normalizeOptions(options) {
     useChatTextColor,
     chatTextColor: normalizeHexColor(options?.chatTextColor, DEFAULT_CHAT_TEXT_COLOR),
     useNicknameColorForMessage: useChatTextColor && options?.useNicknameColorForMessage === true,
-    chatBoxColor: normalizeHexColor(options?.chatBoxColor, DEFAULT_CHAT_BOX_COLOR)
+    chatBoxColor,
+    chatBoxColorDefaultRevision: CHAT_BOX_COLOR_DEFAULT_REVISION,
+    chatBoxOpacity: normalizeChatBoxOpacity(options?.chatBoxOpacity)
   };
 }
 
@@ -582,6 +602,7 @@ function syncControlsFromOptions() {
 
   chatFontSizeValue.textContent = `${currentOptions.chatFontSizePt}pt`;
   nicknameFontSizeValue.textContent = `${currentOptions.nicknameFontSizePt}pt`;
+  chatBoxOpacityValue.textContent = `${currentOptions.chatBoxOpacity}%`;
   syncNicknameColorDependencies();
   syncConditionalBlocks();
   renderColorChips();
@@ -609,7 +630,7 @@ function syncPreview() {
     currentOptions.showChatBoxes
       ? getChatBoxBackgroundColor(
         currentOptions.chatBoxColor,
-        normalizePopupTheme(document.documentElement.dataset.popupTheme)
+        currentOptions.chatBoxOpacity
       )
       : "transparent"
   );
@@ -667,51 +688,15 @@ function hexToRgba(hexColor, alpha) {
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }
 
-function clampRatio(value) {
-  return Math.max(0, Math.min(1, value));
-}
-
-function getChatBoxBackdropRgb(theme) {
-  return theme === "dark"
-    ? { red: 16, green: 20, blue: 24 }
-    : { red: 255, green: 255, blue: 255 };
-}
-
-function getChatBoxLuminance(color) {
-  const channels = [color.red, color.green, color.blue].map((channel) => {
-    const normalized = channel / 255;
-
-    return normalized <= 0.03928
-      ? normalized / 12.92
-      : ((normalized + 0.055) / 1.055) ** 2.4;
-  });
-
-  return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
-}
-
-function getChatBoxContrastRatio(firstColor, secondColor) {
-  const first = getChatBoxLuminance(firstColor);
-  const second = getChatBoxLuminance(secondColor);
-
-  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
-}
-
-function getChatBoxAlpha(hexColor, theme, { hover = false } = {}) {
-  const boxColor = hexToRgb(hexColor);
-  const backdrop = getChatBoxBackdropRgb(theme);
-  const contrast = getChatBoxContrastRatio(boxColor, backdrop);
-  const progress = clampRatio(
-    (contrast - CHAT_BOX_ALPHA_CONTRAST_START) /
-    (CHAT_BOX_ALPHA_CONTRAST_END - CHAT_BOX_ALPHA_CONTRAST_START)
-  );
-  const alpha = CHAT_BOX_ALPHA + progress * (CHAT_BOX_ALPHA_MAX - CHAT_BOX_ALPHA);
+function getChatBoxAlpha(opacity, { hover = false } = {}) {
+  const alpha = normalizeChatBoxOpacity(opacity) / 100;
   const hoverAlpha = hover ? alpha + CHAT_BOX_HOVER_ALPHA_BONUS : alpha;
 
-  return Math.min(CHAT_BOX_ALPHA_MAX, hoverAlpha);
+  return Math.min(1, hoverAlpha);
 }
 
-function getChatBoxBackgroundColor(hexColor, theme, { hover = false } = {}) {
-  return hexToRgba(hexColor, Number(getChatBoxAlpha(hexColor, theme, { hover }).toFixed(2)));
+function getChatBoxBackgroundColor(hexColor, opacity, { hover = false } = {}) {
+  return hexToRgba(hexColor, Number(getChatBoxAlpha(opacity, { hover }).toFixed(2)));
 }
 
 function renderColorChips() {
@@ -1226,7 +1211,15 @@ function handleOptionInput(event) {
   if (input.type === "checkbox") {
     setOptionValue(key, input.checked);
   } else if (input.type === "range") {
-    setOptionValue(key, normalizeChatFontSizePt(input.value));
+    const value = key === "chatBoxOpacity"
+      ? normalizeChatBoxOpacity(input.value)
+      : normalizeChatFontSizePt(input.value);
+
+    setOptionValue(key, value);
+
+    if (key === "chatBoxOpacity") {
+      chatBoxOpacityValue.textContent = `${currentOptions.chatBoxOpacity}%`;
+    }
 
     if (key === "chatFontSizePt") {
       chatFontSizeValue.textContent = `${currentOptions.chatFontSizePt}pt`;
@@ -1275,7 +1268,9 @@ function bindEvents() {
   });
 
   app.addEventListener("input", (event) => {
-    if (event.target.matches('[data-option="chatFontSizePt"], [data-option="nicknameFontSizePt"]')) {
+    if (event.target.matches(
+      '[data-option="chatBoxOpacity"], [data-option="chatFontSizePt"], [data-option="nicknameFontSizePt"]'
+    )) {
       handleOptionInput(event);
     }
   });

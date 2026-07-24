@@ -1,4 +1,4 @@
-var SCRIPT_VERSION = "0.6.2";
+var SCRIPT_VERSION = "0.6.5";
 var GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 var CHZZK_CHAT_UI_TOGGLE_SHOULD_START = !window[GLOBAL_KEY];
 
@@ -35,11 +35,8 @@ var MINI_CHAT_FRAME_ID = "chzzk-chat-ui-toggle-mini-chat-frame";
 var MINI_CHAT_BUTTON_ID = "chzzk-chat-ui-toggle-mini-chat-button";
 var MINI_CHAT_BUTTON_ICON_CLASS = "chzzk-chat-ui-toggle-mini-chat-button__icon";
 var MINI_CHAT_PANEL_CONTROLS_CLASS = "chzzk-chat-ui-toggle-mini-chat__controls";
-var MINI_CHAT_PANEL_SCALE_CLASS = "chzzk-chat-ui-toggle-mini-chat__scale";
-var MINI_CHAT_PANEL_SCALE_BUTTON_CLASS = "chzzk-chat-ui-toggle-mini-chat__scale-button";
-var MINI_CHAT_PANEL_SCALE_VALUE_CLASS = "chzzk-chat-ui-toggle-mini-chat__scale-value";
-var MINI_CHAT_PANEL_MODE_CLASS = "chzzk-chat-ui-toggle-mini-chat__mode";
-var MINI_CHAT_PANEL_INPUT_ONLY_CLASS = "chzzk-chat-ui-toggle-mini-chat__input-only";
+var MINI_CHAT_PANEL_DRAG_HANDLE_CLASS = "chzzk-chat-ui-toggle-mini-chat__drag-handle";
+var MINI_CHAT_PANEL_ACTIONS_CLASS = "chzzk-chat-ui-toggle-mini-chat__actions";
 var MINI_CHAT_PANEL_MINIMIZE_CLASS = "chzzk-chat-ui-toggle-mini-chat__minimize";
 var MINI_CHAT_PANEL_CLOSE_CLASS = "chzzk-chat-ui-toggle-mini-chat__close";
 var MINI_CHAT_PANEL_RESIZE_CLASS = "chzzk-chat-ui-toggle-mini-chat__resize";
@@ -59,6 +56,7 @@ var LOCAL_ONLY_CHAT_ROW_ATTR = "data-chzzk-chat-ui-toggle-local-only-row";
 var LOCAL_ONLY_CHAT_MESSAGE_ID_ATTR = "data-chzzk-chat-ui-toggle-local-only-message-id";
 var MINI_CHAT_EMBED_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-embed";
 var MINI_CHAT_HIDDEN_CONTROL_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-hidden-control";
+var MINI_CHAT_TRANSPARENT_SURFACE_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-transparent-surface";
 var NON_CHAT_PANEL_ATTR = "data-chzzk-chat-ui-toggle-non-chat-panel";
 var MINI_CHAT_COMPACT_INPUT_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-compact-input";
 var MINI_CHAT_INPUT_ONLY_PATH_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-path";
@@ -93,11 +91,11 @@ var CHAT_FONT_SIZE_PT_MIN = 8;
 var CHAT_FONT_SIZE_PT_MAX = 36;
 var CHAT_FONT_SIZE_PT_DEFAULT = 13;
 var CHAT_TEXT_COLOR_DEFAULT = "#101418";
-var CHAT_BOX_ALPHA = 0.18;
-var CHAT_BOX_ALPHA_MAX = 0.88;
-var CHAT_BOX_ALPHA_CONTRAST_START = 3;
-var CHAT_BOX_ALPHA_CONTRAST_END = 12;
+var CHAT_BOX_OPACITY_MIN = 0;
+var CHAT_BOX_OPACITY_MAX = 100;
+var CHAT_BOX_OPACITY_DEFAULT = 100;
 var CHAT_BOX_HOVER_ALPHA_BONUS = 0.08;
+var CHAT_BOX_COLOR_DEFAULT_REVISION = 2;
 var AUTO_CONTRAST_MIN_RATIO = 3;
 var AUTO_CONTRAST_NEAR_COLOR_DISTANCE = 96;
 var AUTO_CONTRAST_NEUTRAL_CHANNEL_DELTA = 32;
@@ -156,7 +154,9 @@ var DEFAULT_OPTIONS = {
   useChatTextColor: false,
   chatTextColor: CHAT_TEXT_COLOR_DEFAULT,
   useNicknameColorForMessage: false,
-  chatBoxColor: "#808080"
+  chatBoxColor: "#dfdfdf",
+  chatBoxColorDefaultRevision: CHAT_BOX_COLOR_DEFAULT_REVISION,
+  chatBoxOpacity: CHAT_BOX_OPACITY_DEFAULT
 };
 
 var DATASET_KEYS = {
