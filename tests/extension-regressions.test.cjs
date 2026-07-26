@@ -4003,13 +4003,16 @@ test("오디오 설정은 쉬운 강도 프리셋을 우선하고 전문 파라�
       advancedOpen: document.querySelector(".audio-advanced")?.open,
       activePreset: document.querySelector("[data-audio-preset].is-active")?.dataset.audioPreset,
       status: document.getElementById("audioPresetStatus")?.textContent,
-      gainLabel: document.querySelector('label[for="audioCompressorGain"]')?.textContent
+      gainLabel: document.querySelector('label[for="audioCompressorGain"]')?.textContent,
+      audioViewText: document.querySelector('[data-view="audio"]')?.textContent
     }));
 
     assert.equal(initial.advancedOpen, false);
     assert.equal(initial.activePreset, "strong");
     assert.equal(initial.status, "강하게");
     assert.equal(initial.gainLabel, "보정 음량");
+    assert.match(initial.audioViewText, /오디오 개선/);
+    assert.doesNotMatch(initial.audioViewText, /압축|컴프레서/);
 
     await harness.page.click('[data-audio-preset="balanced"]');
     await harness.page.waitForFunction((storageKey) => {
@@ -4072,7 +4075,7 @@ test("오디오 설정은 쉬운 강도 프리셋을 우선하고 전문 파라�
   }
 });
 
-test("오디오 컴프레서는 주 영상에 설정값을 적용하고 끄면 원음 경로로 우회한다", { timeout: 15_000 }, async () => {
+test("오디오 개선은 주 영상에 설정값을 적용하고 끄면 원음 경로로 우회한다", { timeout: 15_000 }, async () => {
   const harness = await createHarness({
     html: `<!doctype html>
       <html lang="ko">

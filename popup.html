@@ -97,8 +97,8 @@
                 <span>가독성 강화</span>
                 <input type="checkbox" data-quick-bundle="readability">
               </label>
-              <label class="quick-toggle" title="큰 소리를 줄이고 작은 소리와의 차이를 완화합니다">
-                <span>오디오 압축</span>
+              <label class="quick-toggle" title="영상 소리를 더 편안하고 고르게 들려줍니다">
+                <span>오디오 개선</span>
                 <input type="checkbox" data-option="useAudioCompressor">
               </label>
             </div>
@@ -125,7 +125,7 @@
               </button>
               <button type="button" class="nav-tile" data-goto="audio">
                 <span class="nav-tile__label">오디오</span>
-                <span class="nav-tile__hint">컴프레서·게인</span>
+                <span class="nav-tile__hint">소리 균형·음량</span>
               </button>
             </div>
           </div>
@@ -306,8 +306,8 @@
             <div class="setting-block">
               <label class="setting-row">
                 <span class="setting-row__text">
-                  <strong>소리 크기 균형</strong>
-                  <small>갑자기 커지는 소리를 줄입니다</small>
+                  <strong>오디오 개선</strong>
+                  <small>영상 소리를 더 편안하고 고르게 들려줍니다</small>
                 </span>
                 <input type="checkbox" data-option="useAudioCompressor">
               </label>
@@ -317,7 +317,7 @@
                   <span>효과 강도</span>
                   <output id="audioPresetStatus">강하게</output>
                 </div>
-                <div class="audio-preset-group" role="group" aria-label="오디오 압축 효과 강도">
+                <div class="audio-preset-group" role="group" aria-label="오디오 개선 효과 강도">
                   <button type="button" class="audio-preset-button" data-audio-preset="natural" aria-pressed="false">자연스럽게</button>
                   <button type="button" class="audio-preset-button" data-audio-preset="balanced" aria-pressed="false">균형</button>
                   <button type="button" class="audio-preset-button" data-audio-preset="strong" aria-pressed="true">강하게</button>
@@ -329,7 +329,7 @@
                   <label for="audioCompressorGain">보정 음량</label>
                   <output id="audioCompressorGainValue" for="audioCompressorGain">100%</output>
                 </div>
-                <small class="audio-control-help">압축 후 작아진 전체 음량을 보충합니다</small>
+                <small class="audio-control-help">개선 과정에서 작아진 전체 음량을 보충합니다</small>
                 <input
                   type="range"
                   id="audioCompressorGain"
@@ -348,19 +348,19 @@
               <div class="audio-advanced__content">
                 <div class="slider-block">
                   <div class="slider-block__head">
-                    <label for="audioCompressorThreshold">압축 시작 음량</label>
+                    <label for="audioCompressorThreshold">개선 시작 음량</label>
                     <output id="audioCompressorThresholdValue" for="audioCompressorThreshold">-50dB</output>
                   </div>
-                  <small class="audio-control-help">낮을수록 더 많은 소리에 압축을 적용합니다</small>
-                  <input type="range" id="audioCompressorThreshold" data-option="audioCompressorThreshold" min="-100" max="0" step="1" value="-50" aria-label="압축 시작 음량">
+                  <small class="audio-control-help">낮을수록 더 많은 소리에 개선 효과를 적용합니다</small>
+                  <input type="range" id="audioCompressorThreshold" data-option="audioCompressorThreshold" min="-100" max="0" step="1" value="-50" aria-label="개선 시작 음량">
                 </div>
                 <div class="slider-block">
                   <div class="slider-block__head">
-                    <label for="audioCompressorKnee">압축 적용 방식</label>
+                    <label for="audioCompressorKnee">개선 적용 방식</label>
                     <output id="audioCompressorKneeValue" for="audioCompressorKnee">40dB</output>
                   </div>
-                  <small class="audio-control-help">높을수록 압축이 부드럽게 시작됩니다</small>
-                  <input type="range" id="audioCompressorKnee" data-option="audioCompressorKnee" min="0" max="40" step="1" value="40" aria-label="압축 적용 방식">
+                  <small class="audio-control-help">높을수록 개선 효과가 부드럽게 시작됩니다</small>
+                  <input type="range" id="audioCompressorKnee" data-option="audioCompressorKnee" min="0" max="40" step="1" value="40" aria-label="개선 적용 방식">
                 </div>
                 <div class="slider-block">
                   <div class="slider-block__head">
@@ -383,7 +383,7 @@
                     <label for="audioCompressorRelease">원래 음량 복귀 속도</label>
                     <output id="audioCompressorReleaseValue" for="audioCompressorRelease">0.25s</output>
                   </div>
-                  <small class="audio-control-help">짧을수록 압축이 빠르게 풀립니다</small>
+                  <small class="audio-control-help">짧을수록 개선 효과가 빠르게 풀립니다</small>
                   <input type="range" id="audioCompressorRelease" data-option="audioCompressorRelease" min="0" max="1" step="0.01" value="0.25" aria-label="원래 음량 복귀 속도">
                 </div>
                 <button type="button" class="audio-reset-button" id="audioResetButton">오디오 기본값으로 되돌리기</button>
