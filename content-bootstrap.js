@@ -164,7 +164,7 @@ var DEFAULT_OPTIONS = {
   audioCompressorRatio: 12,
   audioCompressorAttack: 0,
   audioCompressorRelease: 0.25,
-  audioCompressorGain: 1
+  audioCompressorGain: 1.1
 };
 
 var DATASET_KEYS = {

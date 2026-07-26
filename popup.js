@@ -87,7 +87,7 @@ const DEFAULT_OPTIONS = {
   audioCompressorRatio: 12,
   audioCompressorAttack: 0,
   audioCompressorRelease: 0.25,
-  audioCompressorGain: 1
+  audioCompressorGain: 1.1
 };
 
 const PRESET_DEFINITIONS = {
@@ -331,7 +331,7 @@ function normalizeOptions(options) {
     audioCompressorRatio: clampNumber(options?.audioCompressorRatio, 1, 20, 12),
     audioCompressorAttack: clampNumber(options?.audioCompressorAttack, 0, 1, 0),
     audioCompressorRelease: clampNumber(options?.audioCompressorRelease, 0, 1, 0.25),
-    audioCompressorGain: clampNumber(options?.audioCompressorGain, 0, 2, 1)
+    audioCompressorGain: clampNumber(options?.audioCompressorGain, 0, 2, 1.1)
   };
 }
 
@@ -1250,7 +1250,7 @@ function handleOptionInput(event) {
       audioCompressorRatio: [1, 20, 12],
       audioCompressorAttack: [0, 1, 0],
       audioCompressorRelease: [0, 1, 0.25],
-      audioCompressorGain: [0, 2, 1]
+      audioCompressorGain: [0, 2, 1.1]
     };
     const value = key === "chatBoxOpacity"
       ? normalizeChatBoxOpacity(input.value)
