@@ -2,7 +2,7 @@ const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const PRESET_STORAGE_KEY = "chzzkChatUiToggleCustomPreset";
 const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
 const UPDATE_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_UPDATE_OPTIONS";
-const CONTENT_VERSION = "0.6.5";
+const CONTENT_VERSION = "0.7.0";
 const POPUP_THEME_FALLBACK = "light";
 
 const DEFAULT_CHAT_BOX_COLOR = "#dfdfdf";
@@ -80,7 +80,14 @@ const DEFAULT_OPTIONS = {
   useNicknameColorForMessage: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR,
   chatBoxColorDefaultRevision: CHAT_BOX_COLOR_DEFAULT_REVISION,
-  chatBoxOpacity: CHAT_BOX_OPACITY_DEFAULT
+  chatBoxOpacity: CHAT_BOX_OPACITY_DEFAULT,
+  useAudioCompressor: false,
+  audioCompressorThreshold: -50,
+  audioCompressorKnee: 40,
+  audioCompressorRatio: 12,
+  audioCompressorAttack: 0,
+  audioCompressorRelease: 0.25,
+  audioCompressorGain: 1
 };
 
 const PRESET_DEFINITIONS = {
@@ -109,7 +116,14 @@ const PRESET_DEFINITIONS = {
 const PRESET_EXCLUDED_OPTION_KEYS = new Set([
   "useGuestChatFrame",
   "useMiniFloatingChat",
-  "miniFloatingChatFullscreenOnly"
+  "miniFloatingChatFullscreenOnly",
+  "useAudioCompressor",
+  "audioCompressorThreshold",
+  "audioCompressorKnee",
+  "audioCompressorRatio",
+  "audioCompressorAttack",
+  "audioCompressorRelease",
+  "audioCompressorGain"
 ]);
 
 const app = document.getElementById("app");
@@ -130,6 +144,12 @@ const nicknameColorOption = document.getElementById("useNicknameColorForMessage"
 const chatBoxOpacityValue = document.getElementById("chatBoxOpacityValue");
 const chatFontSizeValue = document.getElementById("chatFontSizePtValue");
 const nicknameFontSizeValue = document.getElementById("nicknameFontSizePtValue");
+const audioCompressorGainValue = document.getElementById("audioCompressorGainValue");
+const audioCompressorThresholdValue = document.getElementById("audioCompressorThresholdValue");
+const audioCompressorKneeValue = document.getElementById("audioCompressorKneeValue");
+const audioCompressorRatioValue = document.getElementById("audioCompressorRatioValue");
+const audioCompressorAttackValue = document.getElementById("audioCompressorAttackValue");
+const audioCompressorReleaseValue = document.getElementById("audioCompressorReleaseValue");
 const colorPickerTitle = document.getElementById("colorPickerTitle");
 const colorPickerSwatch = document.getElementById("colorPickerSwatch");
 const colorPickerHex = document.getElementById("chatTextColorHex");
@@ -304,7 +324,14 @@ function normalizeOptions(options) {
     useNicknameColorForMessage: useChatTextColor && options?.useNicknameColorForMessage === true,
     chatBoxColor,
     chatBoxColorDefaultRevision: CHAT_BOX_COLOR_DEFAULT_REVISION,
-    chatBoxOpacity: normalizeChatBoxOpacity(options?.chatBoxOpacity)
+    chatBoxOpacity: normalizeChatBoxOpacity(options?.chatBoxOpacity),
+    useAudioCompressor: options?.useAudioCompressor === true,
+    audioCompressorThreshold: clampNumber(options?.audioCompressorThreshold, -100, 0, -50),
+    audioCompressorKnee: clampNumber(options?.audioCompressorKnee, 0, 40, 40),
+    audioCompressorRatio: clampNumber(options?.audioCompressorRatio, 1, 20, 12),
+    audioCompressorAttack: clampNumber(options?.audioCompressorAttack, 0, 1, 0),
+    audioCompressorRelease: clampNumber(options?.audioCompressorRelease, 0, 1, 0.25),
+    audioCompressorGain: clampNumber(options?.audioCompressorGain, 0, 2, 1)
   };
 }
 
@@ -603,6 +630,12 @@ function syncControlsFromOptions() {
   chatFontSizeValue.textContent = `${currentOptions.chatFontSizePt}pt`;
   nicknameFontSizeValue.textContent = `${currentOptions.nicknameFontSizePt}pt`;
   chatBoxOpacityValue.textContent = `${currentOptions.chatBoxOpacity}%`;
+  audioCompressorGainValue.textContent = `${Math.round(currentOptions.audioCompressorGain * 100)}%`;
+  audioCompressorThresholdValue.textContent = `${currentOptions.audioCompressorThreshold}dB`;
+  audioCompressorKneeValue.textContent = `${currentOptions.audioCompressorKnee}dB`;
+  audioCompressorRatioValue.textContent = `${currentOptions.audioCompressorRatio}:1`;
+  audioCompressorAttackValue.textContent = `${currentOptions.audioCompressorAttack}s`;
+  audioCompressorReleaseValue.textContent = `${currentOptions.audioCompressorRelease}s`;
   syncNicknameColorDependencies();
   syncConditionalBlocks();
   renderColorChips();
@@ -1211,9 +1244,19 @@ function handleOptionInput(event) {
   if (input.type === "checkbox") {
     setOptionValue(key, input.checked);
   } else if (input.type === "range") {
+    const audioRanges = {
+      audioCompressorThreshold: [-100, 0, -50],
+      audioCompressorKnee: [0, 40, 40],
+      audioCompressorRatio: [1, 20, 12],
+      audioCompressorAttack: [0, 1, 0],
+      audioCompressorRelease: [0, 1, 0.25],
+      audioCompressorGain: [0, 2, 1]
+    };
     const value = key === "chatBoxOpacity"
       ? normalizeChatBoxOpacity(input.value)
-      : normalizeChatFontSizePt(input.value);
+      : audioRanges[key]
+        ? clampNumber(input.value, ...audioRanges[key])
+        : normalizeChatFontSizePt(input.value);
 
     setOptionValue(key, value);
 

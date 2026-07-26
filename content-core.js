@@ -116,6 +116,7 @@ function applyOptions(options, { markAsReady = true, cache = true, source = "dir
   annotateNonChatPanels();
   annotateMiniChatHiddenControls();
   scheduleLargeTextLayoutSync();
+  scheduleAudioCompressorSync(0);
 
   if (markAsReady) {
     markReady();
@@ -132,7 +133,10 @@ function getStatus() {
     optionsLoadError: lastOptionsLoadError,
     guestChatTheme: currentGuestChatTheme,
     detectedTheme: document.documentElement.dataset.chzzkChatUiToggleDetectedTheme || null,
-    detectedThemeSource: document.documentElement.dataset.chzzkChatUiToggleDetectedThemeSource || null
+    detectedThemeSource: document.documentElement.dataset.chzzkChatUiToggleDetectedThemeSource || null,
+    audioCompressorState:
+      document.documentElement.dataset[AUDIO_COMPRESSOR_STATE_DATASET_KEY] || "off",
+    audioCompressorError: audioCompressorState.lastError || null
   };
 }
 

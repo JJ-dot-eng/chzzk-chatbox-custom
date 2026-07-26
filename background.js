@@ -67,7 +67,14 @@ const DEFAULT_OPTIONS = {
   useNicknameColorForMessage: false,
   chatBoxColor: DEFAULT_CHAT_BOX_COLOR,
   chatBoxColorDefaultRevision: CHAT_BOX_COLOR_DEFAULT_REVISION,
-  chatBoxOpacity: CHAT_BOX_OPACITY_DEFAULT
+  chatBoxOpacity: CHAT_BOX_OPACITY_DEFAULT,
+  useAudioCompressor: false,
+  audioCompressorThreshold: -50,
+  audioCompressorKnee: 40,
+  audioCompressorRatio: 12,
+  audioCompressorAttack: 0,
+  audioCompressorRelease: 0.25,
+  audioCompressorGain: 1
 };
 
 const guestChatThemesByTab = new Map();
@@ -138,7 +145,14 @@ function normalizeOptions(options) {
     useNicknameColorForMessage: useChatTextColor && options?.useNicknameColorForMessage === true,
     chatBoxColor,
     chatBoxColorDefaultRevision: CHAT_BOX_COLOR_DEFAULT_REVISION,
-    chatBoxOpacity: normalizeChatBoxOpacity(options?.chatBoxOpacity)
+    chatBoxOpacity: normalizeChatBoxOpacity(options?.chatBoxOpacity),
+    useAudioCompressor: options?.useAudioCompressor === true,
+    audioCompressorThreshold: clampNumber(options?.audioCompressorThreshold, -100, 0, -50),
+    audioCompressorKnee: clampNumber(options?.audioCompressorKnee, 0, 40, 40),
+    audioCompressorRatio: clampNumber(options?.audioCompressorRatio, 1, 20, 12),
+    audioCompressorAttack: clampNumber(options?.audioCompressorAttack, 0, 1, 0),
+    audioCompressorRelease: clampNumber(options?.audioCompressorRelease, 0, 1, 0.25),
+    audioCompressorGain: clampNumber(options?.audioCompressorGain, 0, 2, 1)
   };
 }
 

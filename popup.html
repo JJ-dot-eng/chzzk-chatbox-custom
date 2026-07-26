@@ -97,6 +97,10 @@
                 <span>가독성 강화</span>
                 <input type="checkbox" data-quick-bundle="readability">
               </label>
+              <label class="quick-toggle" title="큰 소리를 줄이고 작은 소리와의 차이를 완화합니다">
+                <span>오디오 압축</span>
+                <input type="checkbox" data-option="useAudioCompressor">
+              </label>
             </div>
           </div>
 
@@ -118,6 +122,10 @@
               <button type="button" class="nav-tile" data-goto="buttons">
                 <span class="nav-tile__label">버튼</span>
                 <span class="nav-tile__hint">헤더·하단 아이콘</span>
+              </button>
+              <button type="button" class="nav-tile" data-goto="audio">
+                <span class="nav-tile__label">오디오</span>
+                <span class="nav-tile__hint">컴프레서·게인</span>
               </button>
             </div>
           </div>
@@ -286,6 +294,78 @@
               <span class="setting-row__text"><strong>설정 아이콘</strong><small>채팅 헤더</small></span>
               <input type="checkbox" data-option="showHeaderSettingsButton" id="showHeaderSettingsButton">
             </label>
+          </div>
+        </section>
+
+        <section class="view" data-view="audio" hidden aria-label="오디오 설정">
+          <header class="view-header">
+            <button type="button" class="back-btn" data-back aria-label="뒤로">‹</button>
+            <h2 class="view-header__title">오디오</h2>
+          </header>
+          <div class="card-list">
+            <div class="setting-block">
+              <label class="setting-row">
+                <span class="setting-row__text">
+                  <strong>오디오 컴프레서</strong>
+                  <small>큰 소리를 줄여 음량 차이를 완화</small>
+                </span>
+                <input type="checkbox" data-option="useAudioCompressor">
+              </label>
+
+              <div class="slider-block" data-when="useAudioCompressor">
+                <div class="slider-block__head">
+                  <span>출력 게인</span>
+                  <output id="audioCompressorGainValue" for="audioCompressorGain">100%</output>
+                </div>
+                <input
+                  type="range"
+                  id="audioCompressorGain"
+                  data-option="audioCompressorGain"
+                  min="0"
+                  max="2"
+                  step="0.05"
+                  value="1"
+                >
+              </div>
+            </div>
+
+            <div class="setting-block" data-when="useAudioCompressor">
+              <div class="slider-block is-visible">
+                <div class="slider-block__head">
+                  <span>임계값</span>
+                  <output id="audioCompressorThresholdValue" for="audioCompressorThreshold">-50dB</output>
+                </div>
+                <input type="range" id="audioCompressorThreshold" data-option="audioCompressorThreshold" min="-100" max="0" step="1" value="-50">
+              </div>
+              <div class="slider-block is-visible">
+                <div class="slider-block__head">
+                  <span>니</span>
+                  <output id="audioCompressorKneeValue" for="audioCompressorKnee">40dB</output>
+                </div>
+                <input type="range" id="audioCompressorKnee" data-option="audioCompressorKnee" min="0" max="40" step="1" value="40">
+              </div>
+              <div class="slider-block is-visible">
+                <div class="slider-block__head">
+                  <span>비율</span>
+                  <output id="audioCompressorRatioValue" for="audioCompressorRatio">12:1</output>
+                </div>
+                <input type="range" id="audioCompressorRatio" data-option="audioCompressorRatio" min="1" max="20" step="0.5" value="12">
+              </div>
+              <div class="slider-block is-visible">
+                <div class="slider-block__head">
+                  <span>어택</span>
+                  <output id="audioCompressorAttackValue" for="audioCompressorAttack">0s</output>
+                </div>
+                <input type="range" id="audioCompressorAttack" data-option="audioCompressorAttack" min="0" max="1" step="0.01" value="0">
+              </div>
+              <div class="slider-block is-visible">
+                <div class="slider-block__head">
+                  <span>릴리즈</span>
+                  <output id="audioCompressorReleaseValue" for="audioCompressorRelease">0.25s</output>
+                </div>
+                <input type="range" id="audioCompressorRelease" data-option="audioCompressorRelease" min="0" max="1" step="0.01" value="0.25">
+              </div>
+            </div>
           </div>
         </section>
 

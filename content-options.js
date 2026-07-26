@@ -218,7 +218,14 @@ function normalizeOptions(options) {
     useNicknameColorForMessage: useChatTextColor && options?.useNicknameColorForMessage === true,
     chatBoxColor,
     chatBoxColorDefaultRevision: CHAT_BOX_COLOR_DEFAULT_REVISION,
-    chatBoxOpacity: normalizeChatBoxOpacity(options?.chatBoxOpacity)
+    chatBoxOpacity: normalizeChatBoxOpacity(options?.chatBoxOpacity),
+    useAudioCompressor: options?.useAudioCompressor === true,
+    audioCompressorThreshold: clampNumber(options?.audioCompressorThreshold, -100, 0, -50),
+    audioCompressorKnee: clampNumber(options?.audioCompressorKnee, 0, 40, 40),
+    audioCompressorRatio: clampNumber(options?.audioCompressorRatio, 1, 20, 12),
+    audioCompressorAttack: clampNumber(options?.audioCompressorAttack, 0, 1, 0),
+    audioCompressorRelease: clampNumber(options?.audioCompressorRelease, 0, 1, 0.25),
+    audioCompressorGain: clampNumber(options?.audioCompressorGain, 0, 2, 1)
   };
 }
 

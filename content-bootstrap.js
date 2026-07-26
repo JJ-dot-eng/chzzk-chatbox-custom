@@ -1,4 +1,4 @@
-var SCRIPT_VERSION = "0.6.5";
+var SCRIPT_VERSION = "0.7.0";
 var GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 var CHZZK_CHAT_UI_TOGGLE_SHOULD_START = !window[GLOBAL_KEY];
 
@@ -120,6 +120,7 @@ var GUEST_CHAT_TOGGLE_BUTTON_ICON_CLASS = "chzzk-chat-ui-toggle-guest-chat-toggl
 var GUEST_CHAT_TOGGLE_BUTTON_SLASH_CLASS = "chzzk-chat-ui-toggle-guest-chat-toggle__slash";
 var HEADER_SETTINGS_BUTTON_ID = "chzzk-chat-ui-toggle-header-settings";
 var HEADER_SETTINGS_BUTTON_ICON_CLASS = "chzzk-chat-ui-toggle-header-settings__icon";
+var AUDIO_COMPRESSOR_STATE_DATASET_KEY = "chzzkChatUiToggleAudioCompressorState";
 var LIVE_CHANNEL_ID_PATTERN = /^[0-9a-f]{32}$/i;
 var FULLSCREEN_UNSUPPORTED_MINI_CHAT_HOST_TAG_NAMES = new Set(["VIDEO", "AUDIO", "CANVAS", "IFRAME", "IMG"]);
 
@@ -156,7 +157,14 @@ var DEFAULT_OPTIONS = {
   useNicknameColorForMessage: false,
   chatBoxColor: "#dfdfdf",
   chatBoxColorDefaultRevision: CHAT_BOX_COLOR_DEFAULT_REVISION,
-  chatBoxOpacity: CHAT_BOX_OPACITY_DEFAULT
+  chatBoxOpacity: CHAT_BOX_OPACITY_DEFAULT,
+  useAudioCompressor: false,
+  audioCompressorThreshold: -50,
+  audioCompressorKnee: 40,
+  audioCompressorRatio: 12,
+  audioCompressorAttack: 0,
+  audioCompressorRelease: 0.25,
+  audioCompressorGain: 1
 };
 
 var DATASET_KEYS = {
@@ -177,7 +185,8 @@ var DATASET_KEYS = {
   showBoldText: "chzzkChatUiToggleBoldText",
   useAutoTextContrast: "chzzkChatUiToggleAutoTextContrast",
   useChatTextColor: "chzzkChatUiToggleChatTextColor",
-  useNicknameColorForMessage: "chzzkChatUiToggleNicknameColorMessage"
+  useNicknameColorForMessage: "chzzkChatUiToggleNicknameColorMessage",
+  useAudioCompressor: "chzzkChatUiToggleAudioCompressor"
 };
 
 var NAMED_CHAT_BOX_COLORS = {
@@ -364,3 +373,14 @@ var localOnlyChatSuspendedTimelineSnapshot = [];
 var localOnlyChatSuspendedTimelineRowsSnapshot = [];
 var localOnlyChatOriginalFieldStates = new WeakMap();
 var localOnlyChatOriginalSendButtonStates = new WeakMap();
+var audioCompressorState = {
+  context: null,
+  compressor: null,
+  gain: null,
+  video: null,
+  source: null,
+  sources: new WeakMap(),
+  syncTimer: 0,
+  resumeListenerConnected: false,
+  lastError: ""
+};

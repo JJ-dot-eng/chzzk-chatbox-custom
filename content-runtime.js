@@ -42,6 +42,10 @@ function connectObserver() {
       )
     );
 
+    if (hasAddedNodes && currentOptions.useAudioCompressor) {
+      scheduleAudioCompressorSync();
+    }
+
     if (nativeChangedRows.length > 0) {
       scanRows(nativeChangedRows, { contentMutatedRows: nativeContentMutatedRows });
       syncLocalOnlyChatRows({ mutatedNativeRows: nativeContentMutatedRows });

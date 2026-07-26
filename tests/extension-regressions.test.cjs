@@ -3982,3 +3982,74 @@ test("미니 버블 복원 저장이 미확정 timeout이어도 다시 최소화
     await harness.close();
   }
 });
+
+test("오디오 컴프레서는 주 영상에 설정값을 적용하고 끄면 원음 경로로 우회한다", { timeout: 15_000 }, async () => {
+  const harness = await createHarness({
+    html: `<!doctype html>
+      <html lang="ko">
+        <head><meta charset="utf-8"><title>Audio compressor fixture</title></head>
+        <body>
+          <div id="live_player_layout">
+            <div class="pzp-pc"><video id="primary-video"></video></div>
+          </div>
+        </body>
+      </html>`,
+    initialOptions: {
+      useAudioCompressor: true,
+      audioCompressorThreshold: -42,
+      audioCompressorKnee: 24,
+      audioCompressorRatio: 8,
+      audioCompressorAttack: 0.03,
+      audioCompressorRelease: 0.4,
+      audioCompressorGain: 1.35
+    }
+  });
+
+  try {
+    await harness.page.mouse.click(10, 10);
+    await harness.page.waitForFunction(() =>
+      document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState === "on"
+    );
+
+    const enabled = await harness.page.evaluate(() => ({
+      state: document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState,
+      videoId: audioCompressorState.video?.id,
+      threshold: audioCompressorState.compressor?.threshold.value,
+      knee: audioCompressorState.compressor?.knee.value,
+      ratio: audioCompressorState.compressor?.ratio.value,
+      attack: audioCompressorState.compressor?.attack.value,
+      release: audioCompressorState.compressor?.release.value,
+      gain: audioCompressorState.gain?.gain.value
+    }));
+
+    assert.equal(enabled.state, "on");
+    assert.equal(enabled.videoId, "primary-video");
+    assert.equal(enabled.threshold, -42);
+    assert.equal(enabled.knee, 24);
+    assert.equal(enabled.ratio, 8);
+    assert.ok(Math.abs(enabled.attack - 0.03) < 0.001);
+    assert.ok(Math.abs(enabled.release - 0.4) < 0.001);
+    assert.ok(Math.abs(enabled.gain - 1.35) < 0.001);
+
+    await harness.page.evaluate(() => {
+      applyOptions({
+        ...currentOptions,
+        useAudioCompressor: false
+      });
+    });
+    await harness.page.waitForFunction(() =>
+      document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState === "off"
+    );
+
+    const disabled = await harness.page.evaluate(() => ({
+      state: document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState,
+      error: audioCompressorState.lastError
+    }));
+
+    assert.equal(disabled.state, "off");
+    assert.equal(disabled.error, "");
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
