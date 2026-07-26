@@ -465,15 +465,12 @@ function getChatMode(options = currentOptions) {
   return "default";
 }
 
-function createChatWindowOptionsPatch(options = currentOptions) {
+function createPresetExcludedOptionsPatch(options = currentOptions) {
   const normalized = normalizeOptions(options);
-  const mode = getChatMode(normalized);
 
-  return {
-    useGuestChatFrame: mode === "guest",
-    useMiniFloatingChat: mode === "mini",
-    miniFloatingChatFullscreenOnly: normalized.miniFloatingChatFullscreenOnly
-  };
+  return Object.fromEntries(
+    [...PRESET_EXCLUDED_OPTION_KEYS].map((key) => [key, normalized[key]])
+  );
 }
 
 function createPresetSnapshot(options) {
@@ -490,7 +487,7 @@ function applyPresetSnapshot(snapshot, optionsToPreserve = currentOptions) {
   return normalizeOptions({
     ...DEFAULT_OPTIONS,
     ...snapshot,
-    ...createChatWindowOptionsPatch(optionsToPreserve)
+    ...createPresetExcludedOptionsPatch(optionsToPreserve)
   });
 }
 
@@ -912,18 +909,15 @@ function loadCustomPreset() {
 }
 
 function applyPreset(presetId) {
-  const chatWindowOptions = createChatWindowOptionsPatch(currentOptions);
-
   if (presetId === "custom") {
     if (!customPresetSnapshot) {
       return;
     }
 
-    currentOptions = applyPresetSnapshot(customPresetSnapshot, chatWindowOptions);
+    currentOptions = applyPresetSnapshot(customPresetSnapshot);
   } else {
     currentOptions = applyPresetSnapshot(
-      { ...DEFAULT_OPTIONS, ...PRESET_DEFINITIONS[presetId] },
-      chatWindowOptions
+      { ...DEFAULT_OPTIONS, ...PRESET_DEFINITIONS[presetId] }
     );
   }
 

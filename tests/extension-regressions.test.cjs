@@ -1142,6 +1142,13 @@ test("custom preset save and load exclude chat window settings", { timeout: 20_0
     assert.equal(Object.hasOwn(savedPreset, "useGuestChatFrame"), false);
     assert.equal(Object.hasOwn(savedPreset, "useMiniFloatingChat"), false);
     assert.equal(Object.hasOwn(savedPreset, "miniFloatingChatFullscreenOnly"), false);
+    assert.equal(Object.hasOwn(savedPreset, "useAudioCompressor"), false);
+    assert.equal(Object.hasOwn(savedPreset, "audioCompressorThreshold"), false);
+    assert.equal(Object.hasOwn(savedPreset, "audioCompressorKnee"), false);
+    assert.equal(Object.hasOwn(savedPreset, "audioCompressorRatio"), false);
+    assert.equal(Object.hasOwn(savedPreset, "audioCompressorAttack"), false);
+    assert.equal(Object.hasOwn(savedPreset, "audioCompressorRelease"), false);
+    assert.equal(Object.hasOwn(savedPreset, "audioCompressorGain"), false);
     assert.equal(savedPreset.showBadges, false);
 
     await setPopupChatWindowSettings(harness.page, "guest", false);
@@ -1176,6 +1183,49 @@ test("custom preset save and load exclude chat window settings", { timeout: 20_0
       ),
       true
     );
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("스타일 프리셋 전환은 저장 제외 설정을 유지한다", { timeout: 20_000 }, async () => {
+  const excludedOptions = {
+    useGuestChatFrame: false,
+    useMiniFloatingChat: false,
+    miniFloatingChatFullscreenOnly: true,
+    useAudioCompressor: true,
+    audioCompressorThreshold: -42,
+    audioCompressorKnee: 24,
+    audioCompressorRatio: 8,
+    audioCompressorAttack: 0.03,
+    audioCompressorRelease: 0.4,
+    audioCompressorGain: 1.35
+  };
+  const harness = await createPopupHarness({
+    initialOptions: excludedOptions,
+    customPreset: { showBadges: false }
+  });
+
+  try {
+    for (const presetId of ["default", "clean", "minimal", "custom"]) {
+      await harness.page.locator(`[data-preset="${presetId}"]`).click();
+      await harness.page.waitForFunction(
+        ({ storageKey, nextPresetId, preservedOptions }) => {
+          const options = window.__popupHarness.store[storageKey];
+          const activePreset = document.querySelector("[data-preset].is-active")?.dataset.preset;
+
+          return activePreset === nextPresetId &&
+            Object.entries(preservedOptions).every(([key, value]) => options[key] === value);
+        },
+        {
+          storageKey: STORAGE_KEY,
+          nextPresetId: presetId,
+          preservedOptions: excludedOptions
+        }
+      );
+    }
+
     assertNoPageErrors(harness.pageErrors);
   } finally {
     await harness.close();

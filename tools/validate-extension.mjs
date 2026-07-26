@@ -218,6 +218,7 @@ for (const token of [
   "미니 버블 복원 저장이 미확정 timeout이어도 다시 최소화하지 않는다",
   "style presets preserve every chat window selection",
   "custom preset save and load exclude chat window settings",
+  "스타일 프리셋 전환은 저장 제외 설정을 유지한다",
   "legacy custom preset chat window values cannot replace the current selection",
   "optionsUpdateResponseDelays: [900]",
   "vm.runInContext(source, context"
@@ -677,10 +678,11 @@ for (const token of [
 }
 for (const token of [
   "const PRESET_EXCLUDED_OPTION_KEYS = new Set([",
-  "function createChatWindowOptionsPatch(options = currentOptions)",
+  "function createPresetExcludedOptionsPatch(options = currentOptions)",
   "function createPresetSnapshot(options)",
   "!PRESET_EXCLUDED_OPTION_KEYS.has(key)",
   "function applyPresetSnapshot(snapshot, optionsToPreserve = currentOptions)",
+  "...createPresetExcludedOptionsPatch(optionsToPreserve)",
   "const nextCustomPresetSnapshot = createPresetSnapshot(currentOptions);",
   "? createPresetSnapshot(local[PRESET_STORAGE_KEY])"
 ]) {
