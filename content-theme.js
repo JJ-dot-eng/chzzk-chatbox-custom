@@ -544,7 +544,17 @@ function syncGuestChatTheme() {
       document.documentElement.removeAttribute(MINI_CHAT_EMBED_ATTR);
     }
 
-    applyNativeGuestChatThemeClass(getGuestChatThemeFromUrl(window.location.href));
+    const trackedTheme = normalizeGuestChatTheme(currentGuestChatTheme);
+    const initialUrlTheme = getGuestChatThemeFromUrl(window.location.href);
+
+    if (trackedTheme) {
+      applyNativeGuestChatThemeClass(trackedTheme);
+    } else if (initialUrlTheme) {
+      applyGuestChatTheme(initialUrlTheme, { source: "frame-url" });
+    } else {
+      applyNativeGuestChatThemeClass(null);
+    }
+
     readGuestChatThemeFromBackground();
 
     if (typeof syncChatBoxColorVariables === "function") {

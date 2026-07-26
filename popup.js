@@ -2,7 +2,7 @@ const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const PRESET_STORAGE_KEY = "chzzkChatUiToggleCustomPreset";
 const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
 const UPDATE_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_UPDATE_OPTIONS";
-const CONTENT_VERSION = "0.7.0";
+const CONTENT_VERSION = "0.7.1";
 const POPUP_THEME_FALLBACK = "light";
 
 const DEFAULT_CHAT_BOX_COLOR = "#dfdfdf";

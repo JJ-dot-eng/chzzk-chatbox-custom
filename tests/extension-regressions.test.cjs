@@ -1427,6 +1427,79 @@ test("나만 보기 전환 버튼은 기본·나만 보기 채팅의 전송 버�
   }
 });
 
+test("나만 보는 채팅은 초기 URL 테마보다 이후에 추적한 테마를 유지한다", { timeout: 20_000 }, async () => {
+  const harness = await createHarness({
+    html: createLocalOnlyChatDocument(),
+    initialOptions: { useGuestChatFrame: false }
+  });
+
+  try {
+    const initialThemeUrl = `${GUEST_CHAT_URL}&theme=light`;
+
+    await harness.page.evaluate((guestChatUrl) => {
+      const iframe = document.createElement("iframe");
+
+      iframe.id = "guest-chat-theme-test-frame";
+      iframe.src = guestChatUrl;
+      iframe.setAttribute("credentialless", "");
+      iframe.credentialless = true;
+      document.body.append(iframe);
+    }, initialThemeUrl);
+
+    const deadline = Date.now() + 5_000;
+    let frame = null;
+
+    while (Date.now() < deadline) {
+      frame = harness.page.frames().find((candidate) => {
+        try {
+          const frameUrl = new URL(candidate.url());
+
+          return frameUrl.pathname.endsWith("/chat") &&
+            frameUrl.searchParams.get("chzzkChatUiToggleGuest") === "1" &&
+            frameUrl.searchParams.get("theme") === "light";
+        } catch (_error) {
+          return false;
+        }
+      }) || null;
+
+      if (frame) {
+        break;
+      }
+
+      await harness.page.waitForTimeout(25);
+    }
+
+    assert.ok(frame, "나만 보는 채팅 테마 fixture frame을 찾을 수 있어야 합니다.");
+    await injectContentScripts(frame);
+
+    const trackedThemeState = await frame.evaluate(() => {
+      applyGuestChatTheme("dark", { source: "background-push" });
+      syncGuestChatTheme();
+
+      return {
+        currentTheme: currentGuestChatTheme,
+        guestTheme: document.documentElement.getAttribute(
+          "data-chzzk-chat-ui-toggle-guest-theme"
+        ),
+        hasDarkClass: document.documentElement.classList.contains("dark"),
+        hasLightClass: document.documentElement.classList.contains("light"),
+        nativeTheme: document.documentElement.dataset.chzzkChatUiToggleNativeTheme
+      };
+    });
+
+    assert.deepEqual(trackedThemeState, {
+      currentTheme: "dark",
+      guestTheme: "dark",
+      hasDarkClass: true,
+      hasLightClass: false,
+      nativeTheme: "dark"
+    });
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
 test("나만 보는 채팅은 원본 수신 행을 보존하고 사이트 전송 경로 없이 같은 로그에만 추가한다", { timeout: 20_000 }, async () => {
   const harness = await createLocalOnlyChatHarness();
 
