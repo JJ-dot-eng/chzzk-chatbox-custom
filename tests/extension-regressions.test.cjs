@@ -3983,6 +3983,95 @@ test("미니 버블 복원 저장이 미확정 timeout이어도 다시 최소화
   }
 });
 
+test("오디오 설정은 쉬운 강도 프리셋을 우선하고 전문 파라미터를 고급 설정에 숨긴다", { timeout: 15_000 }, async () => {
+  const harness = await createPopupHarness({
+    initialOptions: {
+      useAudioCompressor: true,
+      audioCompressorThreshold: -50,
+      audioCompressorKnee: 40,
+      audioCompressorRatio: 12,
+      audioCompressorAttack: 0,
+      audioCompressorRelease: 0.25,
+      audioCompressorGain: 1.1
+    }
+  });
+
+  try {
+    await harness.page.click('[data-goto="audio"]');
+
+    const initial = await harness.page.evaluate(() => ({
+      advancedOpen: document.querySelector(".audio-advanced")?.open,
+      activePreset: document.querySelector("[data-audio-preset].is-active")?.dataset.audioPreset,
+      status: document.getElementById("audioPresetStatus")?.textContent,
+      gainLabel: document.querySelector('label[for="audioCompressorGain"]')?.textContent
+    }));
+
+    assert.equal(initial.advancedOpen, false);
+    assert.equal(initial.activePreset, "strong");
+    assert.equal(initial.status, "강하게");
+    assert.equal(initial.gainLabel, "보정 음량");
+
+    await harness.page.click('[data-audio-preset="balanced"]');
+    await harness.page.waitForFunction((storageKey) => {
+      const options = window.__popupHarness.store[storageKey];
+      return options.audioCompressorThreshold === -30 &&
+        options.audioCompressorKnee === 30 &&
+        options.audioCompressorRatio === 4 &&
+        options.audioCompressorAttack === 0.01 &&
+        options.audioCompressorRelease === 0.25;
+    }, STORAGE_KEY);
+
+    const balanced = await harness.page.evaluate(() => ({
+      activePreset: document.querySelector("[data-audio-preset].is-active")?.dataset.audioPreset,
+      status: document.getElementById("audioPresetStatus")?.textContent
+    }));
+
+    assert.equal(balanced.activePreset, "balanced");
+    assert.equal(balanced.status, "균형");
+
+    await harness.page.click(".audio-advanced > summary");
+    await harness.page.evaluate(() => {
+      const threshold = document.getElementById("audioCompressorThreshold");
+      threshold.value = "-31";
+      threshold.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const custom = await harness.page.evaluate(() => ({
+      advancedOpen: document.querySelector(".audio-advanced")?.open,
+      activePresetCount: document.querySelectorAll("[data-audio-preset].is-active").length,
+      status: document.getElementById("audioPresetStatus")?.textContent,
+      thresholdLabel: document.getElementById("audioCompressorThresholdValue")?.textContent
+    }));
+
+    assert.equal(custom.advancedOpen, true);
+    assert.equal(custom.activePresetCount, 0);
+    assert.equal(custom.status, "사용자 설정");
+    assert.equal(custom.thresholdLabel, "-31dB");
+
+    await harness.page.click("#audioResetButton");
+    await harness.page.waitForFunction((storageKey) => {
+      const options = window.__popupHarness.store[storageKey];
+      return options.audioCompressorThreshold === -50 &&
+        options.audioCompressorKnee === 40 &&
+        options.audioCompressorRatio === 12 &&
+        options.audioCompressorAttack === 0 &&
+        options.audioCompressorRelease === 0.25 &&
+        options.audioCompressorGain === 1.1;
+    }, STORAGE_KEY);
+
+    const reset = await harness.page.evaluate(() => ({
+      activePreset: document.querySelector("[data-audio-preset].is-active")?.dataset.audioPreset,
+      status: document.getElementById("audioPresetStatus")?.textContent
+    }));
+
+    assert.equal(reset.activePreset, "strong");
+    assert.equal(reset.status, "강하게");
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
 test("오디오 컴프레서는 주 영상에 설정값을 적용하고 끄면 원음 경로로 우회한다", { timeout: 15_000 }, async () => {
   const harness = await createHarness({
     html: `<!doctype html>

@@ -113,6 +113,40 @@ const PRESET_DEFINITIONS = {
   }
 };
 
+const AUDIO_COMPRESSOR_PRESETS = {
+  natural: {
+    label: "자연스럽게",
+    audioCompressorThreshold: -24,
+    audioCompressorKnee: 20,
+    audioCompressorRatio: 3,
+    audioCompressorAttack: 0.02,
+    audioCompressorRelease: 0.25
+  },
+  balanced: {
+    label: "균형",
+    audioCompressorThreshold: -30,
+    audioCompressorKnee: 30,
+    audioCompressorRatio: 4,
+    audioCompressorAttack: 0.01,
+    audioCompressorRelease: 0.25
+  },
+  strong: {
+    label: "강하게",
+    audioCompressorThreshold: -50,
+    audioCompressorKnee: 40,
+    audioCompressorRatio: 12,
+    audioCompressorAttack: 0,
+    audioCompressorRelease: 0.25
+  }
+};
+const AUDIO_COMPRESSOR_PRESET_OPTION_KEYS = [
+  "audioCompressorThreshold",
+  "audioCompressorKnee",
+  "audioCompressorRatio",
+  "audioCompressorAttack",
+  "audioCompressorRelease"
+];
+
 const PRESET_EXCLUDED_OPTION_KEYS = new Set([
   "useGuestChatFrame",
   "useMiniFloatingChat",
@@ -150,6 +184,9 @@ const audioCompressorKneeValue = document.getElementById("audioCompressorKneeVal
 const audioCompressorRatioValue = document.getElementById("audioCompressorRatioValue");
 const audioCompressorAttackValue = document.getElementById("audioCompressorAttackValue");
 const audioCompressorReleaseValue = document.getElementById("audioCompressorReleaseValue");
+const audioPresetStatus = document.getElementById("audioPresetStatus");
+const audioPresetButtons = [...document.querySelectorAll("[data-audio-preset]")];
+const audioResetButton = document.getElementById("audioResetButton");
 const colorPickerTitle = document.getElementById("colorPickerTitle");
 const colorPickerSwatch = document.getElementById("colorPickerSwatch");
 const colorPickerHex = document.getElementById("chatTextColorHex");
@@ -574,6 +611,58 @@ function syncQuickBundles() {
   }
 }
 
+function detectAudioCompressorPreset(options = currentOptions) {
+  for (const [presetId, preset] of Object.entries(AUDIO_COMPRESSOR_PRESETS)) {
+    const matches = AUDIO_COMPRESSOR_PRESET_OPTION_KEYS.every(
+      (key) => Math.abs(Number(options[key]) - Number(preset[key])) < 0.0001
+    );
+
+    if (matches) {
+      return presetId;
+    }
+  }
+
+  return "custom";
+}
+
+function syncAudioCompressorPresetButtons() {
+  const activeAudioPreset = detectAudioCompressorPreset();
+
+  for (const button of audioPresetButtons) {
+    const isActive = button.dataset.audioPreset === activeAudioPreset;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  }
+
+  audioPresetStatus.textContent =
+    AUDIO_COMPRESSOR_PRESETS[activeAudioPreset]?.label || "사용자 설정";
+}
+
+function applyAudioCompressorPreset(presetId) {
+  const preset = AUDIO_COMPRESSOR_PRESETS[presetId];
+
+  if (!preset) {
+    return;
+  }
+
+  for (const key of AUDIO_COMPRESSOR_PRESET_OPTION_KEYS) {
+    currentOptions[key] = preset[key];
+  }
+
+  syncControlsFromOptions();
+  scheduleCommit({ immediate: true });
+}
+
+function resetAudioCompressorOptions() {
+  for (const key of AUDIO_COMPRESSOR_PRESET_OPTION_KEYS) {
+    currentOptions[key] = DEFAULT_OPTIONS[key];
+  }
+
+  currentOptions.audioCompressorGain = DEFAULT_OPTIONS.audioCompressorGain;
+  syncControlsFromOptions();
+  scheduleCommit({ immediate: true });
+}
+
 function applyQuickBundle(bundleId, enabled) {
   if (bundleId === "identity") {
     currentOptions.showNicknames = enabled;
@@ -638,6 +727,7 @@ function syncControlsFromOptions() {
   audioCompressorReleaseValue.textContent = `${currentOptions.audioCompressorRelease}s`;
   syncNicknameColorDependencies();
   syncConditionalBlocks();
+  syncAudioCompressorPresetButtons();
   renderColorChips();
   syncPresetButtons();
   syncQuickBundles();
@@ -1312,7 +1402,7 @@ function bindEvents() {
 
   app.addEventListener("input", (event) => {
     if (event.target.matches(
-      '[data-option="chatBoxOpacity"], [data-option="chatFontSizePt"], [data-option="nicknameFontSizePt"]'
+      '[data-option="chatBoxOpacity"], [data-option="chatFontSizePt"], [data-option="nicknameFontSizePt"], input[type="range"][data-option^="audioCompressor"]'
     )) {
       handleOptionInput(event);
     }
@@ -1344,6 +1434,13 @@ function bindEvents() {
 
     if (openColor) {
       openColorPicker(openColor.dataset.openColor);
+      return;
+    }
+
+    const audioPresetButton = event.target.closest("[data-audio-preset]");
+
+    if (audioPresetButton) {
+      applyAudioCompressorPreset(audioPresetButton.dataset.audioPreset);
       return;
     }
 
@@ -1385,6 +1482,8 @@ function bindEvents() {
     syncPreview();
     await commitOptions();
   });
+
+  audioResetButton.addEventListener("click", resetAudioCompressorOptions);
 
   colorPickerField.addEventListener("pointerdown", (event) => {
     colorPickerField.setPointerCapture(event.pointerId);
