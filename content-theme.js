@@ -394,6 +394,7 @@ function syncNativeGuestChatThemeClass(theme) {
 
   classList.remove(...GUEST_CHAT_NATIVE_THEME_CLASSES);
   classList.add(expectedThemeClass, expectedPrefixedThemeClass);
+  document.documentElement.setAttribute("data-theme", normalizedTheme);
   document.documentElement.style.colorScheme = normalizedTheme;
 }
 
@@ -410,6 +411,8 @@ function isNativeGuestChatThemeClassSynced(theme) {
   const hasExpectedClasses =
     classList.contains(expectedThemeClass) &&
     classList.contains(expectedPrefixedThemeClass);
+  const hasExpectedThemeAttribute =
+    document.documentElement.getAttribute("data-theme") === normalizedTheme;
   const hasConflictingClasses = GUEST_CHAT_NATIVE_THEME_CLASSES.some(
     (className) =>
       className !== expectedThemeClass &&
@@ -418,7 +421,12 @@ function isNativeGuestChatThemeClassSynced(theme) {
   );
   const hasExpectedColorScheme = document.documentElement.style.colorScheme === normalizedTheme;
 
-  return hasExpectedClasses && !hasConflictingClasses && hasExpectedColorScheme;
+  return (
+    hasExpectedClasses &&
+    hasExpectedThemeAttribute &&
+    !hasConflictingClasses &&
+    hasExpectedColorScheme
+  );
 }
 
 function scheduleNativeGuestChatThemeClassRetries(theme) {

@@ -1470,7 +1470,33 @@ test("나만 보는 채팅은 초기 URL 테마보다 이후에 추적한 테마
     }
 
     assert.ok(frame, "나만 보는 채팅 테마 fixture frame을 찾을 수 있어야 합니다.");
+    await frame.evaluate(() => {
+      document.documentElement.setAttribute("data-theme", "theme_dark");
+      const style = document.createElement("style");
+
+      style.textContent = `
+        :root { --fixture-semantic-theme: dark; }
+        [data-theme="light"] { --fixture-semantic-theme: light; }
+      `;
+      document.head.append(style);
+    });
     await injectContentScripts(frame);
+
+    const initialThemeState = await frame.evaluate(() => ({
+      currentTheme: currentGuestChatTheme,
+      dataTheme: document.documentElement.getAttribute("data-theme"),
+      fixtureSemanticTheme: getComputedStyle(document.documentElement)
+        .getPropertyValue("--fixture-semantic-theme")
+        .trim(),
+      nativeTheme: document.documentElement.dataset.chzzkChatUiToggleNativeTheme
+    }));
+
+    assert.deepEqual(initialThemeState, {
+      currentTheme: "light",
+      dataTheme: "light",
+      fixtureSemanticTheme: "light",
+      nativeTheme: "light"
+    });
 
     const trackedThemeState = await frame.evaluate(() => {
       applyGuestChatTheme("dark", { source: "background-push" });
@@ -1478,9 +1504,13 @@ test("나만 보는 채팅은 초기 URL 테마보다 이후에 추적한 테마
 
       return {
         currentTheme: currentGuestChatTheme,
+        dataTheme: document.documentElement.getAttribute("data-theme"),
         guestTheme: document.documentElement.getAttribute(
           "data-chzzk-chat-ui-toggle-guest-theme"
         ),
+        fixtureSemanticTheme: getComputedStyle(document.documentElement)
+          .getPropertyValue("--fixture-semantic-theme")
+          .trim(),
         hasDarkClass: document.documentElement.classList.contains("dark"),
         hasLightClass: document.documentElement.classList.contains("light"),
         nativeTheme: document.documentElement.dataset.chzzkChatUiToggleNativeTheme
@@ -1489,7 +1519,9 @@ test("나만 보는 채팅은 초기 URL 테마보다 이후에 추적한 테마
 
     assert.deepEqual(trackedThemeState, {
       currentTheme: "dark",
+      dataTheme: "dark",
       guestTheme: "dark",
+      fixtureSemanticTheme: "dark",
       hasDarkClass: true,
       hasLightClass: false,
       nativeTheme: "dark"
