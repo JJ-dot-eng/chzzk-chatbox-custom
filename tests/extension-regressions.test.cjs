@@ -3992,7 +3992,7 @@ test("오디오 설정은 쉬운 강도 프리셋을 우선하고 전문 파라�
       audioCompressorRatio: 12,
       audioCompressorAttack: 0,
       audioCompressorRelease: 0.25,
-      audioCompressorGain: 1.1
+      audioCompressorGain: 1
     }
   });
 
@@ -4056,7 +4056,7 @@ test("오디오 설정은 쉬운 강도 프리셋을 우선하고 전문 파라�
         options.audioCompressorRatio === 12 &&
         options.audioCompressorAttack === 0 &&
         options.audioCompressorRelease === 0.25 &&
-        options.audioCompressorGain === 1.1;
+        options.audioCompressorGain === 1;
     }, STORAGE_KEY);
 
     const reset = await harness.page.evaluate(() => ({
