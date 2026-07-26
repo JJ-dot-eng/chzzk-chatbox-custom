@@ -97,7 +97,17 @@ function connectAudioCompressorResumeListener() {
   const resume = () => {
     const context = audioCompressorState.context;
 
-    if (!currentOptions.useAudioCompressor || !context) {
+    if (!currentOptions.useAudioCompressor) {
+      return;
+    }
+
+    if (!context) {
+      syncAudioCompressor(true);
+      return;
+    }
+
+    if (context.state !== "suspended") {
+      scheduleAudioCompressorSync(0);
       return;
     }
 
@@ -110,7 +120,7 @@ function connectAudioCompressorResumeListener() {
   document.addEventListener("keydown", resume, { capture: true });
 }
 
-function ensureAudioCompressorNodes(video) {
+function ensureAudioCompressorNodes(video, userGestureActive = false) {
   const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
 
   if (!AudioContextConstructor) {
@@ -118,22 +128,32 @@ function ensureAudioCompressorNodes(video) {
     return false;
   }
 
+  connectAudioCompressorResumeListener();
+
   if (!audioCompressorState.context) {
+    if (!userGestureActive) {
+      setAudioCompressorState("waiting");
+      return false;
+    }
+
     audioCompressorState.context = new AudioContextConstructor();
     audioCompressorState.compressor = audioCompressorState.context.createDynamicsCompressor();
     audioCompressorState.gain = audioCompressorState.context.createGain();
-    connectAudioCompressorResumeListener();
   }
 
   if (audioCompressorState.context.state === "suspended") {
     setAudioCompressorState("waiting");
-    audioCompressorState.context.resume()
-      .catch(() => {})
-      .finally(() => {
-        if (audioCompressorState.context?.state === "running") {
-          scheduleAudioCompressorSync(0);
-        }
-      });
+
+    if (userGestureActive) {
+      audioCompressorState.context.resume()
+        .catch(() => {})
+        .finally(() => {
+          if (audioCompressorState.context?.state === "running") {
+            scheduleAudioCompressorSync(0);
+          }
+        });
+    }
+
     return false;
   }
 
@@ -157,7 +177,7 @@ function ensureAudioCompressorNodes(video) {
   return true;
 }
 
-function syncAudioCompressor() {
+function syncAudioCompressor(userGestureActive = false) {
   window.clearTimeout(audioCompressorState.syncTimer);
   audioCompressorState.syncTimer = 0;
 
@@ -178,7 +198,7 @@ function syncAudioCompressor() {
     return;
   }
 
-  if (!ensureAudioCompressorNodes(video)) {
+  if (!ensureAudioCompressorNodes(video, userGestureActive)) {
     return;
   }
 

@@ -4253,6 +4253,18 @@ test("오디오 개선은 주 영상에 설정값을 적용하고 끄면 원음 
   });
 
   try {
+    await harness.page.waitForFunction(() =>
+      document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState === "waiting"
+    );
+
+    const beforeGesture = await harness.page.evaluate(() => ({
+      state: document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState,
+      contextCreated: Boolean(audioCompressorState.context)
+    }));
+
+    assert.equal(beforeGesture.state, "waiting");
+    assert.equal(beforeGesture.contextCreated, false);
+
     await harness.page.mouse.click(10, 10);
     await harness.page.waitForFunction(() =>
       document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState === "on"
