@@ -103,6 +103,7 @@ $filesToCopy = @(
   "content-options.js",
   "content-theme.js",
   "content-core.js",
+  "content-audio.js",
   "content-mini-chat.js",
   "content-guest-chat.js",
   "content-chat-annotate.js",
