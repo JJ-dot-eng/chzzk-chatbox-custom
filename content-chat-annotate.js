@@ -1756,6 +1756,11 @@ function scan() {
     return;
   }
 
+  if (scanTimer) {
+    window.clearTimeout(scanTimer);
+    scanTimer = 0;
+  }
+
   isScanning = true;
   const roots = getChatRoots();
 
@@ -1775,6 +1780,7 @@ function scan() {
     syncGuestChatUi();
   } finally {
     isScanning = false;
+    lastScanAt = Date.now();
   }
 }
 
@@ -1991,6 +1997,15 @@ function collectChangedChatRows(mutations) {
 }
 
 function scheduleScan() {
-  window.clearTimeout(scanTimer);
-  scanTimer = window.setTimeout(scan, SCAN_DELAY_MS);
+  if (scanTimer) {
+    return;
+  }
+
+  const elapsedSinceLastScan = Date.now() - lastScanAt;
+  const delay = Math.max(SCAN_DELAY_MS, SCAN_MIN_INTERVAL_MS - elapsedSinceLastScan);
+
+  scanTimer = window.setTimeout(() => {
+    scanTimer = 0;
+    scan();
+  }, delay);
 }

@@ -19,6 +19,7 @@ var STORAGE_READ_TIMEOUT_MS = 700;
 var OPTIONS_LOAD_RETRY_MS = 250;
 var OPTIONS_LOAD_MAX_ATTEMPTS = 20;
 var SCAN_DELAY_MS = 50;
+var SCAN_MIN_INTERVAL_MS = 1000;
 var SCAN_INTERVAL_MS = 5000;
 var MINI_CHAT_SCAN_INTERVAL_MS = 30000;
 var FULL_CLEANUP_INTERVAL_MS = 10000;
@@ -325,6 +326,7 @@ var TARGET_SELECTORS = {
 
 var currentOptions = { ...DEFAULT_OPTIONS };
 var scanTimer = 0;
+var lastScanAt = 0;
 var uiSyncTimer = 0;
 var optionsLoadTimer = 0;
 var optionsLoadGeneration = 0;

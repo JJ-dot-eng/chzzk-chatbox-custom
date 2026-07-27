@@ -2916,6 +2916,28 @@ test("미니 채팅은 불투명 외피로 영상 합성을 차단하고 내부 
     const frameElement = panel.locator("#chzzk-chat-ui-toggle-mini-chat-frame");
 
     await panel.waitFor({ state: "visible" });
+    const cachedThemeState = await harness.page.evaluate(() => {
+      const originalDetectPageTheme = detectPageTheme;
+      const previousTheme = currentGuestChatTheme;
+      let detectCount = 0;
+
+      try {
+        currentGuestChatTheme = null;
+        detectPageTheme = () => {
+          detectCount += 1;
+          return "light";
+        };
+
+        return {
+          firstTheme: getGuestChatFrameTheme(),
+          secondTheme: getGuestChatFrameTheme(),
+          detectCount
+        };
+      } finally {
+        detectPageTheme = originalDetectPageTheme;
+        currentGuestChatTheme = previousTheme;
+      }
+    });
 
     const deadline = Date.now() + 5_000;
     let miniFrame = null;
@@ -3119,6 +3141,11 @@ test("미니 채팅은 불투명 외피로 영상 합성을 차단하고 내부 
       JSON.stringify({ actionsBox, emojiButtonBox })
     );
     assert.equal(outerState.background, "rgb(249, 250, 251)");
+    assert.deepEqual(cachedThemeState, {
+      firstTheme: "light",
+      secondTheme: "light",
+      detectCount: 1
+    });
     assert.equal(outerState.borderColor, transparent);
     assert.equal(outerState.boxShadow, "none");
     assert.equal(outerState.transform, "none");
