@@ -20,6 +20,7 @@ var OPTIONS_LOAD_RETRY_MS = 250;
 var OPTIONS_LOAD_MAX_ATTEMPTS = 20;
 var SCAN_DELAY_MS = 50;
 var SCAN_INTERVAL_MS = 5000;
+var MINI_CHAT_SCAN_INTERVAL_MS = 30000;
 var FULL_CLEANUP_INTERVAL_MS = 10000;
 var UI_SYNC_DELAY_MS = 100;
 var THEME_SYNC_INTERVAL_MS = 3000;
@@ -329,6 +330,7 @@ var optionsLoadTimer = 0;
 var optionsLoadGeneration = 0;
 var optionsStateRevision = 0;
 var scanIntervalTimer = 0;
+var scanIntervalDelayMs = 0;
 var isScanning = false;
 var observer = null;
 var lastFullCleanupAt = 0;
@@ -380,6 +382,7 @@ var audioCompressorState = {
   video: null,
   source: null,
   sources: new WeakMap(),
+  graphMode: "off",
   syncTimer: 0,
   resumeListenerConnected: false,
   lastError: ""

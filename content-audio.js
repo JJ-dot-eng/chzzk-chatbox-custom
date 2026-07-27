@@ -7,7 +7,10 @@ function isTopLevelAudioPage() {
 }
 
 function setAudioCompressorState(state, error = "") {
-  document.documentElement.dataset[AUDIO_COMPRESSOR_STATE_DATASET_KEY] = state;
+  if (document.documentElement.dataset[AUDIO_COMPRESSOR_STATE_DATASET_KEY] !== state) {
+    document.documentElement.dataset[AUDIO_COMPRESSOR_STATE_DATASET_KEY] = state;
+  }
+
   audioCompressorState.lastError = error;
 }
 
@@ -76,15 +79,22 @@ function updateAudioCompressorParameters() {
 function bypassAudioCompressor() {
   const { context, compressor, gain, source } = audioCompressorState;
 
+  if (audioCompressorState.graphMode === "bypass") {
+    setAudioCompressorState("off");
+    return;
+  }
+
   disconnectAudioNode(source);
   disconnectAudioNode(compressor);
   disconnectAudioNode(gain);
 
   if (source && context && connectAudioNode(source, context.destination)) {
+    audioCompressorState.graphMode = "bypass";
     setAudioCompressorState("off");
     return;
   }
 
+  audioCompressorState.graphMode = "off";
   setAudioCompressorState("off");
 }
 
@@ -204,10 +214,16 @@ function syncAudioCompressor(userGestureActive = false) {
 
   const { context, compressor, gain, source } = audioCompressorState;
 
+  updateAudioCompressorParameters();
+
+  if (audioCompressorState.graphMode === "compressor") {
+    setAudioCompressorState("on");
+    return;
+  }
+
   disconnectAudioNode(source);
   disconnectAudioNode(compressor);
   disconnectAudioNode(gain);
-  updateAudioCompressorParameters();
 
   const connected =
     connectAudioNode(source, compressor) &&
@@ -215,6 +231,7 @@ function syncAudioCompressor(userGestureActive = false) {
     connectAudioNode(gain, context.destination);
 
   if (connected) {
+    audioCompressorState.graphMode = "compressor";
     setAudioCompressorState("on");
   } else {
     const error = audioCompressorState.lastError || "audio-graph-connect-failed";
@@ -223,7 +240,31 @@ function syncAudioCompressor(userGestureActive = false) {
   }
 }
 
+function audioCompressorMutationNeedsSync(mutations) {
+  if (!isTopLevelAudioPage() || !currentOptions.useAudioCompressor) {
+    return false;
+  }
+
+  if (audioCompressorState.video && !audioCompressorState.video.isConnected) {
+    return true;
+  }
+
+  return mutations.some((mutation) => [...mutation.addedNodes].some((node) => {
+    return (
+      node instanceof HTMLVideoElement ||
+      (node instanceof Element && Boolean(node.querySelector("video")))
+    );
+  }));
+}
+
 function scheduleAudioCompressorSync(delay = 50) {
   window.clearTimeout(audioCompressorState.syncTimer);
+  audioCompressorState.syncTimer = 0;
+
+  if (!isTopLevelAudioPage()) {
+    setAudioCompressorState("off");
+    return;
+  }
+
   audioCompressorState.syncTimer = window.setTimeout(syncAudioCompressor, delay);
 }

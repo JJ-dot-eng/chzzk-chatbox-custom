@@ -1,4 +1,13 @@
 var chatRowAnnotationSnapshots = new WeakMap();
+var miniChatAnnotationPass = null;
+var MINI_CHAT_ANNOTATION_ATTRIBUTES = [
+  MINI_CHAT_HIDDEN_CONTROL_ATTR,
+  MINI_CHAT_TRANSPARENT_SURFACE_ATTR,
+  MINI_CHAT_COMPACT_INPUT_ATTR,
+  MINI_CHAT_INPUT_ONLY_PATH_ATTR,
+  MINI_CHAT_INPUT_ONLY_KEEP_ATTR,
+  MINI_CHAT_INPUT_ONLY_HIDDEN_ATTR
+];
 
 function hasChatLikeText(element) {
   const text = element.textContent?.trim() ?? "";
@@ -100,10 +109,48 @@ function getMiniChatActionControls(root = document) {
   ]).filter((element) => element instanceof HTMLElement);
 }
 
-function markMiniChatHiddenControl(element) {
-  if (element instanceof HTMLElement) {
-    element.setAttribute(MINI_CHAT_HIDDEN_CONTROL_ATTR, "true");
+function beginMiniChatAnnotationPass() {
+  miniChatAnnotationPass = new Map(
+    MINI_CHAT_ANNOTATION_ATTRIBUTES.map((attribute) => [attribute, new Set()])
+  );
+}
+
+function markMiniChatAnnotation(element, attribute) {
+  if (!(element instanceof HTMLElement)) {
+    return;
   }
+
+  miniChatAnnotationPass?.get(attribute)?.add(element);
+
+  if (element.getAttribute(attribute) !== "true") {
+    element.setAttribute(attribute, "true");
+  }
+}
+
+function finishMiniChatAnnotationPass() {
+  const pass = miniChatAnnotationPass;
+
+  miniChatAnnotationPass = null;
+
+  if (!pass) {
+    return;
+  }
+
+  const selector = MINI_CHAT_ANNOTATION_ATTRIBUTES
+    .map((attribute) => `[${attribute}]`)
+    .join(",");
+
+  for (const element of document.querySelectorAll(selector)) {
+    for (const attribute of MINI_CHAT_ANNOTATION_ATTRIBUTES) {
+      if (element.hasAttribute(attribute) && !pass.get(attribute)?.has(element)) {
+        element.removeAttribute(attribute);
+      }
+    }
+  }
+}
+
+function markMiniChatHiddenControl(element) {
+  markMiniChatAnnotation(element, MINI_CHAT_HIDDEN_CONTROL_ATTR);
 }
 
 function markMiniChatTransparentSurfaces() {
@@ -118,7 +165,7 @@ function markMiniChatTransparentSurfaces() {
     current instanceof HTMLElement && current !== document.body && depth < 12;
     current = current.parentElement, depth += 1
   ) {
-    current.setAttribute(MINI_CHAT_TRANSPARENT_SURFACE_ATTR, "true");
+    markMiniChatAnnotation(current, MINI_CHAT_TRANSPARENT_SURFACE_ATTR);
   }
 }
 
@@ -418,7 +465,7 @@ function markMiniChatCompactInputContainer(actionRow) {
   const inputContainer = findMiniChatCompactInputContainer(actionRow);
 
   if (inputContainer instanceof HTMLElement) {
-    inputContainer.setAttribute(MINI_CHAT_COMPACT_INPUT_ATTR, "true");
+    markMiniChatAnnotation(inputContainer, MINI_CHAT_COMPACT_INPUT_ATTR);
   }
 }
 
@@ -518,8 +565,8 @@ function markMiniChatInputOnlyLayout() {
     return;
   }
 
-  inputContainer.setAttribute(MINI_CHAT_COMPACT_INPUT_ATTR, "true");
-  inputContainer.setAttribute(MINI_CHAT_INPUT_ONLY_KEEP_ATTR, "true");
+  markMiniChatAnnotation(inputContainer, MINI_CHAT_COMPACT_INPUT_ATTR);
+  markMiniChatAnnotation(inputContainer, MINI_CHAT_INPUT_ONLY_KEEP_ATTR);
 
   for (
     let current = inputContainer;
@@ -531,7 +578,7 @@ function markMiniChatInputOnlyLayout() {
     }
 
     if (current !== inputContainer) {
-      current.setAttribute(MINI_CHAT_INPUT_ONLY_PATH_ATTR, "true");
+      markMiniChatAnnotation(current, MINI_CHAT_INPUT_ONLY_PATH_ATTR);
     }
 
     const parent = current.parentElement;
@@ -542,7 +589,7 @@ function markMiniChatInputOnlyLayout() {
 
     for (const sibling of parent.children) {
       if (sibling !== current && sibling instanceof HTMLElement) {
-        sibling.setAttribute(MINI_CHAT_INPUT_ONLY_HIDDEN_ATTR, "true");
+        markMiniChatAnnotation(sibling, MINI_CHAT_INPUT_ONLY_HIDDEN_ATTR);
       }
     }
   }
@@ -577,58 +624,40 @@ function annotateMiniChatHiddenControls() {
     return;
   }
 
-  for (const element of document.querySelectorAll(`[${MINI_CHAT_HIDDEN_CONTROL_ATTR}]`)) {
-    element.removeAttribute(MINI_CHAT_HIDDEN_CONTROL_ATTR);
-  }
+  beginMiniChatAnnotationPass();
 
-  for (const element of document.querySelectorAll(`[${MINI_CHAT_TRANSPARENT_SURFACE_ATTR}]`)) {
-    element.removeAttribute(MINI_CHAT_TRANSPARENT_SURFACE_ATTR);
-  }
+  try {
+    markMiniChatHiddenControl(findMiniChatNativeHeader());
+    markMiniChatTransparentSurfaces();
 
-  for (const element of document.querySelectorAll(`[${MINI_CHAT_COMPACT_INPUT_ATTR}]`)) {
-    element.removeAttribute(MINI_CHAT_COMPACT_INPUT_ATTR);
-  }
+    const controls = getMiniChatActionControls();
+    const donationControls = controls.filter((control) => getCompactText(control).includes("후원하기"));
 
-  for (const element of document.querySelectorAll(`[${MINI_CHAT_INPUT_ONLY_PATH_ATTR}]`)) {
-    element.removeAttribute(MINI_CHAT_INPUT_ONLY_PATH_ATTR);
-  }
+    for (const control of donationControls) {
+      const actionRow = findMiniChatActionControlRow(control);
 
-  for (const element of document.querySelectorAll(`[${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}]`)) {
-    element.removeAttribute(MINI_CHAT_INPUT_ONLY_KEEP_ATTR);
-  }
+      if (actionRow) {
+        markMiniChatHiddenControl(actionRow);
+        markMiniChatCompactInputContainer(actionRow);
 
-  for (const element of document.querySelectorAll(`[${MINI_CHAT_INPUT_ONLY_HIDDEN_ATTR}]`)) {
-    element.removeAttribute(MINI_CHAT_INPUT_ONLY_HIDDEN_ATTR);
-  }
-
-  markMiniChatHiddenControl(findMiniChatNativeHeader());
-  markMiniChatTransparentSurfaces();
-
-  const controls = getMiniChatActionControls();
-  const donationControls = controls.filter((control) => getCompactText(control).includes("후원하기"));
-
-  for (const control of donationControls) {
-    const actionRow = findMiniChatActionControlRow(control);
-
-    if (actionRow) {
-      markMiniChatHiddenControl(actionRow);
-      markMiniChatCompactInputContainer(actionRow);
-
-      for (const rowControl of getMiniChatActionControls(actionRow)) {
-        markMiniChatHiddenControl(rowControl);
+        for (const rowControl of getMiniChatActionControls(actionRow)) {
+          markMiniChatHiddenControl(rowControl);
+        }
+      } else {
+        markMiniChatHiddenControl(control);
       }
-    } else {
-      markMiniChatHiddenControl(control);
     }
-  }
 
-  for (const control of controls) {
-    if (getCompactText(control) === "채팅") {
-      markMiniChatHiddenControl(control);
+    for (const control of controls) {
+      if (getCompactText(control) === "채팅") {
+        markMiniChatHiddenControl(control);
+      }
     }
-  }
 
-  markMiniChatInputOnlyLayout();
+    markMiniChatInputOnlyLayout();
+  } finally {
+    finishMiniChatAnnotationPass();
+  }
 }
 
 function looksLikeTimestamp(element) {

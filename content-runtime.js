@@ -42,7 +42,7 @@ function connectObserver() {
       )
     );
 
-    if (hasAddedNodes && currentOptions.useAudioCompressor) {
+    if (audioCompressorMutationNeedsSync(mutations)) {
       scheduleAudioCompressorSync();
     }
 
@@ -241,10 +241,13 @@ function start() {
   loadStoredOptions(1, { allowFallback: true });
 
   if (!scanIntervalTimer) {
-    scanIntervalTimer = window.setInterval(scan, SCAN_INTERVAL_MS);
+    scanIntervalDelayMs = isMiniChatFrameEmbedUrl(window.location.href)
+      ? MINI_CHAT_SCAN_INTERVAL_MS
+      : SCAN_INTERVAL_MS;
+    scanIntervalTimer = window.setInterval(scan, scanIntervalDelayMs);
   }
 
-  if (!themeSyncTimer) {
+  if (!themeSyncTimer && !isMiniChatFrameEmbedUrl(window.location.href)) {
     themeSyncTimer = window.setInterval(syncGuestChatTheme, THEME_SYNC_INTERVAL_MS);
   }
 }

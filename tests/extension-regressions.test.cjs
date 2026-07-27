@@ -2886,7 +2886,7 @@ test("나만 보는 입력 가로채기는 최상위 페이지와 미니 채팅 
   }
 });
 
-test("미니 채팅은 외피와 빈 영역만 투명화하고 기존 채팅 스타일과 입력을 유지한다", { timeout: 30_000 }, async () => {
+test("미니 채팅은 불투명 외피로 영상 합성을 차단하고 내부 스타일과 입력을 유지한다", { timeout: 30_000 }, async () => {
   const harness = await createHarness({
     html: createMiniChatDocument(),
     initialOptions: {
@@ -2950,6 +2950,7 @@ test("미니 채팅은 외피와 빈 영역만 투명화하고 기존 채팅 스
         background: style.backgroundColor,
         borderColor: style.borderColor,
         boxShadow: style.boxShadow,
+        transform: style.transform,
         controlsBackground: controlsStyle?.backgroundColor || null,
         controlsDisplay: controlsStyle?.display || null,
         controlsHeight: controlsElement?.getBoundingClientRect().height || 0,
@@ -2974,7 +2975,49 @@ test("미니 채팅은 외피와 빈 영역만 투명화하고 기존 채팅 스
       };
     });
     const frameBackground = await frameElement.evaluate((element) => getComputedStyle(element).backgroundColor);
-    const innerState = await miniFrame.evaluate(() => {
+    const innerState = await miniFrame.evaluate(async () => {
+      const miniChatAnnotationAttributes = [
+        "data-chzzk-chat-ui-toggle-mini-chat-hidden-control",
+        "data-chzzk-chat-ui-toggle-mini-chat-transparent-surface",
+        "data-chzzk-chat-ui-toggle-mini-chat-compact-input",
+        "data-chzzk-chat-ui-toggle-mini-chat-input-only-path",
+        "data-chzzk-chat-ui-toggle-mini-chat-input-only-keep",
+        "data-chzzk-chat-ui-toggle-mini-chat-input-only-hidden"
+      ];
+      const annotationObserver = new MutationObserver(() => {});
+
+      annotationObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: miniChatAnnotationAttributes,
+        subtree: true
+      });
+      annotateMiniChatHiddenControls();
+      annotationObserver.takeRecords();
+      annotateMiniChatHiddenControls();
+      const stableAnnotationMutationCount = annotationObserver.takeRecords().length;
+
+      annotationObserver.disconnect();
+
+      const waitForRender = () => new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve))
+      );
+      const scanObserver = new MutationObserver(() => {});
+
+      scanObserver.observe(document.documentElement, {
+        attributes: true,
+        characterData: true,
+        childList: true,
+        subtree: true
+      });
+      scan();
+      await waitForRender();
+      scanObserver.takeRecords();
+      scan();
+      await waitForRender();
+      const stableScanMutationCount = scanObserver.takeRecords().length;
+
+      scanObserver.disconnect();
+
       const ids = [
         "mini-app-root",
         "aside-chatting",
@@ -3058,7 +3101,11 @@ test("미니 채팅은 외피와 빈 영역만 투명화하고 기존 채팅 스
         ) || false,
         transparentSurfaceCount: document.querySelectorAll(
           '[data-chzzk-chat-ui-toggle-mini-chat-transparent-surface="true"]'
-        ).length
+        ).length,
+        scanIntervalDelayMs,
+        themePollingActive: Boolean(themeSyncTimer),
+        stableAnnotationMutationCount,
+        stableScanMutationCount
       };
     });
 
@@ -3071,9 +3118,10 @@ test("미니 채팅은 외피와 빈 영역만 투명화하고 기존 채팅 스
       actionsBox.x >= emojiButtonBox.x + emojiButtonBox.width - 0.1,
       JSON.stringify({ actionsBox, emojiButtonBox })
     );
-    assert.equal(outerState.background, transparent);
+    assert.equal(outerState.background, "rgb(249, 250, 251)");
     assert.equal(outerState.borderColor, transparent);
     assert.equal(outerState.boxShadow, "none");
+    assert.equal(outerState.transform, "none");
     assert.equal(outerState.controlsBackground, transparent);
     assert.equal(outerState.controlsDisplay, "flex");
     assert.ok(Math.abs(outerState.controlsHeight - 52) <= 0.1);
@@ -3093,7 +3141,7 @@ test("미니 채팅은 외피와 빈 영역만 투명화하고 기존 채팅 스
     assert.equal(outerState.resizeBackground, transparent);
     assert.ok(Math.abs(outerState.resizeHeight - 10) <= 0.1);
     assert.ok(Math.abs(outerState.resizeWidth - 10) <= 0.1);
-    assert.equal(frameBackground, transparent);
+    assert.equal(frameBackground, "rgb(249, 250, 251)");
     assert.equal(innerState.embed, "true");
     assert.equal(innerState.rootBackground, transparent);
     assert.equal(innerState.bodyBackground, transparent);
@@ -3132,6 +3180,10 @@ test("미니 채팅은 외피와 빈 영역만 투명화하고 기존 채팅 스
     assert.equal(innerState.emojiButtonTop, "0px");
     assert.equal(innerState.inputVisible, true);
     assert.ok(innerState.transparentSurfaceCount >= 5);
+    assert.equal(innerState.scanIntervalDelayMs, 30_000);
+    assert.equal(innerState.themePollingActive, false);
+    assert.equal(innerState.stableAnnotationMutationCount, 0);
+    assert.equal(innerState.stableScanMutationCount, 0);
 
     await miniFrame.locator("#mini-chat-input").fill("입력 유지 확인");
     assert.equal(await miniFrame.locator("#mini-chat-input").inputValue(), "입력 유지 확인");
@@ -4265,6 +4317,21 @@ test("오디오 개선은 주 영상에 설정값을 적용하고 끄면 원음 
     assert.equal(beforeGesture.state, "waiting");
     assert.equal(beforeGesture.contextCreated, false);
 
+    await harness.page.evaluate(() => {
+      const originalConnect = AudioNode.prototype.connect;
+      const originalDisconnect = AudioNode.prototype.disconnect;
+
+      window.__audioGraphCalls = { connect: 0, disconnect: 0 };
+      AudioNode.prototype.connect = function (...args) {
+        window.__audioGraphCalls.connect += 1;
+        return originalConnect.apply(this, args);
+      };
+      AudioNode.prototype.disconnect = function (...args) {
+        window.__audioGraphCalls.disconnect += 1;
+        return originalDisconnect.apply(this, args);
+      };
+    });
+
     await harness.page.mouse.click(10, 10);
     await harness.page.waitForFunction(() =>
       document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState === "on"
@@ -4278,7 +4345,8 @@ test("오디오 개선은 주 영상에 설정값을 적용하고 끄면 원음 
       ratio: audioCompressorState.compressor?.ratio.value,
       attack: audioCompressorState.compressor?.attack.value,
       release: audioCompressorState.compressor?.release.value,
-      gain: audioCompressorState.gain?.gain.value
+      gain: audioCompressorState.gain?.gain.value,
+      graphCalls: { ...window.__audioGraphCalls }
     }));
 
     assert.equal(enabled.state, "on");
@@ -4289,6 +4357,32 @@ test("오디오 개선은 주 영상에 설정값을 적용하고 끄면 원음 
     assert.ok(Math.abs(enabled.attack - 0.03) < 0.001);
     assert.ok(Math.abs(enabled.release - 0.4) < 0.001);
     assert.ok(Math.abs(enabled.gain - 1.35) < 0.001);
+
+    await harness.page.evaluate(() => {
+      const unrelatedNode = document.createElement("div");
+
+      unrelatedNode.id = "unrelated-audio-mutation";
+      document.body.append(unrelatedNode);
+    });
+    await harness.page.waitForTimeout(100);
+    assert.deepEqual(
+      await harness.page.evaluate(() => ({ ...window.__audioGraphCalls })),
+      enabled.graphCalls,
+      "영상과 관계없는 DOM 추가는 활성 오디오 그래프를 다시 연결하지 않아야 합니다"
+    );
+
+    await harness.page.evaluate(() => {
+      applyOptions({
+        ...currentOptions,
+        showBadges: !currentOptions.showBadges
+      });
+    });
+    await harness.page.waitForTimeout(50);
+    assert.deepEqual(
+      await harness.page.evaluate(() => ({ ...window.__audioGraphCalls })),
+      enabled.graphCalls,
+      "채팅 표시 설정 변경은 이미 연결된 오디오 그래프를 다시 연결하지 않아야 합니다"
+    );
 
     await harness.page.evaluate(() => {
       applyOptions({
