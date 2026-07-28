@@ -264,7 +264,16 @@ function applyGuestChatCleanBotDefault() {
 
 function getGuestChatFrameTheme() {
   if (window.self === window.top && !isLiveChatFrameUrl(window.location.href)) {
-    return detectPageTheme();
+    const trackedTheme = normalizeGuestChatTheme(currentGuestChatTheme);
+
+    if (trackedTheme) {
+      return trackedTheme;
+    }
+
+    const detectedTheme = detectPageTheme();
+    currentGuestChatTheme = detectedTheme;
+    document.documentElement.dataset.chzzkChatUiToggleDetectedTheme = detectedTheme;
+    return detectedTheme;
   }
 
   return normalizeGuestChatTheme(currentGuestChatTheme);
@@ -315,5 +324,8 @@ function isMiniFloatingChatEligibleContext() {
     return false;
   }
 
-  return Boolean(getMiniChatFrameUrl()) && !isLiveChatFrameUrl(window.location.href);
+  return (
+    Boolean(extractLiveChannelIdFromUrl(getCurrentLivePageUrl())) &&
+    !isLiveChatFrameUrl(window.location.href)
+  );
 }

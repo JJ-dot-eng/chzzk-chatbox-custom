@@ -29,10 +29,19 @@ function connectObserver() {
   }
 
   observer = new MutationObserver((mutations) => {
-    const hasAddedNodes = hasNonGeneratedAddedNodes(mutations);
-    const hasGlobalUiAddedNodes = hasNonGeneratedAddedNodesOutsideChatRows(mutations);
-    const needsLocalOnlyChatSync = localOnlyChatMutationNeedsSync(mutations);
-    const { rows: changedRows, contentMutatedRows } = collectChangedChatRowDetails(mutations);
+    const relevantMutations = mutations.filter(
+      (mutation) => !isHiddenGuestChatNativeMutation(mutation)
+    );
+
+    if (relevantMutations.length === 0) {
+      return;
+    }
+
+    const hasAddedNodes = hasNonGeneratedAddedNodes(relevantMutations);
+    const hasGlobalUiAddedNodes = hasNonGeneratedAddedNodesOutsideChatRows(relevantMutations);
+    const needsLocalOnlyChatSync = localOnlyChatMutationNeedsSync(relevantMutations);
+    const { rows: changedRows, contentMutatedRows } =
+      collectChangedChatRowDetails(relevantMutations);
     const nativeChangedRows = changedRows.filter(
       (row) => row.getAttribute(LOCAL_ONLY_CHAT_ROW_ATTR) !== "true"
     );
@@ -42,7 +51,7 @@ function connectObserver() {
       )
     );
 
-    if (hasAddedNodes && currentOptions.useAudioCompressor) {
+    if (audioCompressorMutationNeedsSync(relevantMutations)) {
       scheduleAudioCompressorSync();
     }
 
@@ -241,10 +250,13 @@ function start() {
   loadStoredOptions(1, { allowFallback: true });
 
   if (!scanIntervalTimer) {
-    scanIntervalTimer = window.setInterval(scan, SCAN_INTERVAL_MS);
+    scanIntervalDelayMs = isMiniChatFrameEmbedUrl(window.location.href)
+      ? MINI_CHAT_SCAN_INTERVAL_MS
+      : SCAN_INTERVAL_MS;
+    scanIntervalTimer = window.setInterval(scan, scanIntervalDelayMs);
   }
 
-  if (!themeSyncTimer) {
+  if (!themeSyncTimer && !isMiniChatFrameEmbedUrl(window.location.href)) {
     themeSyncTimer = window.setInterval(syncGuestChatTheme, THEME_SYNC_INTERVAL_MS);
   }
 }

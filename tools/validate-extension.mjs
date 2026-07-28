@@ -595,7 +595,7 @@ for (const token of [
   '"--chzzk-chat-ui-toggle-auto-message-color"',
   "const useChatTextColor = options?.useChatTextColor === true;",
   "useNicknameColorForMessage: useChatTextColor && options?.useNicknameColorForMessage === true",
-  'useAutoTextContrast: options?.useAutoTextContrast === true',
+  'useAutoTextContrast: options?.useAutoTextContrast !== false',
   "function syncAutoContrast(row)",
   "var autoContrastCache = new Map();",
   "AUTO_CONTRAST_CACHE_LIMIT",

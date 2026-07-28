@@ -1,4 +1,4 @@
-var SCRIPT_VERSION = "0.7.2";
+var SCRIPT_VERSION = "0.7.3";
 var GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 var CHZZK_CHAT_UI_TOGGLE_SHOULD_START = !window[GLOBAL_KEY];
 
@@ -19,7 +19,9 @@ var STORAGE_READ_TIMEOUT_MS = 700;
 var OPTIONS_LOAD_RETRY_MS = 250;
 var OPTIONS_LOAD_MAX_ATTEMPTS = 20;
 var SCAN_DELAY_MS = 50;
+var SCAN_MIN_INTERVAL_MS = 1000;
 var SCAN_INTERVAL_MS = 5000;
+var MINI_CHAT_SCAN_INTERVAL_MS = 30000;
 var FULL_CLEANUP_INTERVAL_MS = 10000;
 var UI_SYNC_DELAY_MS = 100;
 var THEME_SYNC_INTERVAL_MS = 3000;
@@ -62,6 +64,7 @@ var MINI_CHAT_COMPACT_INPUT_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-compact-
 var MINI_CHAT_INPUT_ONLY_PATH_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-path";
 var MINI_CHAT_INPUT_ONLY_KEEP_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-keep";
 var MINI_CHAT_INPUT_ONLY_HIDDEN_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-hidden";
+var MINI_CHAT_INPUT_ONLY_LAYOUT_HIDDEN_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-layout-hidden";
 var MINI_CHAT_FULLSCREEN_HOST_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-fullscreen-host";
 var LIVE_CHAT_FRAME_ATTR = "data-chzzk-chat-ui-toggle-live-chat-frame";
 var GUEST_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleGuest";
@@ -151,7 +154,7 @@ var DEFAULT_OPTIONS = {
   useNicknameFontSize: false,
   nicknameFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT,
   showBoldText: false,
-  useAutoTextContrast: false,
+  useAutoTextContrast: true,
   useChatTextColor: false,
   chatTextColor: CHAT_TEXT_COLOR_DEFAULT,
   useNicknameColorForMessage: false,
@@ -324,11 +327,13 @@ var TARGET_SELECTORS = {
 
 var currentOptions = { ...DEFAULT_OPTIONS };
 var scanTimer = 0;
+var lastScanAt = 0;
 var uiSyncTimer = 0;
 var optionsLoadTimer = 0;
 var optionsLoadGeneration = 0;
 var optionsStateRevision = 0;
 var scanIntervalTimer = 0;
+var scanIntervalDelayMs = 0;
 var isScanning = false;
 var observer = null;
 var lastFullCleanupAt = 0;
@@ -380,6 +385,7 @@ var audioCompressorState = {
   video: null,
   source: null,
   sources: new WeakMap(),
+  graphMode: "off",
   syncTimer: 0,
   resumeListenerConnected: false,
   lastError: ""

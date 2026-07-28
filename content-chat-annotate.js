@@ -1,4 +1,14 @@
 var chatRowAnnotationSnapshots = new WeakMap();
+var miniChatAnnotationPass = null;
+var MINI_CHAT_ANNOTATION_ATTRIBUTES = [
+  MINI_CHAT_HIDDEN_CONTROL_ATTR,
+  MINI_CHAT_TRANSPARENT_SURFACE_ATTR,
+  MINI_CHAT_COMPACT_INPUT_ATTR,
+  MINI_CHAT_INPUT_ONLY_PATH_ATTR,
+  MINI_CHAT_INPUT_ONLY_KEEP_ATTR,
+  MINI_CHAT_INPUT_ONLY_HIDDEN_ATTR,
+  MINI_CHAT_INPUT_ONLY_LAYOUT_HIDDEN_ATTR
+];
 
 function hasChatLikeText(element) {
   const text = element.textContent?.trim() ?? "";
@@ -100,10 +110,48 @@ function getMiniChatActionControls(root = document) {
   ]).filter((element) => element instanceof HTMLElement);
 }
 
-function markMiniChatHiddenControl(element) {
-  if (element instanceof HTMLElement) {
-    element.setAttribute(MINI_CHAT_HIDDEN_CONTROL_ATTR, "true");
+function beginMiniChatAnnotationPass() {
+  miniChatAnnotationPass = new Map(
+    MINI_CHAT_ANNOTATION_ATTRIBUTES.map((attribute) => [attribute, new Set()])
+  );
+}
+
+function markMiniChatAnnotation(element, attribute) {
+  if (!(element instanceof HTMLElement)) {
+    return;
   }
+
+  miniChatAnnotationPass?.get(attribute)?.add(element);
+
+  if (element.getAttribute(attribute) !== "true") {
+    element.setAttribute(attribute, "true");
+  }
+}
+
+function finishMiniChatAnnotationPass() {
+  const pass = miniChatAnnotationPass;
+
+  miniChatAnnotationPass = null;
+
+  if (!pass) {
+    return;
+  }
+
+  const selector = MINI_CHAT_ANNOTATION_ATTRIBUTES
+    .map((attribute) => `[${attribute}]`)
+    .join(",");
+
+  for (const element of document.querySelectorAll(selector)) {
+    for (const attribute of MINI_CHAT_ANNOTATION_ATTRIBUTES) {
+      if (element.hasAttribute(attribute) && !pass.get(attribute)?.has(element)) {
+        element.removeAttribute(attribute);
+      }
+    }
+  }
+}
+
+function markMiniChatHiddenControl(element) {
+  markMiniChatAnnotation(element, MINI_CHAT_HIDDEN_CONTROL_ATTR);
 }
 
 function markMiniChatTransparentSurfaces() {
@@ -118,7 +166,7 @@ function markMiniChatTransparentSurfaces() {
     current instanceof HTMLElement && current !== document.body && depth < 12;
     current = current.parentElement, depth += 1
   ) {
-    current.setAttribute(MINI_CHAT_TRANSPARENT_SURFACE_ATTR, "true");
+    markMiniChatAnnotation(current, MINI_CHAT_TRANSPARENT_SURFACE_ATTR);
   }
 }
 
@@ -418,7 +466,7 @@ function markMiniChatCompactInputContainer(actionRow) {
   const inputContainer = findMiniChatCompactInputContainer(actionRow);
 
   if (inputContainer instanceof HTMLElement) {
-    inputContainer.setAttribute(MINI_CHAT_COMPACT_INPUT_ATTR, "true");
+    markMiniChatAnnotation(inputContainer, MINI_CHAT_COMPACT_INPUT_ATTR);
   }
 }
 
@@ -511,6 +559,28 @@ function connectMiniChatInputOnlyScrollGuard() {
   document.addEventListener("input", scheduleMiniChatInputOnlyScrollReset, true);
 }
 
+function shouldPreserveMiniChatInputOnlyLayout(element) {
+  if (!(element instanceof HTMLElement) || hasMiniChatInputField(element)) {
+    return false;
+  }
+
+  try {
+    if (
+      element.matches("[role='log']") ||
+      element.querySelector("[role='log']") ||
+      matchesAnySafe(element, CHAT_ROW_SELECTORS) ||
+      queryAllSafe(element, CHAT_ROW_SELECTORS).length > 0
+    ) {
+      return true;
+    }
+
+    return Boolean(element.closest("aside")) &&
+      Number.parseFloat(getComputedStyle(element).flexGrow) > 0;
+  } catch (_error) {
+    return false;
+  }
+}
+
 function markMiniChatInputOnlyLayout() {
   const inputContainer = findMiniChatInputOnlyContainer();
 
@@ -518,8 +588,8 @@ function markMiniChatInputOnlyLayout() {
     return;
   }
 
-  inputContainer.setAttribute(MINI_CHAT_COMPACT_INPUT_ATTR, "true");
-  inputContainer.setAttribute(MINI_CHAT_INPUT_ONLY_KEEP_ATTR, "true");
+  markMiniChatAnnotation(inputContainer, MINI_CHAT_COMPACT_INPUT_ATTR);
+  markMiniChatAnnotation(inputContainer, MINI_CHAT_INPUT_ONLY_KEEP_ATTR);
 
   for (
     let current = inputContainer;
@@ -531,7 +601,7 @@ function markMiniChatInputOnlyLayout() {
     }
 
     if (current !== inputContainer) {
-      current.setAttribute(MINI_CHAT_INPUT_ONLY_PATH_ATTR, "true");
+      markMiniChatAnnotation(current, MINI_CHAT_INPUT_ONLY_PATH_ATTR);
     }
 
     const parent = current.parentElement;
@@ -542,7 +612,12 @@ function markMiniChatInputOnlyLayout() {
 
     for (const sibling of parent.children) {
       if (sibling !== current && sibling instanceof HTMLElement) {
-        sibling.setAttribute(MINI_CHAT_INPUT_ONLY_HIDDEN_ATTR, "true");
+        markMiniChatAnnotation(
+          sibling,
+          shouldPreserveMiniChatInputOnlyLayout(sibling)
+            ? MINI_CHAT_INPUT_ONLY_LAYOUT_HIDDEN_ATTR
+            : MINI_CHAT_INPUT_ONLY_HIDDEN_ATTR
+        );
       }
     }
   }
@@ -577,58 +652,40 @@ function annotateMiniChatHiddenControls() {
     return;
   }
 
-  for (const element of document.querySelectorAll(`[${MINI_CHAT_HIDDEN_CONTROL_ATTR}]`)) {
-    element.removeAttribute(MINI_CHAT_HIDDEN_CONTROL_ATTR);
-  }
+  beginMiniChatAnnotationPass();
 
-  for (const element of document.querySelectorAll(`[${MINI_CHAT_TRANSPARENT_SURFACE_ATTR}]`)) {
-    element.removeAttribute(MINI_CHAT_TRANSPARENT_SURFACE_ATTR);
-  }
+  try {
+    markMiniChatHiddenControl(findMiniChatNativeHeader());
+    markMiniChatTransparentSurfaces();
 
-  for (const element of document.querySelectorAll(`[${MINI_CHAT_COMPACT_INPUT_ATTR}]`)) {
-    element.removeAttribute(MINI_CHAT_COMPACT_INPUT_ATTR);
-  }
+    const controls = getMiniChatActionControls();
+    const donationControls = controls.filter((control) => getCompactText(control).includes("후원하기"));
 
-  for (const element of document.querySelectorAll(`[${MINI_CHAT_INPUT_ONLY_PATH_ATTR}]`)) {
-    element.removeAttribute(MINI_CHAT_INPUT_ONLY_PATH_ATTR);
-  }
+    for (const control of donationControls) {
+      const actionRow = findMiniChatActionControlRow(control);
 
-  for (const element of document.querySelectorAll(`[${MINI_CHAT_INPUT_ONLY_KEEP_ATTR}]`)) {
-    element.removeAttribute(MINI_CHAT_INPUT_ONLY_KEEP_ATTR);
-  }
+      if (actionRow) {
+        markMiniChatHiddenControl(actionRow);
+        markMiniChatCompactInputContainer(actionRow);
 
-  for (const element of document.querySelectorAll(`[${MINI_CHAT_INPUT_ONLY_HIDDEN_ATTR}]`)) {
-    element.removeAttribute(MINI_CHAT_INPUT_ONLY_HIDDEN_ATTR);
-  }
-
-  markMiniChatHiddenControl(findMiniChatNativeHeader());
-  markMiniChatTransparentSurfaces();
-
-  const controls = getMiniChatActionControls();
-  const donationControls = controls.filter((control) => getCompactText(control).includes("후원하기"));
-
-  for (const control of donationControls) {
-    const actionRow = findMiniChatActionControlRow(control);
-
-    if (actionRow) {
-      markMiniChatHiddenControl(actionRow);
-      markMiniChatCompactInputContainer(actionRow);
-
-      for (const rowControl of getMiniChatActionControls(actionRow)) {
-        markMiniChatHiddenControl(rowControl);
+        for (const rowControl of getMiniChatActionControls(actionRow)) {
+          markMiniChatHiddenControl(rowControl);
+        }
+      } else {
+        markMiniChatHiddenControl(control);
       }
-    } else {
-      markMiniChatHiddenControl(control);
     }
-  }
 
-  for (const control of controls) {
-    if (getCompactText(control) === "채팅") {
-      markMiniChatHiddenControl(control);
+    for (const control of controls) {
+      if (getCompactText(control) === "채팅") {
+        markMiniChatHiddenControl(control);
+      }
     }
-  }
 
-  markMiniChatInputOnlyLayout();
+    markMiniChatInputOnlyLayout();
+  } finally {
+    finishMiniChatAnnotationPass();
+  }
 }
 
 function looksLikeTimestamp(element) {
@@ -1681,6 +1738,10 @@ function cleanupUnscopedAnnotations(root = document) {
       continue;
     }
 
+    if (isHiddenGuestChatNativeContent(element)) {
+      continue;
+    }
+
     const scopedRow = element instanceof HTMLElement && element.getAttribute(CHAT_ROW_ATTR) === "true"
       ? element
       : element.closest(`[${CHAT_ROW_ATTR}="true"]`);
@@ -1708,8 +1769,40 @@ function cleanupUnscopedAnnotationsWhenDue() {
   cleanupUnscopedAnnotations();
 }
 
+function isHiddenGuestChatNativeContent(element) {
+  if (
+    currentOptions.useGuestChatFrame !== true ||
+    window.self !== window.top ||
+    !(element instanceof Element)
+  ) {
+    return false;
+  }
+
+  const host = element.closest(`[${GUEST_CHAT_HOST_ATTR}="true"]`);
+
+  if (!(host instanceof HTMLElement) || element === host) {
+    return false;
+  }
+
+  if (element.closest(`#${GUEST_CHAT_FRAME_CONTAINER_ID}`)) {
+    return false;
+  }
+
+  return !element.closest(`[${GUEST_CHAT_CONTROL_HOST_ATTR}="true"]`);
+}
+
+function isHiddenGuestChatNativeMutation(mutation) {
+  const element = mutation.target instanceof Element
+    ? mutation.target
+    : mutation.target.parentElement;
+
+  return isHiddenGuestChatNativeContent(element);
+}
+
 function scanRows(rows, { contentMutated = false, contentMutatedRows = null } = {}) {
-  const uniqueRows = [...new Set(rows)].filter((element) => element instanceof HTMLElement);
+  const uniqueRows = [...new Set(rows)]
+    .filter((element) => element instanceof HTMLElement)
+    .filter((element) => !isHiddenGuestChatNativeContent(element));
 
   cleanupRows(uniqueRows);
 
@@ -1727,6 +1820,11 @@ function scan() {
     return;
   }
 
+  if (scanTimer) {
+    window.clearTimeout(scanTimer);
+    scanTimer = 0;
+  }
+
   isScanning = true;
   const roots = getChatRoots();
 
@@ -1735,6 +1833,10 @@ function scan() {
     const rows = new Set();
 
     for (const root of roots) {
+      if (isHiddenGuestChatNativeContent(root)) {
+        continue;
+      }
+
       for (const row of getChatRows(root)) {
         rows.add(row);
       }
@@ -1746,6 +1848,7 @@ function scan() {
     syncGuestChatUi();
   } finally {
     isScanning = false;
+    lastScanAt = Date.now();
   }
 }
 
@@ -1962,6 +2065,15 @@ function collectChangedChatRows(mutations) {
 }
 
 function scheduleScan() {
-  window.clearTimeout(scanTimer);
-  scanTimer = window.setTimeout(scan, SCAN_DELAY_MS);
+  if (scanTimer) {
+    return;
+  }
+
+  const elapsedSinceLastScan = Date.now() - lastScanAt;
+  const delay = Math.max(SCAN_DELAY_MS, SCAN_MIN_INTERVAL_MS - elapsedSinceLastScan);
+
+  scanTimer = window.setTimeout(() => {
+    scanTimer = 0;
+    scan();
+  }, delay);
 }

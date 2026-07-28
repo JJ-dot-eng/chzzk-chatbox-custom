@@ -234,9 +234,13 @@ function createMiniChatDocument() {
         width: auto;
         height: 40px;
       }
+      #mini-portal {
+        flex: 1 1 auto;
+      }
     </style>
   </head>
   <body>
+    <div id="mini-portal"></div>
     <div id="mini-app-root">
       <aside id="aside-chatting">
         <section id="mini-header-decoy" class="_header_notice_fixture_12">
@@ -1009,6 +1013,51 @@ after(async () => {
   await browser?.close();
 });
 
+test("automatic text contrast defaults to on and preserves an explicit off setting", { timeout: 30_000 }, async () => {
+  const popupDefault = await createPopupHarness();
+  const popupDisabled = await createPopupHarness({
+    initialOptions: { useAutoTextContrast: false }
+  });
+  const contentDefault = await createHarness();
+  const contentDisabled = await createHarness({
+    initialOptions: { useAutoTextContrast: false }
+  });
+
+  try {
+    assert.equal(
+      await popupDefault.page.locator('[data-option="useAutoTextContrast"]').isChecked(),
+      true
+    );
+    assert.equal(
+      await popupDisabled.page.locator('[data-option="useAutoTextContrast"]').isChecked(),
+      false
+    );
+    assert.equal(
+      await contentDefault.page.locator("html").getAttribute(
+        "data-chzzk-chat-ui-toggle-auto-text-contrast"
+      ),
+      "on"
+    );
+    assert.equal(
+      await contentDisabled.page.locator("html").getAttribute(
+        "data-chzzk-chat-ui-toggle-auto-text-contrast"
+      ),
+      "off"
+    );
+    assertNoPageErrors(popupDefault.pageErrors);
+    assertNoPageErrors(popupDisabled.pageErrors);
+    assertNoPageErrors(contentDefault.pageErrors);
+    assertNoPageErrors(contentDisabled.pageErrors);
+  } finally {
+    await Promise.all([
+      popupDefault.close(),
+      popupDisabled.close(),
+      contentDefault.close(),
+      contentDisabled.close()
+    ]);
+  }
+});
+
 test("style presets preserve every chat window selection", { timeout: 30_000 }, async () => {
   const harness = await createPopupHarness();
   const chatWindowScenarios = [
@@ -1023,7 +1072,8 @@ test("style presets preserve every chat window selection", { timeout: 30_000 }, 
         showNicknames: true,
         showBadges: true,
         showChatBoxes: true,
-        showNonChatPanels: false
+        showNonChatPanels: false,
+        useAutoTextContrast: true
       }
     },
     {
@@ -1032,7 +1082,8 @@ test("style presets preserve every chat window selection", { timeout: 30_000 }, 
         showNicknames: false,
         showBadges: false,
         showChatBoxes: true,
-        showBoldText: true
+        showBoldText: true,
+        useAutoTextContrast: true
       }
     },
     {
@@ -1041,7 +1092,8 @@ test("style presets preserve every chat window selection", { timeout: 30_000 }, 
         showNicknames: true,
         showBadges: false,
         showChatBoxes: false,
-        showBoldText: false
+        showBoldText: false,
+        useAutoTextContrast: true
       }
     }
   ];
@@ -2886,7 +2938,7 @@ test("나만 보는 입력 가로채기는 최상위 페이지와 미니 채팅 
   }
 });
 
-test("미니 채팅은 외피와 빈 영역만 투명화하고 기존 채팅 스타일과 입력을 유지한다", { timeout: 30_000 }, async () => {
+test("미니 채팅은 투명 외피와 성능 최적화를 함께 유지한다", { timeout: 30_000 }, async () => {
   const harness = await createHarness({
     html: createMiniChatDocument(),
     initialOptions: {
@@ -2916,6 +2968,28 @@ test("미니 채팅은 외피와 빈 영역만 투명화하고 기존 채팅 스
     const frameElement = panel.locator("#chzzk-chat-ui-toggle-mini-chat-frame");
 
     await panel.waitFor({ state: "visible" });
+    const cachedThemeState = await harness.page.evaluate(() => {
+      const originalDetectPageTheme = detectPageTheme;
+      const previousTheme = currentGuestChatTheme;
+      let detectCount = 0;
+
+      try {
+        currentGuestChatTheme = null;
+        detectPageTheme = () => {
+          detectCount += 1;
+          return "light";
+        };
+
+        return {
+          firstTheme: getGuestChatFrameTheme(),
+          secondTheme: getGuestChatFrameTheme(),
+          detectCount
+        };
+      } finally {
+        detectPageTheme = originalDetectPageTheme;
+        currentGuestChatTheme = previousTheme;
+      }
+    });
 
     const deadline = Date.now() + 5_000;
     let miniFrame = null;
@@ -2950,6 +3024,7 @@ test("미니 채팅은 외피와 빈 영역만 투명화하고 기존 채팅 스
         background: style.backgroundColor,
         borderColor: style.borderColor,
         boxShadow: style.boxShadow,
+        transform: style.transform,
         controlsBackground: controlsStyle?.backgroundColor || null,
         controlsDisplay: controlsStyle?.display || null,
         controlsHeight: controlsElement?.getBoundingClientRect().height || 0,
@@ -2974,7 +3049,50 @@ test("미니 채팅은 외피와 빈 영역만 투명화하고 기존 채팅 스
       };
     });
     const frameBackground = await frameElement.evaluate((element) => getComputedStyle(element).backgroundColor);
-    const innerState = await miniFrame.evaluate(() => {
+    const innerState = await miniFrame.evaluate(async () => {
+      const miniChatAnnotationAttributes = [
+        "data-chzzk-chat-ui-toggle-mini-chat-hidden-control",
+        "data-chzzk-chat-ui-toggle-mini-chat-transparent-surface",
+        "data-chzzk-chat-ui-toggle-mini-chat-compact-input",
+        "data-chzzk-chat-ui-toggle-mini-chat-input-only-path",
+        "data-chzzk-chat-ui-toggle-mini-chat-input-only-keep",
+        "data-chzzk-chat-ui-toggle-mini-chat-input-only-hidden",
+        "data-chzzk-chat-ui-toggle-mini-chat-input-only-layout-hidden"
+      ];
+      const annotationObserver = new MutationObserver(() => {});
+
+      annotationObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: miniChatAnnotationAttributes,
+        subtree: true
+      });
+      annotateMiniChatHiddenControls();
+      annotationObserver.takeRecords();
+      annotateMiniChatHiddenControls();
+      const stableAnnotationMutationCount = annotationObserver.takeRecords().length;
+
+      annotationObserver.disconnect();
+
+      const waitForRender = () => new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve))
+      );
+      const scanObserver = new MutationObserver(() => {});
+
+      scanObserver.observe(document.documentElement, {
+        attributes: true,
+        characterData: true,
+        childList: true,
+        subtree: true
+      });
+      scan();
+      await waitForRender();
+      scanObserver.takeRecords();
+      scan();
+      await waitForRender();
+      const stableScanMutationCount = scanObserver.takeRecords().length;
+
+      scanObserver.disconnect();
+
       const ids = [
         "mini-app-root",
         "aside-chatting",
@@ -3058,7 +3176,11 @@ test("미니 채팅은 외피와 빈 영역만 투명화하고 기존 채팅 스
         ) || false,
         transparentSurfaceCount: document.querySelectorAll(
           '[data-chzzk-chat-ui-toggle-mini-chat-transparent-surface="true"]'
-        ).length
+        ).length,
+        scanIntervalDelayMs,
+        themePollingActive: Boolean(themeSyncTimer),
+        stableAnnotationMutationCount,
+        stableScanMutationCount
       };
     });
 
@@ -3072,8 +3194,14 @@ test("미니 채팅은 외피와 빈 영역만 투명화하고 기존 채팅 스
       JSON.stringify({ actionsBox, emojiButtonBox })
     );
     assert.equal(outerState.background, transparent);
+    assert.deepEqual(cachedThemeState, {
+      firstTheme: "light",
+      secondTheme: "light",
+      detectCount: 1
+    });
     assert.equal(outerState.borderColor, transparent);
     assert.equal(outerState.boxShadow, "none");
+    assert.equal(outerState.transform, "none");
     assert.equal(outerState.controlsBackground, transparent);
     assert.equal(outerState.controlsDisplay, "flex");
     assert.ok(Math.abs(outerState.controlsHeight - 52) <= 0.1);
@@ -3132,6 +3260,10 @@ test("미니 채팅은 외피와 빈 영역만 투명화하고 기존 채팅 스
     assert.equal(innerState.emojiButtonTop, "0px");
     assert.equal(innerState.inputVisible, true);
     assert.ok(innerState.transparentSurfaceCount >= 5);
+    assert.equal(innerState.scanIntervalDelayMs, 30_000);
+    assert.equal(innerState.themePollingActive, false);
+    assert.equal(innerState.stableAnnotationMutationCount, 0);
+    assert.equal(innerState.stableScanMutationCount, 0);
 
     await miniFrame.locator("#mini-chat-input").fill("입력 유지 확인");
     assert.equal(await miniFrame.locator("#mini-chat-input").inputValue(), "입력 유지 확인");
@@ -4265,6 +4397,38 @@ test("오디오 개선은 주 영상에 설정값을 적용하고 끄면 원음 
     assert.equal(beforeGesture.state, "waiting");
     assert.equal(beforeGesture.contextCreated, false);
 
+    await harness.page.evaluate(() => {
+      const originalConnect = AudioNode.prototype.connect;
+      const originalDisconnect = AudioNode.prototype.disconnect;
+
+      window.__audioGraphCalls = { bypassConnect: 0, connect: 0, disconnect: 0 };
+      AudioNode.prototype.connect = function (...args) {
+        window.__audioGraphCalls.connect += 1;
+
+        if (
+          window.__failNextCompressorConnect === true &&
+          this === audioCompressorState.compressor &&
+          args[0] === audioCompressorState.gain
+        ) {
+          window.__failNextCompressorConnect = false;
+          throw new Error("forced-compressor-connect-failure");
+        }
+
+        if (
+          this === audioCompressorState.source &&
+          args[0] === audioCompressorState.context?.destination
+        ) {
+          window.__audioGraphCalls.bypassConnect += 1;
+        }
+
+        return originalConnect.apply(this, args);
+      };
+      AudioNode.prototype.disconnect = function (...args) {
+        window.__audioGraphCalls.disconnect += 1;
+        return originalDisconnect.apply(this, args);
+      };
+    });
+
     await harness.page.mouse.click(10, 10);
     await harness.page.waitForFunction(() =>
       document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState === "on"
@@ -4278,7 +4442,8 @@ test("오디오 개선은 주 영상에 설정값을 적용하고 끄면 원음 
       ratio: audioCompressorState.compressor?.ratio.value,
       attack: audioCompressorState.compressor?.attack.value,
       release: audioCompressorState.compressor?.release.value,
-      gain: audioCompressorState.gain?.gain.value
+      gain: audioCompressorState.gain?.gain.value,
+      graphCalls: { ...window.__audioGraphCalls }
     }));
 
     assert.equal(enabled.state, "on");
@@ -4289,6 +4454,32 @@ test("오디오 개선은 주 영상에 설정값을 적용하고 끄면 원음 
     assert.ok(Math.abs(enabled.attack - 0.03) < 0.001);
     assert.ok(Math.abs(enabled.release - 0.4) < 0.001);
     assert.ok(Math.abs(enabled.gain - 1.35) < 0.001);
+
+    await harness.page.evaluate(() => {
+      const unrelatedNode = document.createElement("div");
+
+      unrelatedNode.id = "unrelated-audio-mutation";
+      document.body.append(unrelatedNode);
+    });
+    await harness.page.waitForTimeout(100);
+    assert.deepEqual(
+      await harness.page.evaluate(() => ({ ...window.__audioGraphCalls })),
+      enabled.graphCalls,
+      "영상과 관계없는 DOM 추가는 활성 오디오 그래프를 다시 연결하지 않아야 합니다"
+    );
+
+    await harness.page.evaluate(() => {
+      applyOptions({
+        ...currentOptions,
+        showBadges: !currentOptions.showBadges
+      });
+    });
+    await harness.page.waitForTimeout(50);
+    assert.deepEqual(
+      await harness.page.evaluate(() => ({ ...window.__audioGraphCalls })),
+      enabled.graphCalls,
+      "채팅 표시 설정 변경은 이미 연결된 오디오 그래프를 다시 연결하지 않아야 합니다"
+    );
 
     await harness.page.evaluate(() => {
       applyOptions({
@@ -4302,11 +4493,195 @@ test("오디오 개선은 주 영상에 설정값을 적용하고 끄면 원음 
 
     const disabled = await harness.page.evaluate(() => ({
       state: document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState,
-      error: audioCompressorState.lastError
+      error: audioCompressorState.lastError,
+      graphMode: audioCompressorState.graphMode,
+      graphCalls: { ...window.__audioGraphCalls }
     }));
 
     assert.equal(disabled.state, "off");
     assert.equal(disabled.error, "");
+    assert.equal(disabled.graphMode, "bypass");
+    assert.equal(disabled.graphCalls.bypassConnect, 1);
+
+    await harness.page.evaluate(() => {
+      window.__failNextCompressorConnect = true;
+      applyOptions({
+        ...currentOptions,
+        useAudioCompressor: true
+      });
+    });
+    await harness.page.waitForFunction(() =>
+      document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState === "error" &&
+      window.__failNextCompressorConnect === false
+    );
+
+    const failedReconnect = await harness.page.evaluate(() => ({
+      state: document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState,
+      error: audioCompressorState.lastError,
+      graphMode: audioCompressorState.graphMode,
+      graphCalls: { ...window.__audioGraphCalls }
+    }));
+
+    assert.equal(failedReconnect.state, "error");
+    assert.match(failedReconnect.error, /forced-compressor-connect-failure/);
+    assert.equal(failedReconnect.graphMode, "bypass");
+    assert.equal(failedReconnect.graphCalls.bypassConnect, 2);
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("게스트 채팅에서 숨긴 원본 목록의 새 행은 다시 스캔하지 않는다", { timeout: 20_000 }, async () => {
+  const harness = await createHarness({
+    html: createLocalOnlyChatDocument(),
+    initialOptions: { useGuestChatFrame: true }
+  });
+
+  try {
+    await harness.page.locator("#chzzk-chat-ui-toggle-guest-chat-frame-container")
+      .waitFor({ state: "visible" });
+
+    await harness.page.evaluate(() => {
+      const originalScanRows = scanRows;
+      const row = document.createElement("div");
+
+      window.__hiddenGuestScanCount = 0;
+      scanRows = (rows, options) => {
+        window.__hiddenGuestScanCount += [...rows].length;
+        return originalScanRows(rows, options);
+      };
+
+      row.id = "hidden-native-row";
+      row.className = "_item_fixture_7";
+      row.innerHTML = `
+        <div class="_container_fixture_1">
+          <div class="_chatting_message_fixture_21">
+            <button type="button" class="_nickname_fixture_37">
+              <span class="_nickname_shell_fixture_57">
+                <span class="_text_fixture_2">hidden native</span>
+              </span>
+            </button>
+            <span class="_text_fixture_1">hidden native message</span>
+          </div>
+        </div>
+      `;
+      document.querySelector("._wrapper_log_fixture").append(row);
+    });
+    await harness.page.waitForTimeout(250);
+
+    const enabledState = await harness.page.evaluate(() => ({
+      listDisplay: getComputedStyle(
+        document.querySelector("._container_log_fixture")
+      ).display,
+      rowAnnotated: document.getElementById("hidden-native-row")
+        ?.getAttribute("data-chzzk-chat-ui-toggle-chat-row") || null,
+      scanCount: window.__hiddenGuestScanCount
+    }));
+
+    assert.equal(enabledState.listDisplay, "none");
+    assert.equal(enabledState.rowAnnotated, null);
+    assert.equal(enabledState.scanCount, 0);
+
+    await harness.page.evaluate((storageKey) => {
+      const nextOptions = {
+        ...window.__storageHarness.store[storageKey],
+        useGuestChatFrame: false
+      };
+
+      window.__storageHarness.emitOptionsChange(nextOptions);
+    }, STORAGE_KEY);
+    await harness.page.waitForFunction(() =>
+      document.documentElement.dataset.chzzkChatUiToggleGuestChatFrame === "off" &&
+      document.getElementById("hidden-native-row")
+        ?.getAttribute("data-chzzk-chat-ui-toggle-chat-row") === "true"
+    );
+
+    assert.ok(
+      await harness.page.evaluate(() => window.__hiddenGuestScanCount > 0)
+    );
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("입력 전용 미니 채팅은 숨긴 채팅 목록의 가상화 높이를 유지한다", { timeout: 30_000 }, async () => {
+  const harness = await createHarness({
+    html: createMiniChatDocument(),
+    initialOptions: {
+      useMiniFloatingChat: true,
+      miniFloatingChatInputOnly: true
+    }
+  });
+
+  try {
+    await harness.page.locator("#chzzk-chat-ui-toggle-mini-chat-panel")
+      .waitFor({ state: "visible" });
+
+    const deadline = Date.now() + 5_000;
+    let miniFrame = null;
+
+    while (Date.now() < deadline) {
+      miniFrame = harness.page.frames().find((candidate) =>
+        candidate.url().includes("chzzkChatUiToggleMini=1")
+      ) || null;
+      if (miniFrame) break;
+      await harness.page.waitForTimeout(25);
+    }
+
+    assert.ok(miniFrame);
+    await injectContentScripts(miniFrame);
+    await miniFrame.waitForFunction(() =>
+      document.documentElement.dataset.chzzkChatUiToggleMiniFloatingChatInputOnly === "on" &&
+      document.getElementById("mini-log-shell")
+        ?.getAttribute("data-chzzk-chat-ui-toggle-mini-chat-input-only-layout-hidden") === "true"
+    );
+
+    const state = await miniFrame.evaluate(() => {
+      const logShell = document.getElementById("mini-log-shell");
+      const inputContainer = document.getElementById("mini-native-input");
+      const message = document.getElementById("mini-message");
+      const portal = document.getElementById("mini-portal");
+      const logRect = logShell?.getBoundingClientRect();
+      const inputRect = inputContainer?.getBoundingClientRect();
+
+      return {
+        logDisplay: logShell ? getComputedStyle(logShell).display : null,
+        logPosition: logShell ? getComputedStyle(logShell).position : null,
+        logVisibility: logShell ? getComputedStyle(logShell).visibility : null,
+        logWidth: logRect?.width || 0,
+        logHeight: logRect?.height || 0,
+        genericHidden: logShell?.hasAttribute(
+          "data-chzzk-chat-ui-toggle-mini-chat-input-only-hidden"
+        ) || false,
+        inputDisplay: inputContainer ? getComputedStyle(inputContainer).display : null,
+        inputVisibility: inputContainer ? getComputedStyle(inputContainer).visibility : null,
+        inputHeight: inputRect?.height || 0,
+        messageVisibility: message ? getComputedStyle(message).visibility : null,
+        portalDisplay: portal ? getComputedStyle(portal).display : null,
+        portalGenericHidden: portal?.hasAttribute(
+          "data-chzzk-chat-ui-toggle-mini-chat-input-only-hidden"
+        ) || false,
+        portalLayoutHidden: portal?.hasAttribute(
+          "data-chzzk-chat-ui-toggle-mini-chat-input-only-layout-hidden"
+        ) || false
+      };
+    });
+
+    assert.equal(state.logDisplay, "flex");
+    assert.equal(state.logPosition, "absolute");
+    assert.equal(state.logVisibility, "hidden");
+    assert.ok(state.logWidth > 0);
+    assert.ok(state.logHeight > 0);
+    assert.equal(state.genericHidden, false);
+    assert.equal(state.inputDisplay, "flex");
+    assert.equal(state.inputVisibility, "visible");
+    assert.ok(state.inputHeight > 0);
+    assert.equal(state.messageVisibility, "hidden");
+    assert.equal(state.portalDisplay, "none");
+    assert.equal(state.portalGenericHidden, true);
+    assert.equal(state.portalLayoutHidden, false);
     assertNoPageErrors(harness.pageErrors);
   } finally {
     await harness.close();

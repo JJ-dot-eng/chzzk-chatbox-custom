@@ -2,7 +2,7 @@ const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const PRESET_STORAGE_KEY = "chzzkChatUiToggleCustomPreset";
 const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
 const UPDATE_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_UPDATE_OPTIONS";
-const CONTENT_VERSION = "0.7.2";
+const CONTENT_VERSION = "0.7.3";
 const POPUP_THEME_FALLBACK = "light";
 
 const DEFAULT_CHAT_BOX_COLOR = "#dfdfdf";
@@ -74,7 +74,7 @@ const DEFAULT_OPTIONS = {
   useNicknameFontSize: false,
   nicknameFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT,
   showBoldText: false,
-  useAutoTextContrast: false,
+  useAutoTextContrast: true,
   useChatTextColor: false,
   chatTextColor: DEFAULT_CHAT_TEXT_COLOR,
   useNicknameColorForMessage: false,
@@ -92,7 +92,8 @@ const DEFAULT_OPTIONS = {
 
 const PRESET_DEFINITIONS = {
   default: {
-    showNonChatPanels: false
+    showNonChatPanels: false,
+    useAutoTextContrast: true
   },
   clean: {
     showNicknames: false,
@@ -100,7 +101,8 @@ const PRESET_DEFINITIONS = {
     showTimestamps: false,
     showNonChatPanels: false,
     showChatBoxes: true,
-    showBoldText: true
+    showBoldText: true,
+    useAutoTextContrast: true
   },
   minimal: {
     showBadges: false,
@@ -108,6 +110,7 @@ const PRESET_DEFINITIONS = {
     showNonChatPanels: false,
     showChatBoxes: false,
     showLargeText: false,
+    useAutoTextContrast: true,
     useChatTextColor: false,
     useNicknameColorForMessage: false
   }
@@ -355,7 +358,7 @@ function normalizeOptions(options) {
     useNicknameFontSize: options?.useNicknameFontSize === true,
     nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt),
     showBoldText: options?.showBoldText === true || legacyBoldText,
-    useAutoTextContrast: options?.useAutoTextContrast === true,
+    useAutoTextContrast: options?.useAutoTextContrast !== false,
     useChatTextColor,
     chatTextColor: normalizeHexColor(options?.chatTextColor, DEFAULT_CHAT_TEXT_COLOR),
     useNicknameColorForMessage: useChatTextColor && options?.useNicknameColorForMessage === true,

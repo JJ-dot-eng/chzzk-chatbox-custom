@@ -56,10 +56,20 @@ function clampMiniChatBoundsToViewport(
 function applyMiniChatPanelBounds(panel, bounds, clampOptions) {
   const nextBounds = clampMiniChatBoundsToViewport(bounds, clampOptions);
 
-  panel.style.left = `${nextBounds.left}px`;
-  panel.style.top = `${nextBounds.top}px`;
-  panel.style.width = `${nextBounds.width}px`;
-  panel.style.height = `${nextBounds.height}px`;
+  setMiniChatPanelPixelStyle(panel, "left", nextBounds.left);
+  setMiniChatPanelPixelStyle(panel, "top", nextBounds.top);
+  setMiniChatPanelPixelStyle(panel, "width", nextBounds.width);
+  setMiniChatPanelPixelStyle(panel, "height", nextBounds.height);
+}
+
+function setMiniChatPanelPixelStyle(panel, property, value) {
+  const currentValue = Number.parseFloat(panel.style[property]);
+
+  if (Number.isFinite(currentValue) && Math.abs(currentValue - value) < 0.01) {
+    return;
+  }
+
+  panel.style[property] = `${value}px`;
 }
 
 function readMiniChatPanelBounds(panel) {
@@ -74,6 +84,23 @@ function readMiniChatPanelBounds(panel) {
     top: Number.isFinite(styledTop) ? styledTop : rect.bottom - height,
     width: rect.width / scaleRatio,
     height
+  }, { inputOnly: currentOptions.miniFloatingChatInputOnly });
+}
+
+function readMiniChatPanelStyleBounds(panel) {
+  const fallbackBounds = normalizeMiniChatBounds(currentOptions.miniFloatingChatBounds, {
+    inputOnly: currentOptions.miniFloatingChatInputOnly
+  });
+  const readPixelValue = (property, fallback) => {
+    const value = Number.parseFloat(panel.style[property]);
+    return Number.isFinite(value) ? value : fallback;
+  };
+
+  return normalizeMiniChatBounds({
+    left: readPixelValue("left", fallbackBounds.left),
+    top: readPixelValue("top", fallbackBounds.top),
+    width: readPixelValue("width", fallbackBounds.width),
+    height: readPixelValue("height", fallbackBounds.height)
   }, { inputOnly: currentOptions.miniFloatingChatInputOnly });
 }
 
@@ -1022,7 +1049,9 @@ function syncMiniFloatingChatPanel() {
   const isExistingPanel = existingPanel instanceof HTMLElement;
   const panel = isExistingPanel ? existingPanel : createMiniFloatingChatPanel();
   const iframe = panel.querySelector(`#${MINI_CHAT_FRAME_ID}`);
-  const nextBounds = isExistingPanel ? readMiniChatPanelBounds(panel) : currentOptions.miniFloatingChatBounds;
+  const nextBounds = isExistingPanel
+    ? readMiniChatPanelStyleBounds(panel)
+    : currentOptions.miniFloatingChatBounds;
 
   if (iframe instanceof HTMLIFrameElement && iframe.src !== frameUrl) {
     iframe.src = frameUrl;

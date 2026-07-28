@@ -212,7 +212,7 @@ function normalizeOptions(options) {
     useNicknameFontSize: options?.useNicknameFontSize === true,
     nicknameFontSizePt: normalizeChatFontSizePt(options?.nicknameFontSizePt),
     showBoldText: options?.showBoldText === true || legacyBoldText,
-    useAutoTextContrast: options?.useAutoTextContrast === true,
+    useAutoTextContrast: options?.useAutoTextContrast !== false,
     useChatTextColor,
     chatTextColor: normalizeHexColor(options?.chatTextColor, DEFAULT_OPTIONS.chatTextColor),
     useNicknameColorForMessage: useChatTextColor && options?.useNicknameColorForMessage === true,
