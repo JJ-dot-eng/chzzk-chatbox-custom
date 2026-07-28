@@ -2886,7 +2886,7 @@ test("나만 보는 입력 가로채기는 최상위 페이지와 미니 채팅 
   }
 });
 
-test("미니 채팅은 불투명 외피로 영상 합성을 차단하고 내부 스타일과 입력을 유지한다", { timeout: 30_000 }, async () => {
+test("미니 채팅은 투명 외피와 성능 최적화를 함께 유지한다", { timeout: 30_000 }, async () => {
   const harness = await createHarness({
     html: createMiniChatDocument(),
     initialOptions: {
@@ -3140,7 +3140,7 @@ test("미니 채팅은 불투명 외피로 영상 합성을 차단하고 내부 
       actionsBox.x >= emojiButtonBox.x + emojiButtonBox.width - 0.1,
       JSON.stringify({ actionsBox, emojiButtonBox })
     );
-    assert.equal(outerState.background, "rgb(249, 250, 251)");
+    assert.equal(outerState.background, transparent);
     assert.deepEqual(cachedThemeState, {
       firstTheme: "light",
       secondTheme: "light",
@@ -3168,7 +3168,7 @@ test("미니 채팅은 불투명 외피로 영상 합성을 차단하고 내부 
     assert.equal(outerState.resizeBackground, transparent);
     assert.ok(Math.abs(outerState.resizeHeight - 10) <= 0.1);
     assert.ok(Math.abs(outerState.resizeWidth - 10) <= 0.1);
-    assert.equal(frameBackground, "rgb(249, 250, 251)");
+    assert.equal(frameBackground, transparent);
     assert.equal(innerState.embed, "true");
     assert.equal(innerState.rootBackground, transparent);
     assert.equal(innerState.bodyBackground, transparent);
