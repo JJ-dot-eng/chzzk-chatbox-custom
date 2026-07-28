@@ -1,4 +1,4 @@
-var SCRIPT_VERSION = "0.7.2";
+var SCRIPT_VERSION = "0.7.3";
 var GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 var CHZZK_CHAT_UI_TOGGLE_SHOULD_START = !window[GLOBAL_KEY];
 
@@ -154,7 +154,7 @@ var DEFAULT_OPTIONS = {
   useNicknameFontSize: false,
   nicknameFontSizePt: CHAT_FONT_SIZE_PT_DEFAULT,
   showBoldText: false,
-  useAutoTextContrast: false,
+  useAutoTextContrast: true,
   useChatTextColor: false,
   chatTextColor: CHAT_TEXT_COLOR_DEFAULT,
   useNicknameColorForMessage: false,

@@ -1013,6 +1013,51 @@ after(async () => {
   await browser?.close();
 });
 
+test("automatic text contrast defaults to on and preserves an explicit off setting", { timeout: 30_000 }, async () => {
+  const popupDefault = await createPopupHarness();
+  const popupDisabled = await createPopupHarness({
+    initialOptions: { useAutoTextContrast: false }
+  });
+  const contentDefault = await createHarness();
+  const contentDisabled = await createHarness({
+    initialOptions: { useAutoTextContrast: false }
+  });
+
+  try {
+    assert.equal(
+      await popupDefault.page.locator('[data-option="useAutoTextContrast"]').isChecked(),
+      true
+    );
+    assert.equal(
+      await popupDisabled.page.locator('[data-option="useAutoTextContrast"]').isChecked(),
+      false
+    );
+    assert.equal(
+      await contentDefault.page.locator("html").getAttribute(
+        "data-chzzk-chat-ui-toggle-auto-text-contrast"
+      ),
+      "on"
+    );
+    assert.equal(
+      await contentDisabled.page.locator("html").getAttribute(
+        "data-chzzk-chat-ui-toggle-auto-text-contrast"
+      ),
+      "off"
+    );
+    assertNoPageErrors(popupDefault.pageErrors);
+    assertNoPageErrors(popupDisabled.pageErrors);
+    assertNoPageErrors(contentDefault.pageErrors);
+    assertNoPageErrors(contentDisabled.pageErrors);
+  } finally {
+    await Promise.all([
+      popupDefault.close(),
+      popupDisabled.close(),
+      contentDefault.close(),
+      contentDisabled.close()
+    ]);
+  }
+});
+
 test("style presets preserve every chat window selection", { timeout: 30_000 }, async () => {
   const harness = await createPopupHarness();
   const chatWindowScenarios = [
@@ -1027,7 +1072,8 @@ test("style presets preserve every chat window selection", { timeout: 30_000 }, 
         showNicknames: true,
         showBadges: true,
         showChatBoxes: true,
-        showNonChatPanels: false
+        showNonChatPanels: false,
+        useAutoTextContrast: true
       }
     },
     {
@@ -1036,7 +1082,8 @@ test("style presets preserve every chat window selection", { timeout: 30_000 }, 
         showNicknames: false,
         showBadges: false,
         showChatBoxes: true,
-        showBoldText: true
+        showBoldText: true,
+        useAutoTextContrast: true
       }
     },
     {
@@ -1045,7 +1092,8 @@ test("style presets preserve every chat window selection", { timeout: 30_000 }, 
         showNicknames: true,
         showBadges: false,
         showChatBoxes: false,
-        showBoldText: false
+        showBoldText: false,
+        useAutoTextContrast: true
       }
     }
   ];

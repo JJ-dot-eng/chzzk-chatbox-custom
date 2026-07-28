@@ -3,7 +3,7 @@
 - 문서 버전: v0.1
 - 작성일: 2026-07-03
 - 프로젝트: 치지직 채팅 커스텀
-- 현재 확장 버전: `0.7.2`
+- 현재 확장 버전: `0.7.3`
 - 커밋 기준: 버전별 항목에 기록
 - 기준 문서: `docs/project/project-direction.md`
 - 기준 파일: `README.md`, `manifest.json`, `package.json`, `popup.html`, `popup.js`, `content-*.js`
