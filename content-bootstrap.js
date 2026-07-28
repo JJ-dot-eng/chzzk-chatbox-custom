@@ -64,6 +64,7 @@ var MINI_CHAT_COMPACT_INPUT_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-compact-
 var MINI_CHAT_INPUT_ONLY_PATH_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-path";
 var MINI_CHAT_INPUT_ONLY_KEEP_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-keep";
 var MINI_CHAT_INPUT_ONLY_HIDDEN_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-hidden";
+var MINI_CHAT_INPUT_ONLY_LAYOUT_HIDDEN_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-input-only-layout-hidden";
 var MINI_CHAT_FULLSCREEN_HOST_ATTR = "data-chzzk-chat-ui-toggle-mini-chat-fullscreen-host";
 var LIVE_CHAT_FRAME_ATTR = "data-chzzk-chat-ui-toggle-live-chat-frame";
 var GUEST_CHAT_FRAME_MARKER_PARAM = "chzzkChatUiToggleGuest";

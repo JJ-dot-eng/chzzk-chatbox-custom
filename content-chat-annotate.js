@@ -6,7 +6,8 @@ var MINI_CHAT_ANNOTATION_ATTRIBUTES = [
   MINI_CHAT_COMPACT_INPUT_ATTR,
   MINI_CHAT_INPUT_ONLY_PATH_ATTR,
   MINI_CHAT_INPUT_ONLY_KEEP_ATTR,
-  MINI_CHAT_INPUT_ONLY_HIDDEN_ATTR
+  MINI_CHAT_INPUT_ONLY_HIDDEN_ATTR,
+  MINI_CHAT_INPUT_ONLY_LAYOUT_HIDDEN_ATTR
 ];
 
 function hasChatLikeText(element) {
@@ -558,6 +559,28 @@ function connectMiniChatInputOnlyScrollGuard() {
   document.addEventListener("input", scheduleMiniChatInputOnlyScrollReset, true);
 }
 
+function shouldPreserveMiniChatInputOnlyLayout(element) {
+  if (!(element instanceof HTMLElement) || hasMiniChatInputField(element)) {
+    return false;
+  }
+
+  try {
+    if (
+      element.matches("[role='log']") ||
+      element.querySelector("[role='log']") ||
+      matchesAnySafe(element, CHAT_ROW_SELECTORS) ||
+      queryAllSafe(element, CHAT_ROW_SELECTORS).length > 0
+    ) {
+      return true;
+    }
+
+    return Boolean(element.closest("aside")) &&
+      Number.parseFloat(getComputedStyle(element).flexGrow) > 0;
+  } catch (_error) {
+    return false;
+  }
+}
+
 function markMiniChatInputOnlyLayout() {
   const inputContainer = findMiniChatInputOnlyContainer();
 
@@ -589,7 +612,12 @@ function markMiniChatInputOnlyLayout() {
 
     for (const sibling of parent.children) {
       if (sibling !== current && sibling instanceof HTMLElement) {
-        markMiniChatAnnotation(sibling, MINI_CHAT_INPUT_ONLY_HIDDEN_ATTR);
+        markMiniChatAnnotation(
+          sibling,
+          shouldPreserveMiniChatInputOnlyLayout(sibling)
+            ? MINI_CHAT_INPUT_ONLY_LAYOUT_HIDDEN_ATTR
+            : MINI_CHAT_INPUT_ONLY_HIDDEN_ATTR
+        );
       }
     }
   }
@@ -1710,6 +1738,10 @@ function cleanupUnscopedAnnotations(root = document) {
       continue;
     }
 
+    if (isHiddenGuestChatNativeContent(element)) {
+      continue;
+    }
+
     const scopedRow = element instanceof HTMLElement && element.getAttribute(CHAT_ROW_ATTR) === "true"
       ? element
       : element.closest(`[${CHAT_ROW_ATTR}="true"]`);
@@ -1737,8 +1769,40 @@ function cleanupUnscopedAnnotationsWhenDue() {
   cleanupUnscopedAnnotations();
 }
 
+function isHiddenGuestChatNativeContent(element) {
+  if (
+    currentOptions.useGuestChatFrame !== true ||
+    window.self !== window.top ||
+    !(element instanceof Element)
+  ) {
+    return false;
+  }
+
+  const host = element.closest(`[${GUEST_CHAT_HOST_ATTR}="true"]`);
+
+  if (!(host instanceof HTMLElement) || element === host) {
+    return false;
+  }
+
+  if (element.closest(`#${GUEST_CHAT_FRAME_CONTAINER_ID}`)) {
+    return false;
+  }
+
+  return !element.closest(`[${GUEST_CHAT_CONTROL_HOST_ATTR}="true"]`);
+}
+
+function isHiddenGuestChatNativeMutation(mutation) {
+  const element = mutation.target instanceof Element
+    ? mutation.target
+    : mutation.target.parentElement;
+
+  return isHiddenGuestChatNativeContent(element);
+}
+
 function scanRows(rows, { contentMutated = false, contentMutatedRows = null } = {}) {
-  const uniqueRows = [...new Set(rows)].filter((element) => element instanceof HTMLElement);
+  const uniqueRows = [...new Set(rows)]
+    .filter((element) => element instanceof HTMLElement)
+    .filter((element) => !isHiddenGuestChatNativeContent(element));
 
   cleanupRows(uniqueRows);
 
@@ -1769,6 +1833,10 @@ function scan() {
     const rows = new Set();
 
     for (const root of roots) {
+      if (isHiddenGuestChatNativeContent(root)) {
+        continue;
+      }
+
       for (const row of getChatRows(root)) {
         rows.add(row);
       }

@@ -234,9 +234,13 @@ function createMiniChatDocument() {
         width: auto;
         height: 40px;
       }
+      #mini-portal {
+        flex: 1 1 auto;
+      }
     </style>
   </head>
   <body>
+    <div id="mini-portal"></div>
     <div id="mini-app-root">
       <aside id="aside-chatting">
         <section id="mini-header-decoy" class="_header_notice_fixture_12">
@@ -3004,7 +3008,8 @@ test("미니 채팅은 투명 외피와 성능 최적화를 함께 유지한다"
         "data-chzzk-chat-ui-toggle-mini-chat-compact-input",
         "data-chzzk-chat-ui-toggle-mini-chat-input-only-path",
         "data-chzzk-chat-ui-toggle-mini-chat-input-only-keep",
-        "data-chzzk-chat-ui-toggle-mini-chat-input-only-hidden"
+        "data-chzzk-chat-ui-toggle-mini-chat-input-only-hidden",
+        "data-chzzk-chat-ui-toggle-mini-chat-input-only-layout-hidden"
       ];
       const annotationObserver = new MutationObserver(() => {});
 
@@ -4428,6 +4433,162 @@ test("오디오 개선은 주 영상에 설정값을 적용하고 끄면 원음 
 
     assert.equal(disabled.state, "off");
     assert.equal(disabled.error, "");
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("게스트 채팅에서 숨긴 원본 목록의 새 행은 다시 스캔하지 않는다", { timeout: 20_000 }, async () => {
+  const harness = await createHarness({
+    html: createLocalOnlyChatDocument(),
+    initialOptions: { useGuestChatFrame: true }
+  });
+
+  try {
+    await harness.page.locator("#chzzk-chat-ui-toggle-guest-chat-frame-container")
+      .waitFor({ state: "visible" });
+
+    await harness.page.evaluate(() => {
+      const originalScanRows = scanRows;
+      const row = document.createElement("div");
+
+      window.__hiddenGuestScanCount = 0;
+      scanRows = (rows, options) => {
+        window.__hiddenGuestScanCount += [...rows].length;
+        return originalScanRows(rows, options);
+      };
+
+      row.id = "hidden-native-row";
+      row.className = "_item_fixture_7";
+      row.innerHTML = `
+        <div class="_container_fixture_1">
+          <div class="_chatting_message_fixture_21">
+            <button type="button" class="_nickname_fixture_37">
+              <span class="_nickname_shell_fixture_57">
+                <span class="_text_fixture_2">hidden native</span>
+              </span>
+            </button>
+            <span class="_text_fixture_1">hidden native message</span>
+          </div>
+        </div>
+      `;
+      document.querySelector("._wrapper_log_fixture").append(row);
+    });
+    await harness.page.waitForTimeout(250);
+
+    const enabledState = await harness.page.evaluate(() => ({
+      listDisplay: getComputedStyle(
+        document.querySelector("._container_log_fixture")
+      ).display,
+      rowAnnotated: document.getElementById("hidden-native-row")
+        ?.getAttribute("data-chzzk-chat-ui-toggle-chat-row") || null,
+      scanCount: window.__hiddenGuestScanCount
+    }));
+
+    assert.equal(enabledState.listDisplay, "none");
+    assert.equal(enabledState.rowAnnotated, null);
+    assert.equal(enabledState.scanCount, 0);
+
+    await harness.page.evaluate((storageKey) => {
+      const nextOptions = {
+        ...window.__storageHarness.store[storageKey],
+        useGuestChatFrame: false
+      };
+
+      window.__storageHarness.emitOptionsChange(nextOptions);
+    }, STORAGE_KEY);
+    await harness.page.waitForFunction(() =>
+      document.documentElement.dataset.chzzkChatUiToggleGuestChatFrame === "off" &&
+      document.getElementById("hidden-native-row")
+        ?.getAttribute("data-chzzk-chat-ui-toggle-chat-row") === "true"
+    );
+
+    assert.ok(
+      await harness.page.evaluate(() => window.__hiddenGuestScanCount > 0)
+    );
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("입력 전용 미니 채팅은 숨긴 채팅 목록의 가상화 높이를 유지한다", { timeout: 30_000 }, async () => {
+  const harness = await createHarness({
+    html: createMiniChatDocument(),
+    initialOptions: {
+      useMiniFloatingChat: true,
+      miniFloatingChatInputOnly: true
+    }
+  });
+
+  try {
+    await harness.page.locator("#chzzk-chat-ui-toggle-mini-chat-panel")
+      .waitFor({ state: "visible" });
+
+    const deadline = Date.now() + 5_000;
+    let miniFrame = null;
+
+    while (Date.now() < deadline) {
+      miniFrame = harness.page.frames().find((candidate) =>
+        candidate.url().includes("chzzkChatUiToggleMini=1")
+      ) || null;
+      if (miniFrame) break;
+      await harness.page.waitForTimeout(25);
+    }
+
+    assert.ok(miniFrame);
+    await injectContentScripts(miniFrame);
+    await miniFrame.waitForFunction(() =>
+      document.documentElement.dataset.chzzkChatUiToggleMiniFloatingChatInputOnly === "on" &&
+      document.getElementById("mini-log-shell")
+        ?.getAttribute("data-chzzk-chat-ui-toggle-mini-chat-input-only-layout-hidden") === "true"
+    );
+
+    const state = await miniFrame.evaluate(() => {
+      const logShell = document.getElementById("mini-log-shell");
+      const inputContainer = document.getElementById("mini-native-input");
+      const message = document.getElementById("mini-message");
+      const portal = document.getElementById("mini-portal");
+      const logRect = logShell?.getBoundingClientRect();
+      const inputRect = inputContainer?.getBoundingClientRect();
+
+      return {
+        logDisplay: logShell ? getComputedStyle(logShell).display : null,
+        logPosition: logShell ? getComputedStyle(logShell).position : null,
+        logVisibility: logShell ? getComputedStyle(logShell).visibility : null,
+        logWidth: logRect?.width || 0,
+        logHeight: logRect?.height || 0,
+        genericHidden: logShell?.hasAttribute(
+          "data-chzzk-chat-ui-toggle-mini-chat-input-only-hidden"
+        ) || false,
+        inputDisplay: inputContainer ? getComputedStyle(inputContainer).display : null,
+        inputVisibility: inputContainer ? getComputedStyle(inputContainer).visibility : null,
+        inputHeight: inputRect?.height || 0,
+        messageVisibility: message ? getComputedStyle(message).visibility : null,
+        portalDisplay: portal ? getComputedStyle(portal).display : null,
+        portalGenericHidden: portal?.hasAttribute(
+          "data-chzzk-chat-ui-toggle-mini-chat-input-only-hidden"
+        ) || false,
+        portalLayoutHidden: portal?.hasAttribute(
+          "data-chzzk-chat-ui-toggle-mini-chat-input-only-layout-hidden"
+        ) || false
+      };
+    });
+
+    assert.equal(state.logDisplay, "flex");
+    assert.equal(state.logPosition, "absolute");
+    assert.equal(state.logVisibility, "hidden");
+    assert.ok(state.logWidth > 0);
+    assert.ok(state.logHeight > 0);
+    assert.equal(state.genericHidden, false);
+    assert.equal(state.inputDisplay, "flex");
+    assert.equal(state.inputVisibility, "visible");
+    assert.ok(state.inputHeight > 0);
+    assert.equal(state.messageVisibility, "hidden");
+    assert.equal(state.portalDisplay, "none");
+    assert.equal(state.portalGenericHidden, true);
+    assert.equal(state.portalLayoutHidden, false);
     assertNoPageErrors(harness.pageErrors);
   } finally {
     await harness.close();
