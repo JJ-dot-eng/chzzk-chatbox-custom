@@ -221,6 +221,7 @@ function syncAudioCompressor(userGestureActive = false) {
     return;
   }
 
+  audioCompressorState.graphMode = "off";
   disconnectAudioNode(source);
   disconnectAudioNode(compressor);
   disconnectAudioNode(gain);

@@ -4401,9 +4401,26 @@ test("오디오 개선은 주 영상에 설정값을 적용하고 끄면 원음 
       const originalConnect = AudioNode.prototype.connect;
       const originalDisconnect = AudioNode.prototype.disconnect;
 
-      window.__audioGraphCalls = { connect: 0, disconnect: 0 };
+      window.__audioGraphCalls = { bypassConnect: 0, connect: 0, disconnect: 0 };
       AudioNode.prototype.connect = function (...args) {
         window.__audioGraphCalls.connect += 1;
+
+        if (
+          window.__failNextCompressorConnect === true &&
+          this === audioCompressorState.compressor &&
+          args[0] === audioCompressorState.gain
+        ) {
+          window.__failNextCompressorConnect = false;
+          throw new Error("forced-compressor-connect-failure");
+        }
+
+        if (
+          this === audioCompressorState.source &&
+          args[0] === audioCompressorState.context?.destination
+        ) {
+          window.__audioGraphCalls.bypassConnect += 1;
+        }
+
         return originalConnect.apply(this, args);
       };
       AudioNode.prototype.disconnect = function (...args) {
@@ -4476,11 +4493,39 @@ test("오디오 개선은 주 영상에 설정값을 적용하고 끄면 원음 
 
     const disabled = await harness.page.evaluate(() => ({
       state: document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState,
-      error: audioCompressorState.lastError
+      error: audioCompressorState.lastError,
+      graphMode: audioCompressorState.graphMode,
+      graphCalls: { ...window.__audioGraphCalls }
     }));
 
     assert.equal(disabled.state, "off");
     assert.equal(disabled.error, "");
+    assert.equal(disabled.graphMode, "bypass");
+    assert.equal(disabled.graphCalls.bypassConnect, 1);
+
+    await harness.page.evaluate(() => {
+      window.__failNextCompressorConnect = true;
+      applyOptions({
+        ...currentOptions,
+        useAudioCompressor: true
+      });
+    });
+    await harness.page.waitForFunction(() =>
+      document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState === "error" &&
+      window.__failNextCompressorConnect === false
+    );
+
+    const failedReconnect = await harness.page.evaluate(() => ({
+      state: document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState,
+      error: audioCompressorState.lastError,
+      graphMode: audioCompressorState.graphMode,
+      graphCalls: { ...window.__audioGraphCalls }
+    }));
+
+    assert.equal(failedReconnect.state, "error");
+    assert.match(failedReconnect.error, /forced-compressor-connect-failure/);
+    assert.equal(failedReconnect.graphMode, "bypass");
+    assert.equal(failedReconnect.graphCalls.bypassConnect, 2);
     assertNoPageErrors(harness.pageErrors);
   } finally {
     await harness.close();
