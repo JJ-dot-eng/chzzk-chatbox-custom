@@ -11,6 +11,6 @@
     "verify:edge-cdp": "node tools/verify-live-edge.cjs"
   },
   "devDependencies": {
-    "playwright-core": "^1.54.0"
+    "playwright-core": "^1.62.0"
   }
 }
