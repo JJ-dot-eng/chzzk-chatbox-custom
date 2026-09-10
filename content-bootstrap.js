@@ -1,4 +1,4 @@
-var SCRIPT_VERSION = "0.7.3";
+var SCRIPT_VERSION = "0.8.0";
 var GLOBAL_KEY = `__chzzkChatUiToggleLoaded_${SCRIPT_VERSION}`;
 var CHZZK_CHAT_UI_TOGGLE_SHOULD_START = !window[GLOBAL_KEY];
 
@@ -129,6 +129,9 @@ var FULLSCREEN_UNSUPPORTED_MINI_CHAT_HOST_TAG_NAMES = new Set(["VIDEO", "AUDIO",
 
 var DEFAULT_OPTIONS = {
   showNicknames: true,
+  useRandomNicknames: false,
+  randomNicknameMode: "random",
+  randomNicknamePrefix: "시청자",
   showBadges: true,
   showTimestamps: true,
   showNonChatPanels: true,
@@ -172,6 +175,7 @@ var DEFAULT_OPTIONS = {
 
 var DATASET_KEYS = {
   showNicknames: "chzzkChatUiToggleNicknames",
+  useRandomNicknames: "chzzkChatUiToggleRandomNicknames",
   showBadges: "chzzkChatUiToggleBadges",
   showTimestamps: "chzzkChatUiToggleTimestamps",
   showNonChatPanels: "chzzkChatUiToggleNonChatPanels",

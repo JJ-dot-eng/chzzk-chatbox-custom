@@ -1,4 +1,26 @@
 /* Static content styles extracted from content.js for easier Chrome Web Store review. */
+/* Preserve native text nodes and events. Only the visual nickname is replaced. */
+html[data-chzzk-chat-ui-toggle-random-nicknames="on"][data-chzzk-chat-ui-toggle-nicknames="on"]
+  :is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i])[data-chzzk-chat-ui-toggle-chat-row="true"]:has(:is([class*="live_chatting_message_container" i], [class*="_chatting_message_" i])) [data-chzzk-chat-ui-toggle-role~="nickname"][data-chzzk-chat-ui-toggle-random-name]:not([hidden]) {
+  font-size: 0 !important;
+  letter-spacing: 0 !important;
+}
+html[data-chzzk-chat-ui-toggle-random-nicknames="on"][data-chzzk-chat-ui-toggle-nicknames="on"]
+  :is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i])[data-chzzk-chat-ui-toggle-chat-row="true"]:has(:is([class*="live_chatting_message_container" i], [class*="_chatting_message_" i])) [data-chzzk-chat-ui-toggle-role~="nickname"][data-chzzk-chat-ui-toggle-random-name]:not([hidden]) > * {
+  display: none !important;
+}
+html[data-chzzk-chat-ui-toggle-random-nicknames="on"][data-chzzk-chat-ui-toggle-nicknames="on"]
+  :is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i])[data-chzzk-chat-ui-toggle-chat-row="true"]:has(:is([class*="live_chatting_message_container" i], [class*="_chatting_message_" i])) [data-chzzk-chat-ui-toggle-role~="nickname"][data-chzzk-chat-ui-toggle-random-name]:not([hidden])::after {
+  content: attr(data-chzzk-chat-ui-toggle-random-name);
+  font-size: var(--chzzk-random-name-font, 13px);
+  line-height: normal;
+}
+html[data-chzzk-chat-ui-toggle-large-text="on"] [data-chzzk-chat-ui-toggle-random-name] {
+  --chzzk-random-name-font: var(--chzzk-chat-ui-toggle-chat-font-size) !important;
+}
+html[data-chzzk-chat-ui-toggle-large-text="on"][data-chzzk-chat-ui-toggle-nickname-font-size="on"] [data-chzzk-chat-ui-toggle-random-name] {
+  --chzzk-random-name-font: var(--chzzk-chat-ui-toggle-nickname-font-size) !important;
+}
 html {
   --chzzk-chat-ui-toggle-box-bg: rgba(223, 223, 223, 1);
   --chzzk-chat-ui-toggle-box-bg-hover: rgba(223, 223, 223, 1);

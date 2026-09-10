@@ -1,4 +1,114 @@
 var chatRowAnnotationSnapshots = new WeakMap();
+var randomNicknameChannel = null;
+var randomNicknameCache = new Map();
+var randomNicknamePending = new Map();
+var randomNicknameTimer = 0;
+var randomNicknameInFlight = false;
+var randomNicknameRetryAt = 0;
+var RANDOM_NICKNAME_ATTR = "data-chzzk-chat-ui-toggle-random-name";
+
+function isStreamerChatRow(row) {
+  const message = getMessageTextElement(row);
+  const markers = [row, ...row.querySelectorAll("img, svg, [data-user-role], [data-role], [aria-label], [title]")];
+  return markers.some((element) => {
+    if (message && (element === message || message.contains(element))) return false;
+    const role = element.getAttribute("data-user-role") || element.getAttribute("data-role") || "";
+    if (/^(streamer|broadcaster|channel_owner)$/i.test(role)) return true;
+    const label = element.getAttribute("alt") || element.getAttribute("aria-label") || element.getAttribute("title") || "";
+    if (/^(스트리머|방송자|채널 소유자|streamer|broadcaster)(?:\s*배지)?$/i.test(label.trim())) return true;
+    return element.tagName === "IMG" && /(?:^|[\/_.-])(?:streamer|broadcaster)(?:[\/_.-]|$)/i.test(element.getAttribute("src") || "");
+  });
+}
+
+function setRandomNickname(element, entry) {
+  if (!element.hasAttribute(RANDOM_NICKNAME_ATTR)) {
+    element.style.setProperty("--chzzk-random-name-font", getComputedStyle(element).fontSize);
+  }
+  const label = currentOptions.randomNicknameMode === "custom"
+    ? `${currentOptions.randomNicknamePrefix} ${entry.number}` : entry.label.replace(/\s*·\s*(?=\d+$)/, " ");
+  if (element.getAttribute(RANDOM_NICKNAME_ATTR) !== label) element.setAttribute(RANDOM_NICKNAME_ATTR, label);
+}
+
+function clearRandomNickname(element) {
+  element.removeAttribute(RANDOM_NICKNAME_ATTR);
+  element.style.removeProperty("--chzzk-random-name-font");
+}
+
+function flushRandomNicknames() {
+  randomNicknameTimer = 0;
+  if (randomNicknameInFlight || !randomNicknamePending.size) return;
+  const channelId = randomNicknameChannel;
+  const batch = [...randomNicknamePending].slice(0, 250);
+  for (const [name] of batch) randomNicknamePending.delete(name);
+  randomNicknameInFlight = true;
+  const complete = (response) => {
+    randomNicknameInFlight = false;
+    if (channelId !== getCurrentChannelId()) {
+      if (randomNicknamePending.size) randomNicknameTimer = window.setTimeout(flushRandomNicknames, 50);
+      return;
+    }
+    if (!response?.ok) {
+      randomNicknameRetryAt = Date.now() + 5000;
+      randomNicknamePending.clear();
+      return;
+    }
+    const entries = new Map(response.entries);
+    for (const [name, elements] of batch) {
+      const entry = entries.get(name);
+      if (!entry || typeof entry.label !== "string" || !Number.isSafeInteger(entry.number)) continue;
+      randomNicknameCache.set(name, entry);
+      for (const element of elements) {
+        const row = element.closest(`[${CHAT_ROW_ATTR}="true"]`);
+        if (element.isConnected && currentOptions.useRandomNicknames && currentOptions.showNicknames &&
+            element.textContent.trim() === name && row && !isStreamerChatRow(row)) {
+          setRandomNickname(element, entry);
+          scheduleLargeTextLayoutSync([row]);
+        }
+      }
+    }
+    // Only visible/recent names need a frame-local cache; the shared session owns identity.
+    while (randomNicknameCache.size > 2000) randomNicknameCache.delete(randomNicknameCache.keys().next().value);
+    if (randomNicknamePending.size) randomNicknameTimer = window.setTimeout(flushRandomNicknames, 50);
+  };
+  try {
+    getRuntime().runtime.sendMessage({ type: "CHZZK_CHAT_UI_TOGGLE_RANDOM_NAMES", channelId, names: batch.map(([name]) => name) }, (response) => {
+      complete(getRuntime()?.runtime?.lastError ? null : response);
+    });
+  } catch (_error) { complete(null); }
+}
+
+function syncRandomNickname(row) {
+  if (!currentOptions.useRandomNicknames) {
+    for (const element of row.querySelectorAll(`[${RANDOM_NICKNAME_ATTR}]`)) clearRandomNickname(element);
+    return;
+  }
+  const channelId = getCurrentChannelId();
+  if (channelId !== randomNicknameChannel) {
+    randomNicknameChannel = channelId;
+    randomNicknameCache.clear();
+    randomNicknamePending.clear();
+    randomNicknameRetryAt = 0;
+  }
+  const nickname = getNicknameTextElement(row);
+  const enabled = currentOptions.useRandomNicknames && currentOptions.showNicknames && channelId && !isStreamerChatRow(row);
+  for (const element of row.querySelectorAll(`[${RANDOM_NICKNAME_ATTR}]`)) {
+    if (!enabled || element !== nickname) clearRandomNickname(element);
+  }
+  if (!enabled || !nickname) return;
+  const name = nickname.textContent.trim();
+  if (!name || name.length > 128) return;
+  const entry = randomNicknameCache.get(name);
+  if (entry) { setRandomNickname(nickname, entry); return; }
+  clearRandomNickname(nickname);
+  if (Date.now() < randomNicknameRetryAt) return;
+  if (randomNicknamePending.size >= 1000 && !randomNicknamePending.has(name)) return;
+  if (!randomNicknamePending.has(name)) randomNicknamePending.set(name, new Set());
+  for (const element of randomNicknamePending.get(name)) {
+    if (!element.isConnected) randomNicknamePending.get(name).delete(element);
+  }
+  randomNicknamePending.get(name).add(nickname);
+  if (!randomNicknameTimer && !randomNicknameInFlight) randomNicknameTimer = window.setTimeout(flushRandomNicknames, 50);
+}
 var miniChatAnnotationPass = null;
 var MINI_CHAT_ANNOTATION_ATTRIBUTES = [
   MINI_CHAT_HIDDEN_CONTROL_ATTR,
@@ -70,6 +180,7 @@ function addRole(element, role) {
 }
 
 function removeAnnotations(element) {
+  if (element instanceof HTMLElement) clearRandomNickname(element);
   element.removeAttribute(ROLE_ATTR);
   element.removeAttribute(MESSAGE_PREFIX_ATTR);
   element.removeAttribute(MESSAGE_TEXT_ATTR);
@@ -1630,6 +1741,7 @@ function annotateChatRow(row, { contentMutated = false } = {}) {
   annotateMessageText(row);
   syncNicknameColorMessage(row);
   syncAutoContrast(row);
+  syncRandomNickname(row);
   chatRowAnnotationSnapshots.set(row, snapshot);
 }
 
@@ -1928,6 +2040,12 @@ function hasNonGeneratedAddedNodesOutsideChatRows(mutations) {
 
 function collectMutationChatRows(mutation) {
   const rows = new Set();
+
+  if (mutation.type === "attributes") {
+    const row = closestAnySafe(mutation.target, CHAT_ROW_SELECTORS);
+    if (row) rows.add(row);
+    return rows;
+  }
 
   if (mutation.type === "characterData") {
     const element = mutation.target.parentElement;

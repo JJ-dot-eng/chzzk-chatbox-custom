@@ -863,3 +863,26 @@ input:disabled {
   outline: 2px solid rgba(0, 196, 113, 0.55);
   outline-offset: 2px;
 }
+.alias-settings {
+  display: grid;
+  gap: 8px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.alias-settings input, .alias-settings select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+}
+.alias-settings small { color: var(--muted); line-height: 1.5; }
+.alias-settings[hidden] { display: none; }
+
+.alias-settings__custom { display: grid; gap: 8px; }
+.alias-settings__custom[hidden] { display: none; }

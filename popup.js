@@ -2,7 +2,7 @@ const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const PRESET_STORAGE_KEY = "chzzkChatUiToggleCustomPreset";
 const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
 const UPDATE_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_UPDATE_OPTIONS";
-const CONTENT_VERSION = "0.7.3";
+const CONTENT_VERSION = "0.8.0";
 const POPUP_THEME_FALLBACK = "light";
 
 const DEFAULT_CHAT_BOX_COLOR = "#dfdfdf";
@@ -49,6 +49,9 @@ const NAMED_CHAT_BOX_COLORS = {
 
 const DEFAULT_OPTIONS = {
   showNicknames: true,
+  useRandomNicknames: false,
+  randomNicknameMode: "random",
+  randomNicknamePrefix: "시청자",
   showBadges: true,
   showTimestamps: true,
   showNonChatPanels: true,
@@ -151,6 +154,9 @@ const AUDIO_COMPRESSOR_PRESET_OPTION_KEYS = [
 ];
 
 const PRESET_EXCLUDED_OPTION_KEYS = new Set([
+  "useRandomNicknames",
+  "randomNicknameMode",
+  "randomNicknamePrefix",
   "useGuestChatFrame",
   "useMiniFloatingChat",
   "miniFloatingChatFullscreenOnly",
@@ -336,6 +342,11 @@ function normalizeOptions(options) {
 
   return {
     showNicknames: options?.showNicknames !== false,
+    useRandomNicknames: options?.useRandomNicknames === true,
+    randomNicknameMode: options?.randomNicknameMode === "custom" ? "custom" : "random",
+    randomNicknamePrefix: typeof options?.randomNicknamePrefix === "string"
+      ? Array.from(options.randomNicknamePrefix.replace(/[\u0000-\u001f\u007f]/g, "").trim()).slice(0, 20).join("") || "시청자"
+      : "시청자",
     showBadges: options?.showBadges !== false,
     showTimestamps: options?.showTimestamps !== false,
     showNonChatPanels,
@@ -681,6 +692,7 @@ function applyQuickBundle(bundleId, enabled) {
 }
 
 function syncConditionalBlocks() {
+  document.getElementById("customNicknameSettings").hidden = currentOptions.randomNicknameMode !== "custom";
   for (const block of document.querySelectorAll("[data-when]")) {
     const key = block.dataset.when;
     const enabled = currentOptions[key] === true;
@@ -707,7 +719,7 @@ function syncControlsFromOptions() {
       continue;
     }
 
-    if (input.type === "range") {
+    if (input.type === "range" || key === "randomNicknameMode" || key === "randomNicknamePrefix") {
       input.value = String(currentOptions[key]);
     }
   }
@@ -777,6 +789,12 @@ function syncPreview() {
     const text = row.querySelector("[data-preview-text]");
 
     if (nick) {
+      nick.dataset.originalName ??= nick.textContent;
+      nick.textContent = currentOptions.useRandomNicknames
+        ? (currentOptions.randomNicknameMode === "custom"
+          ? `${currentOptions.randomNicknamePrefix} ${index + 1}`
+          : ["초록 여우 1", "하늘 수달 2", "노랑 고래 3"][index % 3])
+        : nick.dataset.originalName;
       nick.style.color = nickColor;
     }
 
@@ -1330,6 +1348,8 @@ function handleOptionInput(event) {
 
   if (input.type === "checkbox") {
     setOptionValue(key, input.checked);
+  } else if (key === "randomNicknameMode" || key === "randomNicknamePrefix") {
+    setOptionValue(key, input.value);
   } else if (input.type === "range") {
     const audioRanges = {
       audioCompressorThreshold: [-100, 0, -50],
@@ -1398,8 +1418,9 @@ function bindEvents() {
   });
 
   app.addEventListener("input", (event) => {
+    if (event.isComposing) return;
     if (event.target.matches(
-      '[data-option="chatBoxOpacity"], [data-option="chatFontSizePt"], [data-option="nicknameFontSizePt"], input[type="range"][data-option^="audioCompressor"]'
+      '[data-option="randomNicknamePrefix"], [data-option="chatBoxOpacity"], [data-option="chatFontSizePt"], [data-option="nicknameFontSizePt"], input[type="range"][data-option^="audioCompressor"]'
     )) {
       handleOptionInput(event);
     }

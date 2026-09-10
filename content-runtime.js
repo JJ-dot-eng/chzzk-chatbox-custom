@@ -84,6 +84,8 @@ function connectObserver() {
   observer.observe(target, {
     childList: true,
     characterData: true,
+    attributes: true,
+    attributeFilter: ["alt", "aria-label", "data-user-role", "data-role"],
     subtree: true
   });
 }

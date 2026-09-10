@@ -143,6 +143,22 @@
               <input type="checkbox" data-option="showNicknames">
             </label>
             <label class="setting-row">
+              <span class="setting-row__text"><strong>랜덤 닉네임</strong><small>같은 탭·방송에서 같은 별명으로 표시</small></span>
+              <input type="checkbox" data-option="useRandomNicknames">
+            </label>
+            <div class="alias-settings" data-when="useRandomNicknames">
+              <label for="randomNicknameMode">별명 방식</label>
+              <select id="randomNicknameMode" data-option="randomNicknameMode">
+                <option value="random">랜덤 별명</option>
+                <option value="custom">직접 지정</option>
+              </select>
+              <div id="customNicknameSettings" class="alias-settings__custom" hidden>
+              <label for="randomNicknamePrefix">지정 닉네임</label>
+              <input id="randomNicknamePrefix" data-option="randomNicknamePrefix" type="text" maxlength="20" placeholder="예: 치수">
+              </div>
+              <small>스트리머는 원래 닉네임으로 표시합니다.</small>
+            </div>
+            <label class="setting-row">
               <span class="setting-row__text"><strong>배지</strong><small>구독·팬 배지 표시</small></span>
               <input type="checkbox" data-option="showBadges">
             </label>

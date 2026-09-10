@@ -906,12 +906,13 @@ async function createLocalOnlyChatHarness({ recordLocalOnlyInputEvents = false }
   };
 }
 
-function createBackgroundHarness({ initialOptions = {}, storageSetDelays = [] } = {}) {
+function createBackgroundHarness({ initialOptions = {}, storageSetDelays = [], sessionStore = {} } = {}) {
   const clone = (value) => JSON.parse(JSON.stringify(value));
   const source = fs.readFileSync(BACKGROUND_SCRIPT_PATH, "utf8");
   const messageListeners = [];
   const store = { [STORAGE_KEY]: clone(initialOptions) };
   const writes = [];
+  const removedListeners = [];
   let writeIndex = 0;
   const chrome = {
     action: {
@@ -929,6 +930,11 @@ function createBackgroundHarness({ initialOptions = {}, storageSetDelays = [] } 
       }
     },
     storage: {
+      session: {
+        async get(key) { return clone(key === null ? sessionStore : Object.fromEntries((Array.isArray(key) ? key : [key]).filter((item) => Object.hasOwn(sessionStore, item)).map((item) => [item, sessionStore[item]]))); },
+        async set(items) { Object.assign(sessionStore, clone(items)); },
+        async remove(keys) { for (const key of keys) delete sessionStore[key]; }
+      },
       local: {
         get(key, callback) {
           const result = Object.prototype.hasOwnProperty.call(store, key)
@@ -951,7 +957,7 @@ function createBackgroundHarness({ initialOptions = {}, storageSetDelays = [] } 
       }
     },
     tabs: {
-      onRemoved: { addListener() {} },
+      onRemoved: { addListener(fn) { removedListeners.push(fn); } },
       sendMessage(_tabId, _message, callback) {
         callback?.();
       }
@@ -971,10 +977,14 @@ function createBackgroundHarness({ initialOptions = {}, storageSetDelays = [] } 
   return {
     store,
     writes,
-    send(message) {
+    async removeTab(tabId) {
+      for (const listener of removedListeners) listener(tabId);
+      await vm.runInContext("randomNamesQueue", context);
+    },
+    send(message, sender = {}) {
       return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error("background response timeout")), 2_000);
-        const returned = messageListeners[0](message, {}, (response) => {
+        const returned = messageListeners[0](message, sender, (response) => {
           clearTimeout(timeout);
           resolve(clone(response));
         });
@@ -4686,4 +4696,125 @@ test("입력 전용 미니 채팅은 숨긴 채팅 목록의 가상화 높이를
   } finally {
     await harness.close();
   }
+});
+
+test("랜덤 닉네임은 프레임·worker 재시작에도 번호를 유지하고 탭 종료 시 지운다", async () => {
+  const sessionStore = {};
+  const background = createBackgroundHarness({ sessionStore });
+  const sender = { tab: { id: 77 }, url: LIVE_URL };
+  const request = (names) => ({ type: "CHZZK_CHAT_UI_TOGGLE_RANDOM_NAMES", channelId: "a".repeat(32), names });
+  const responses = await Promise.all(Array.from({ length: 4 }, (_, batch) =>
+    background.send(request(Array.from({ length: 250 }, (_, i) => `시청자${batch * 250 + i}`)), sender)
+  ));
+  const entries = responses.flatMap((response) => {
+    assert.equal(response.ok, true);
+    return response.entries;
+  });
+  assert.equal(new Set(entries.map(([, value]) => value.label)).size, 1000);
+  assert.equal(new Set(entries.map(([, value]) => value.number)).size, 1000);
+  const again = await createBackgroundHarness({ sessionStore }).send(request(["시청자0"]), { ...sender, url: MINI_CHAT_URL });
+  assert.deepEqual(again.entries[0], entries[0]);
+  const badSender = await background.send(request(["무효"]), { ...sender, url: "https://example.com/" });
+  assert.equal(badSender.ok, false);
+  const otherTab = await background.send(request(["별도"]), { ...sender, tab: { id: 78 } });
+  assert.equal(otherTab.entries[0][1].number, 1);
+  await background.removeTab(77);
+  assert.equal(Object.keys(sessionStore).some((key) => key.startsWith("randomNames:77:")), false);
+  assert.equal(Object.keys(sessionStore).some((key) => key.startsWith("randomNames:78:")), true);
+});
+
+test("랜덤 닉네임은 원문·스트리머를 보존하고 직접 지정·행 재사용·독립 토글을 지원한다", { timeout: 30_000 }, async () => {
+  const harness = await createHarness();
+  const background = createBackgroundHarness();
+  try {
+    await harness.page.exposeFunction("__allocateNames", (message) => background.send(message, { tab: { id: 1 }, url: LIVE_URL }));
+    await harness.page.evaluate(() => {
+      const send = chrome.runtime.sendMessage;
+      chrome.runtime.sendMessage = (message, callback) => message.type === "CHZZK_CHAT_UI_TOGGLE_RANDOM_NAMES"
+        ? window.__allocateNames(message).then(callback) : send(message, callback);
+      const first = document.getElementById("chat-row");
+      const add = (id, name, streamer = false) => {
+        const row = first.cloneNode(true);
+        row.id = id;
+        for (const child of row.querySelectorAll("[id]")) child.removeAttribute("id");
+        const nickname = row.querySelector(".live_chatting_username_nickname");
+        nickname.textContent = name;
+        if (streamer) {
+          const badge = document.createElement("img");
+          badge.alt = "스트리머";
+          badge.className = "badge";
+          row.querySelector("button").prepend(badge);
+        }
+        first.parentElement.append(row);
+      };
+      add("same", "테스터");
+      add("other", "두번째");
+      add("streamer", "방송주인", true);
+      applyOptions({ ...currentOptions, useRandomNicknames: true });
+      scan();
+    });
+    const attr = "data-chzzk-chat-ui-toggle-random-name";
+    const nick = "#nickname";
+    await harness.page.waitForFunction((attr) => document.getElementById("nickname").hasAttribute(attr), attr);
+    const originalAlias = await harness.page.locator(nick).getAttribute(attr);
+    assert.equal(await harness.page.locator("#same .live_chatting_username_nickname").getAttribute(attr), originalAlias);
+    assert.notEqual(await harness.page.locator("#other .live_chatting_username_nickname").getAttribute(attr), originalAlias);
+    assert.equal(await harness.page.locator("#streamer .live_chatting_username_nickname").getAttribute(attr), null);
+    assert.equal(await harness.page.locator(nick).textContent(), "테스터");
+    await harness.page.evaluate(() => {
+      applyOptions({ ...currentOptions, randomNicknameMode: "custom", randomNicknamePrefix: "치수", showLargeText: true, useNicknameFontSize: true, nicknameFontSizePt: 20 });
+      scan();
+    });
+    assert.equal(await harness.page.locator(nick).getAttribute(attr), "치수 1");
+    const rendered = await harness.page.locator(nick).evaluate((element) => ({
+      nativeSize: getComputedStyle(element).fontSize,
+      aliasSize: getComputedStyle(element, "::after").fontSize,
+      content: getComputedStyle(element, "::after").content
+    }));
+    assert.equal(rendered.nativeSize, "0px");
+    assert.ok(Math.abs(parseFloat(rendered.aliasSize) - 20 * 96 / 72) < 0.1);
+    assert.equal(rendered.content, '"치수 1"');
+    await harness.page.evaluate(() => { applyOptions({ ...currentOptions, showLargeText: false }); scan(); });
+    assert.equal(await harness.page.locator(nick).evaluate((element) => getComputedStyle(element, "::after").fontSize), "13.3333px");
+    await harness.page.evaluate(() => { document.getElementById("nickname").firstChild.data = "새사람"; });
+    await harness.page.waitForFunction((attr) => document.getElementById("nickname").getAttribute(attr) === "치수 3", attr);
+    await harness.page.evaluate(() => {
+      const badge = document.createElement("img");
+      badge.alt = "스트리머";
+      document.getElementById("nickname").parentElement.prepend(badge);
+    });
+    await harness.page.waitForFunction((attr) => !document.getElementById("nickname").hasAttribute(attr), attr);
+    await harness.page.evaluate(() => {
+      applyOptions({ ...currentOptions, showBadges: false, showTimestamps: false }); scan();
+    });
+    assert.equal(await harness.page.locator("#other .live_chatting_username_nickname").getAttribute(attr), "치수 2");
+    await harness.page.evaluate(() => { applyOptions({ ...currentOptions, showNicknames: false }); scan(); });
+    assert.equal(await harness.page.locator("#other .live_chatting_username_nickname").isVisible(), false);
+    await harness.page.evaluate(() => { applyOptions({ ...currentOptions, showNicknames: true, useRandomNicknames: false }); scan(); });
+    assert.equal(await harness.page.locator("#other .live_chatting_username_nickname").getAttribute(attr), null);
+    assert.equal(await harness.page.locator("#other .live_chatting_username_nickname").textContent(), "두번째");
+    assert.equal(await harness.page.locator("#message").textContent(), "안녕하세요");
+    await harness.page.evaluate(() => { applyOptions({ ...currentOptions, useRandomNicknames: true }); scan(); });
+    await harness.page.evaluate(() => document.getElementById("other").setAttribute("data-user-role", "streamer"));
+    await harness.page.waitForFunction((attr) => !document.querySelector("#other .live_chatting_username_nickname").hasAttribute(attr), attr);
+    assertNoPageErrors(harness.pageErrors);
+  } finally { await harness.close(); }
+});
+
+test("팝업의 랜덤·직접 지정 닉네임 설정은 저장과 미리보기에 반영된다", { timeout: 20_000 }, async () => {
+  const harness = await createPopupHarness();
+  try {
+    await harness.page.evaluate(() => navigate("visibility"));
+    await harness.page.locator('[data-option="useRandomNicknames"]').check();
+    await harness.page.locator("#randomNicknameMode").selectOption("custom");
+    await harness.page.locator("#randomNicknamePrefix").fill("치수");
+    await harness.page.locator("#randomNicknamePrefix").press("Tab");
+    await harness.page.waitForFunction(() => currentOptions.randomNicknamePrefix === "치수" && !optionsDirty);
+    assert.equal(await harness.page.locator("[data-preview-nick]").first().textContent(), "치수 1");
+    await harness.page.evaluate(() => applyPreset("default"));
+    assert.equal(await harness.page.evaluate(() => currentOptions.useRandomNicknames && currentOptions.randomNicknamePrefix === "치수"), true);
+    await harness.page.evaluate(() => { currentOptions = normalizeOptions({ ...currentOptions, randomNicknamePrefix: "  " }); syncControlsFromOptions(); });
+    assert.equal(await harness.page.locator("#randomNicknamePrefix").inputValue(), "시청자");
+    assertNoPageErrors(harness.pageErrors);
+  } finally { await harness.close(); }
 });

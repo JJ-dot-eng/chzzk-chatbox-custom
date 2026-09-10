@@ -190,6 +190,11 @@ function normalizeOptions(options) {
 
   return {
     showNicknames: options?.showNicknames !== false,
+    useRandomNicknames: options?.useRandomNicknames === true,
+    randomNicknameMode: options?.randomNicknameMode === "custom" ? "custom" : "random",
+    randomNicknamePrefix: typeof options?.randomNicknamePrefix === "string"
+      ? Array.from(options.randomNicknamePrefix.replace(/[\u0000-\u001f\u007f]/g, "").trim()).slice(0, 20).join("") || "시청자"
+      : "시청자",
     showBadges: options?.showBadges !== false,
     showTimestamps: options?.showTimestamps !== false,
     showNonChatPanels,

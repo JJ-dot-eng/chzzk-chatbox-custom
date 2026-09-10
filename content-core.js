@@ -48,6 +48,13 @@ function syncChatBoxColorVariables() {
 }
 
 function applyOptions(options, { markAsReady = true, cache = true, source = "direct" } = {}) {
+  // Re-measure native nickname sizing after a font setting change.
+  if (currentOptions.showLargeText !== options?.showLargeText ||
+      currentOptions.useNicknameFontSize !== options?.useNicknameFontSize ||
+      currentOptions.nicknameFontSizePt !== options?.nicknameFontSizePt ||
+      currentOptions.chatFontSizePt !== options?.chatFontSizePt) {
+    for (const element of document.querySelectorAll(`[${RANDOM_NICKNAME_ATTR}]`)) clearRandomNickname(element);
+  }
   cleanupUnscopedAnnotations();
   lastFullCleanupAt = Date.now();
   currentOptions = normalizeOptions(options);

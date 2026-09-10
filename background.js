@@ -36,6 +36,9 @@ const NAMED_CHAT_BOX_COLORS = {
 
 const DEFAULT_OPTIONS = {
   showNicknames: true,
+  useRandomNicknames: false,
+  randomNicknameMode: "random",
+  randomNicknamePrefix: "시청자",
   showBadges: true,
   showTimestamps: true,
   showNonChatPanels: true,
@@ -79,6 +82,53 @@ const DEFAULT_OPTIONS = {
 
 const guestChatThemesByTab = new Map();
 let optionsUpdateQueue = Promise.resolve();
+const RANDOM_NAMES_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_RANDOM_NAMES";
+const RANDOM_NAMES_PREFIX = "randomNames:";
+let randomNamesQueue = Promise.resolve();
+
+// Session storage survives MV3 worker suspension but is never written to disk.
+// All frames in a tab share the same channel-specific allocation sequence.
+function queueRandomNames(message, sender) {
+  const task = randomNamesQueue.then(async () => {
+    const tabId = sender.tab?.id;
+    const url = new URL(sender.url);
+    const channelId = normalizeChannelId(message.channelId);
+    const parts = url.pathname.split("/").filter(Boolean);
+    const senderChannel = parts[0] === "live" ? parts[1] : parts[0];
+    if (!Number.isInteger(tabId) || url.origin !== "https://chzzk.naver.com" ||
+        !channelId || normalizeChannelId(senderChannel) !== channelId ||
+        !Array.isArray(message.names) || message.names.length > 250 ||
+        message.names.some((name) => typeof name !== "string" || !name.trim() || name.length > 128)) {
+      return { ok: false, error: "invalid-random-names-request" };
+    }
+    const prefix = `${RANDOM_NAMES_PREFIX}${tabId}:${channelId}:`;
+    const counterKey = `${prefix}counter`;
+    const nameKey = (name) => `${prefix}name:${name}`;
+    const stored = await chrome.storage.session.get([counterKey, ...message.names.map(nameKey)]);
+    const entries = new Map();
+    const updates = {};
+    let counter = stored[counterKey] || 0;
+    const colors = ["초록", "하늘", "노랑", "분홍", "보라", "은빛", "주황", "민트"];
+    const animals = ["여우", "수달", "고래", "토끼", "고양이", "펭귄", "다람쥐", "판다"];
+    for (const name of message.names) {
+      if (stored[nameKey(name)]) entries.set(name, stored[nameKey(name)]);
+      if (!entries.has(name)) {
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        const animal = animals[Math.floor(Math.random() * animals.length)];
+        counter += 1;
+        entries.set(name, { label: `${color} ${animal} ${counter}`, number: counter });
+        updates[nameKey(name)] = entries.get(name);
+      }
+    }
+    if (Object.keys(updates).length) {
+      updates[counterKey] = counter;
+      await chrome.storage.session.set(updates);
+    }
+    return { ok: true, entries: message.names.map((name) => [name, entries.get(name)]) };
+  });
+  randomNamesQueue = task.catch(() => {});
+  return task.catch(() => ({ ok: false, error: "random-names-unavailable" }));
+}
 
 function normalizeHexColor(value, fallback = DEFAULT_CHAT_BOX_COLOR) {
   if (typeof value !== "string") {
@@ -117,6 +167,11 @@ function normalizeOptions(options) {
 
   return {
     showNicknames: options?.showNicknames !== false,
+    useRandomNicknames: options?.useRandomNicknames === true,
+    randomNicknameMode: options?.randomNicknameMode === "custom" ? "custom" : "random",
+    randomNicknamePrefix: typeof options?.randomNicknamePrefix === "string"
+      ? Array.from(options.randomNicknamePrefix.replace(/[\u0000-\u001f\u007f]/g, "").trim()).slice(0, 20).join("") || "시청자"
+      : "시청자",
     showBadges: options?.showBadges !== false,
     showTimestamps: options?.showTimestamps !== false,
     showNonChatPanels,
@@ -424,9 +479,18 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   guestChatThemesByTab.delete(tabId);
+  randomNamesQueue = randomNamesQueue.then(async () => {
+    const stored = await chrome.storage.session.get(null);
+    const keys = Object.keys(stored).filter((key) => key.startsWith(`${RANDOM_NAMES_PREFIX}${tabId}:`));
+    if (keys.length) await chrome.storage.session.remove(keys);
+  }).catch(() => {});
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === RANDOM_NAMES_MESSAGE) {
+    queueRandomNames(message, _sender).then(sendResponse);
+    return true;
+  }
   if (message?.type === READ_OPTIONS_MESSAGE) {
     optionsUpdateQueue.then(() => getStoredOptions(sendResponse));
     return true;
