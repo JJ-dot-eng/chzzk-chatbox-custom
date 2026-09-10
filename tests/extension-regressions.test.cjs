@@ -4818,3 +4818,81 @@ test("팝업의 랜덤·직접 지정 닉네임 설정은 저장과 미리보기
     assertNoPageErrors(harness.pageErrors);
   } finally { await harness.close(); }
 });
+
+test("홈 통합 토글은 항목별 전체 설정만 변경하고 채팅창 선택과 조절값을 보존한다", { timeout: 20_000 }, async () => {
+  const harness = await createPopupHarness({ initialOptions: {
+    useGuestChatFrame: true, miniFloatingChatFullscreenOnly: true,
+    chatFontSizePt: 19, nicknameFontSizePt: 15, chatBoxOpacity: 65,
+    chatTextColor: "#123456", randomNicknamePrefix: "치수", audioCompressorGain: 1.4
+  } });
+  const groups = {
+    visibility: ["showNicknames", "useRandomNicknames", "showBadges", "showTimestamps", "showNonChatPanels"],
+    style: ["showChatBoxes", "showLargeText", "useNicknameFontSize", "showBoldText", "useAutoTextContrast", "useChatTextColor", "useNicknameColorForMessage"],
+    buttons: ["showGuestChatToggleButton", "showMiniFloatingChatButton", "showHeaderSettingsButton"],
+    audio: ["useAudioCompressor"]
+  };
+  try {
+    assert.equal(await harness.page.locator("#quickGrid, [data-quick-bundle]").count(), 0);
+    assert.equal(await harness.page.locator("[data-preset]").count(), 4);
+    assert.equal(await harness.page.locator('[data-section-toggle="chat-mode"]').count(), 0);
+    for (const [section, keys] of Object.entries(groups)) {
+      const control = harness.page.locator(`[data-section-toggle="${section}"]`);
+      const before = await harness.page.evaluate(() => ({ ...currentOptions }));
+      if (await control.isChecked()) await control.click();
+      await control.click();
+      await harness.page.waitForFunction(() => !optionsDirty);
+      assert.equal(await control.isChecked(), true);
+      assert.equal(await control.evaluate((input) => input.indeterminate), false);
+      assert.equal(await harness.page.evaluate(() => activeView), "home");
+      const enabled = await harness.page.evaluate(() => ({ ...currentOptions }));
+      for (const key of keys) assert.equal(enabled[key], true, `${section}: ${key}`);
+      for (const [key, value] of Object.entries(before)) {
+        if (!keys.includes(key)) assert.deepEqual(enabled[key], value, `${section} must preserve ${key}`);
+      }
+      await control.click();
+      await harness.page.waitForFunction(() => !optionsDirty);
+      const saved = await harness.page.evaluate((key) => window.__popupHarness.store[key], STORAGE_KEY);
+      for (const key of keys) assert.equal(saved[key], false, `${section}: ${key} saved off`);
+      assert.equal(await control.evaluate((input) => input.indeterminate), false);
+    }
+    await harness.page.locator('[data-goto="chat-mode"]').click();
+    assert.equal(await harness.page.locator('input[name="chatMode"][value="guest"]').isChecked(), true);
+    assertNoPageErrors(harness.pageErrors);
+  } finally { await harness.close(); }
+});
+
+test("홈 통합 토글은 일부 켜짐을 표시하며 카드 이동·키보드·프리셋과 독립적으로 동작한다", { timeout: 20_000 }, async () => {
+  const harness = await createPopupHarness();
+  try {
+    const control = harness.page.locator('[data-section-toggle="visibility"]');
+    assert.equal(await control.evaluate((input) => input.indeterminate), true);
+    assert.equal(await control.getAttribute("aria-checked"), "mixed");
+    await control.focus();
+    await control.press("Space");
+    assert.equal(await control.isChecked(), true);
+    assert.equal(await control.getAttribute("aria-checked"), "true");
+    assert.equal(await harness.page.evaluate(() => activeView), "home");
+    const before = await harness.page.evaluate(() => ({ ...currentOptions }));
+    await harness.page.locator('[data-goto="visibility"] .nav-tile__hint').click();
+    assert.equal(await harness.page.evaluate(() => activeView), "visibility");
+    assert.deepEqual(await harness.page.evaluate(() => ({ ...currentOptions })), before);
+    await harness.page.locator('[data-view="visibility"] [data-option="showBadges"]').uncheck();
+    await harness.page.locator('[data-view="visibility"] [data-back]').click();
+    assert.equal(await control.evaluate((input) => input.indeterminate), true);
+    assert.equal(await control.getAttribute("aria-checked"), "mixed");
+    // Space beside the switch opens details without changing options.
+    await harness.page.locator('[data-section="visibility"] .section-switch').click({ position: { x: 2, y: 2 } });
+    assert.equal(await harness.page.evaluate(() => activeView), "visibility");
+    assert.equal(await control.evaluate((input) => input.indeterminate), true);
+    await harness.page.locator('[data-view="visibility"] [data-back]').click();
+    await control.press("Space");
+    assert.equal(await control.isChecked(), true);
+    await control.press("Space");
+    assert.equal(await control.isChecked(), false);
+    assert.equal(await control.getAttribute("aria-checked"), "false");
+    await harness.page.locator('[data-preset="default"]').click();
+    assert.equal(await control.evaluate((input) => input.indeterminate), true);
+    assert.equal(await harness.page.locator('[data-preset="default"]').getAttribute("class").then((value) => value.includes("is-active")), true);
+    assertNoPageErrors(harness.pageErrors);
+  } finally { await harness.close(); }
+});

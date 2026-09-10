@@ -2,7 +2,7 @@ const STORAGE_KEY = "chzzkChatUiToggleOptions";
 const PRESET_STORAGE_KEY = "chzzkChatUiToggleCustomPreset";
 const READ_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_READ_OPTIONS";
 const UPDATE_OPTIONS_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_UPDATE_OPTIONS";
-const CONTENT_VERSION = "0.8.0";
+const CONTENT_VERSION = "0.8.1";
 const POPUP_THEME_FALLBACK = "light";
 
 const DEFAULT_CHAT_BOX_COLOR = "#dfdfdf";
@@ -206,7 +206,12 @@ const colorPickerReset = document.getElementById("colorPickerReset");
 
 const views = [...document.querySelectorAll("[data-view]")];
 const optionInputs = [...document.querySelectorAll("[data-option]")];
-const quickBundleInputs = [...document.querySelectorAll("[data-quick-bundle]")];
+const sectionToggleInputs = [...document.querySelectorAll("[data-section-toggle]")];
+const SECTION_OPTION_KEYS = Object.fromEntries(sectionToggleInputs.map((input) => [
+  input.dataset.sectionToggle,
+  [...document.querySelectorAll(`[data-view="${input.dataset.sectionToggle}"] input[type="checkbox"][data-option]`)]
+    .map((option) => option.dataset.option)
+]));
 const chatModeRadios = [...document.querySelectorAll('input[name="chatMode"]')];
 
 let currentOptions = normalizeOptions(DEFAULT_OPTIONS);
@@ -594,31 +599,16 @@ function syncNicknameColorDependencies() {
   nicknameColorRow?.classList.toggle("is-disabled", !isChatTextColorEnabled);
 }
 
-function isIdentityBundleActive() {
-  return currentOptions.showNicknames === true && currentOptions.showBadges === true;
-}
-
-function isReadabilityBundleActive() {
-  return (
-    currentOptions.showChatBoxes === true &&
-    currentOptions.showLargeText === true &&
-    currentOptions.showBoldText === true &&
-    currentOptions.useAutoTextContrast === true &&
-    currentOptions.useChatTextColor === true &&
-    currentOptions.useNicknameColorForMessage === true
-  );
-}
-
-function syncQuickBundles() {
-  for (const input of quickBundleInputs) {
-    if (input.dataset.quickBundle === "identity") {
-      input.checked = isIdentityBundleActive();
-      continue;
-    }
-
-    if (input.dataset.quickBundle === "readability") {
-      input.checked = isReadabilityBundleActive();
-    }
+function syncSectionToggles() {
+  for (const input of sectionToggleInputs) {
+    const keys = SECTION_OPTION_KEYS[input.dataset.sectionToggle];
+    const count = keys.filter((key) => currentOptions[key] === true).length;
+    const mixed = count > 0 && count < keys.length;
+    input.checked = count === keys.length;
+    input.indeterminate = mixed;
+    input.setAttribute("aria-checked", mixed ? "mixed" : String(input.checked));
+    const status = mixed ? "일부 켜짐" : input.checked ? "전체 켜짐" : "전체 꺼짐";
+    input.title = `${status} · 누르면 전체 ${input.checked ? "끄기" : "켜기"}`;
   }
 }
 
@@ -674,23 +664,6 @@ function resetAudioCompressorOptions() {
   scheduleCommit({ immediate: true });
 }
 
-function applyQuickBundle(bundleId, enabled) {
-  if (bundleId === "identity") {
-    currentOptions.showNicknames = enabled;
-    currentOptions.showBadges = enabled;
-    return;
-  }
-
-  if (bundleId === "readability") {
-    currentOptions.showChatBoxes = enabled;
-    currentOptions.showLargeText = enabled;
-    currentOptions.showBoldText = enabled;
-    currentOptions.useAutoTextContrast = enabled;
-    currentOptions.useChatTextColor = enabled;
-    currentOptions.useNicknameColorForMessage = enabled;
-  }
-}
-
 function syncConditionalBlocks() {
   document.getElementById("customNicknameSettings").hidden = currentOptions.randomNicknameMode !== "custom";
   for (const block of document.querySelectorAll("[data-when]")) {
@@ -742,7 +715,7 @@ function syncControlsFromOptions() {
   syncAudioCompressorPresetButtons();
   renderColorChips();
   syncPresetButtons();
-  syncQuickBundles();
+  syncSectionToggles();
 }
 
 function syncPreview() {
@@ -1322,16 +1295,12 @@ function updateColorPickerFromField(event) {
   });
 }
 
-function handleQuickBundleInput(event) {
-  const input = event.target.closest("[data-quick-bundle]");
-
-  if (!input) {
-    return;
-  }
-
-  applyQuickBundle(input.dataset.quickBundle, input.checked);
+function handleSectionToggle(event) {
+  const input = event.target.closest("[data-section-toggle]");
+  const keys = SECTION_OPTION_KEYS[input?.dataset.sectionToggle];
+  if (!keys) return;
+  for (const key of keys) currentOptions[key] = input.checked;
   syncNicknameColorDependencies();
-  syncConditionalBlocks();
   syncControlsFromOptions();
   syncPreview();
   scheduleCommit({ immediate: true });
@@ -1402,8 +1371,8 @@ function handleChatModeChange(event) {
 
 function bindEvents() {
   app.addEventListener("change", (event) => {
-    if (event.target.matches("[data-quick-bundle]")) {
-      handleQuickBundleInput(event);
+    if (event.target.matches("[data-section-toggle]")) {
+      handleSectionToggle(event);
       return;
     }
 
@@ -1427,10 +1396,11 @@ function bindEvents() {
   });
 
   app.addEventListener("click", (event) => {
-    const goto = event.target.closest("[data-goto]");
+    if (event.target.closest("[data-section-toggle]")) return;
+    const goto = event.target.closest("[data-goto]") || event.target.closest("[data-section]");
 
     if (goto) {
-      navigate(goto.dataset.goto);
+      navigate(goto.dataset.goto || goto.dataset.section);
       return;
     }
 

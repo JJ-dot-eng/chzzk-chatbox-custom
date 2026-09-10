@@ -79,54 +79,48 @@
           </div>
 
           <div class="section">
-            <h2 class="section__title">빠른 조절</h2>
-            <div class="quick-grid" id="quickGrid">
-              <label class="quick-toggle" title="닉네임과 배지를 함께 켜거나 끕니다">
-                <span>닉네임·배지</span>
-                <input type="checkbox" data-quick-bundle="identity">
-              </label>
-              <label class="quick-toggle">
-                <span>시간</span>
-                <input type="checkbox" data-option="showTimestamps">
-              </label>
-              <label class="quick-toggle" title="랭킹·승부예측 등 채팅 옆 패널 표시">
-                <span>패널</span>
-                <input type="checkbox" data-option="showNonChatPanels">
-              </label>
-              <label class="quick-toggle" title="박스, 글씨 크기, 굵게, 글자색 자동보정, 글자색 변경, 닉네임 색 채팅 적용">
-                <span>가독성 강화</span>
-                <input type="checkbox" data-quick-bundle="readability">
-              </label>
-              <label class="quick-toggle" title="영상 소리를 더 편안하고 고르게 들려줍니다">
-                <span>오디오 개선</span>
-                <input type="checkbox" data-option="useAudioCompressor">
-              </label>
-            </div>
-          </div>
-
-          <div class="section">
             <h2 class="section__title">세부 설정</h2>
             <div class="nav-grid">
-              <button type="button" class="nav-tile" data-goto="visibility">
-                <span class="nav-tile__label">보이기</span>
-                <span class="nav-tile__hint">닉네임·패널</span>
-              </button>
-              <button type="button" class="nav-tile" data-goto="style">
-                <span class="nav-tile__label">스타일</span>
-                <span class="nav-tile__hint">색·글자</span>
-              </button>
+              <div class="nav-tile nav-tile--toggle" data-section="visibility">
+                <button type="button" class="nav-tile__open" data-goto="visibility" aria-label="보이기 세부 설정">
+                  <span class="nav-tile__label">보이기</span>
+                  <span class="nav-tile__hint">닉네임·패널</span>
+                </button>
+                <div class="section-switch">
+                  <input type="checkbox" data-section-toggle="visibility" aria-label="보이기 전체 켜기·끄기">
+                </div>
+              </div>
+              <div class="nav-tile nav-tile--toggle" data-section="style">
+                <button type="button" class="nav-tile__open" data-goto="style" aria-label="스타일 세부 설정">
+                  <span class="nav-tile__label">스타일</span>
+                  <span class="nav-tile__hint">색·글자</span>
+                </button>
+                <div class="section-switch">
+                  <input type="checkbox" data-section-toggle="style" aria-label="스타일 전체 켜기·끄기">
+                </div>
+              </div>
               <button type="button" class="nav-tile" data-goto="chat-mode">
                 <span class="nav-tile__label">채팅창</span>
                 <span class="nav-tile__hint">기본·나만 보기·미니</span>
               </button>
-              <button type="button" class="nav-tile" data-goto="buttons">
-                <span class="nav-tile__label">버튼</span>
-                <span class="nav-tile__hint">헤더·하단 아이콘</span>
-              </button>
-              <button type="button" class="nav-tile" data-goto="audio">
-                <span class="nav-tile__label">오디오</span>
-                <span class="nav-tile__hint">소리 균형·음량</span>
-              </button>
+              <div class="nav-tile nav-tile--toggle" data-section="buttons">
+                <button type="button" class="nav-tile__open" data-goto="buttons" aria-label="버튼 세부 설정">
+                  <span class="nav-tile__label">버튼</span>
+                  <span class="nav-tile__hint">아이콘 표시</span>
+                </button>
+                <div class="section-switch">
+                  <input type="checkbox" data-section-toggle="buttons" aria-label="버튼 전체 켜기·끄기">
+                </div>
+              </div>
+              <div class="nav-tile nav-tile--toggle" data-section="audio">
+                <button type="button" class="nav-tile__open" data-goto="audio" aria-label="오디오 세부 설정">
+                  <span class="nav-tile__label">오디오</span>
+                  <span class="nav-tile__hint">소리 균형·음량</span>
+                </button>
+                <div class="section-switch">
+                  <input type="checkbox" data-section-toggle="audio" aria-label="오디오 전체 켜기·끄기">
+                </div>
+              </div>
             </div>
           </div>
         </section>

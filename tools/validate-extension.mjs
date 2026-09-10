@@ -723,7 +723,7 @@ for (const token of [
   "나만 보는 채팅",
   "원래 입력창 그대로 · 실제 전송되지 않음",
   "나만 보기 전환 버튼",
-  "헤더·하단 아이콘",
+  "아이콘 표시",
   "하단 채팅 버튼 왼쪽"
 ]) {
   assertIncludes(popupMarkup, token, "popup must describe the renamed local-only chat mode");
@@ -786,7 +786,8 @@ for (const token of [
   ".mode-card",
   ".color-chip",
   ".view.view--active",
-  ".quick-toggle"
+  ".section-switch",
+  "input[data-section-toggle]:indeterminate"
 ]) {
   assertIncludes(popupStyles, token, "popup styles must keep the redesigned settings layout");
 }
@@ -857,5 +858,10 @@ for (const token of [
 ]) {
   assertExcludes(`${backgroundSource}\n${contentSource}\n${popupSource}`, token, "extension code must not include remote-code-like execution or network APIs");
 }
+
+
+
+assertExcludes(popupMarkup, 'id="quickGrid"', "popup home must consolidate quick controls into section cards");
+assertExcludes(popupSource, "data-quick-bundle", "obsolete quick bundle handlers must be removed");
 
 console.log("Extension manifest and root files are valid.");
