@@ -4896,3 +4896,77 @@ test("홈 통합 토글은 일부 켜짐을 표시하며 카드 이동·키보�
     assertNoPageErrors(harness.pageErrors);
   } finally { await harness.close(); }
 });
+
+test("별명 응답 지연·실패·행 재사용 중에도 원래 닉네임이 화면에 깜빡이지 않는다", { timeout: 20_000 }, async () => {
+  const harness = await createHarness();
+  try {
+    await harness.page.evaluate(() => {
+      window.__aliasRequests = [];
+      window.__unmodifiedRow = document.getElementById("chat-row").cloneNode(true);
+      const send = chrome.runtime.sendMessage;
+      chrome.runtime.sendMessage = (message, callback) => {
+        if (message.type === "CHZZK_CHAT_UI_TOGGLE_RANDOM_NAMES") {
+          window.__aliasRequests.push({ message, callback });
+        } else send(message, callback);
+      };
+      applyOptions({ ...currentOptions, useRandomNicknames: true, randomNicknameMode: "custom", randomNicknamePrefix: "치수" });
+      scan();
+    });
+    const sampleFrames = () => harness.page.evaluate(async () => {
+      const samples = [];
+      for (let i = 0; i < 6; i++) {
+        await new Promise(requestAnimationFrame);
+        const nickname = document.getElementById("nickname");
+        samples.push({
+          visibility: getComputedStyle(nickname).visibility,
+          messageVisibility: getComputedStyle(document.getElementById("message")).visibility,
+          originalText: nickname.textContent
+        });
+      }
+      return samples;
+    });
+    const assertMasked = async (name) => {
+      for (const sample of await sampleFrames()) {
+        assert.equal(sample.visibility, "hidden");
+        assert.equal(sample.messageVisibility, "visible");
+        assert.equal(sample.originalText, name, "native text nodes must remain intact");
+      }
+    };
+    await assertMasked("테스터");
+    await harness.page.waitForFunction(() => window.__aliasRequests.length > 0);
+    await harness.page.evaluate(() => {
+      const { message, callback } = window.__aliasRequests.shift();
+      callback({ ok: true, entries: message.names.map((name) => [name, { label: "초록 여우 1", number: 1 }]) });
+    });
+    const rendered = await harness.page.locator("#nickname").evaluate((element) => ({
+      visibility: getComputedStyle(element).visibility,
+      nativeSize: getComputedStyle(element).fontSize,
+      alias: getComputedStyle(element, "::after").content
+    }));
+    assert.deepEqual(rendered, { visibility: "visible", nativeSize: "0px", alias: '"치수 1"' });
+    // A virtualized row changes identity while its new alias is still unavailable.
+    await harness.page.evaluate(() => { document.getElementById("nickname").firstChild.data = "재사용된 이름"; });
+    await assertMasked("재사용된 이름");
+    await harness.page.waitForFunction(() => window.__aliasRequests.length > 0);
+    await harness.page.evaluate(() => window.__aliasRequests.shift().callback({ ok: false }));
+    await assertMasked("재사용된 이름");
+    // Newly inserted rows also stay masked during the retry backoff.
+    await harness.page.evaluate(() => {
+      const row = window.__unmodifiedRow.cloneNode(true);
+      row.id = "new-pending-row";
+      for (const element of row.querySelectorAll("[id]")) element.removeAttribute("id");
+      row.querySelector(".live_chatting_username_nickname").textContent = "새로 들어온 이름";
+      document.getElementById("chat-row").parentElement.append(row);
+    });
+    await harness.page.evaluate(() => new Promise(requestAnimationFrame));
+    assert.equal(await harness.page.locator("#new-pending-row .live_chatting_username_nickname").evaluate((element) => getComputedStyle(element).visibility), "hidden");
+    // A late streamer marker restores the original even while allocation is pending.
+    await harness.page.evaluate(() => document.getElementById("chat-row").setAttribute("data-user-role", "streamer"));
+    await harness.page.waitForFunction(() => getComputedStyle(document.getElementById("nickname")).visibility === "visible");
+    assert.equal(await harness.page.locator("#nickname").getAttribute("data-chzzk-chat-ui-toggle-random-name"), null);
+    await harness.page.evaluate(() => { applyOptions({ ...currentOptions, useRandomNicknames: false }); scan(); });
+    assert.equal(await harness.page.locator("#new-pending-row .live_chatting_username_nickname").evaluate((element) => getComputedStyle(element).visibility), "visible");
+    assert.equal(await harness.page.locator("[data-chzzk-chat-ui-toggle-random-name-pending]").count(), 0);
+    assertNoPageErrors(harness.pageErrors);
+  } finally { await harness.close(); }
+});

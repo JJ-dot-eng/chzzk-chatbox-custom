@@ -6,6 +6,8 @@ var randomNicknameTimer = 0;
 var randomNicknameInFlight = false;
 var randomNicknameRetryAt = 0;
 var RANDOM_NICKNAME_ATTR = "data-chzzk-chat-ui-toggle-random-name";
+var RANDOM_NICKNAME_PENDING_ATTR = "data-chzzk-chat-ui-toggle-random-name-pending";
+var RANDOM_NICKNAME_SELECTOR = `[${RANDOM_NICKNAME_ATTR}], [${RANDOM_NICKNAME_PENDING_ATTR}]`;
 
 function isStreamerChatRow(row) {
   const message = getMessageTextElement(row);
@@ -27,10 +29,12 @@ function setRandomNickname(element, entry) {
   const label = currentOptions.randomNicknameMode === "custom"
     ? `${currentOptions.randomNicknamePrefix} ${entry.number}` : entry.label.replace(/\s*·\s*(?=\d+$)/, " ");
   if (element.getAttribute(RANDOM_NICKNAME_ATTR) !== label) element.setAttribute(RANDOM_NICKNAME_ATTR, label);
+  element.removeAttribute(RANDOM_NICKNAME_PENDING_ATTR);
 }
 
 function clearRandomNickname(element) {
   element.removeAttribute(RANDOM_NICKNAME_ATTR);
+  element.removeAttribute(RANDOM_NICKNAME_PENDING_ATTR);
   element.style.removeProperty("--chzzk-random-name-font");
 }
 
@@ -79,7 +83,7 @@ function flushRandomNicknames() {
 
 function syncRandomNickname(row) {
   if (!currentOptions.useRandomNicknames) {
-    for (const element of row.querySelectorAll(`[${RANDOM_NICKNAME_ATTR}]`)) clearRandomNickname(element);
+    for (const element of row.querySelectorAll(RANDOM_NICKNAME_SELECTOR)) clearRandomNickname(element);
     return;
   }
   const channelId = getCurrentChannelId();
@@ -91,7 +95,7 @@ function syncRandomNickname(row) {
   }
   const nickname = getNicknameTextElement(row);
   const enabled = currentOptions.useRandomNicknames && currentOptions.showNicknames && channelId && !isStreamerChatRow(row);
-  for (const element of row.querySelectorAll(`[${RANDOM_NICKNAME_ATTR}]`)) {
+  for (const element of row.querySelectorAll(RANDOM_NICKNAME_SELECTOR)) {
     if (!enabled || element !== nickname) clearRandomNickname(element);
   }
   if (!enabled || !nickname) return;
@@ -100,6 +104,9 @@ function syncRandomNickname(row) {
   const entry = randomNicknameCache.get(name);
   if (entry) { setRandomNickname(nickname, entry); return; }
   clearRandomNickname(nickname);
+  // Hide only the native name while the batched allocation is pending, including
+  // retries and recycled rows. The rest of the chat stays visible and untouched.
+  nickname.setAttribute(RANDOM_NICKNAME_PENDING_ATTR, "true");
   if (Date.now() < randomNicknameRetryAt) return;
   if (randomNicknamePending.size >= 1000 && !randomNicknamePending.has(name)) return;
   if (!randomNicknamePending.has(name)) randomNicknamePending.set(name, new Set());
@@ -1837,6 +1844,7 @@ function scheduleLargeTextLayoutSync(rows = null) {
 
 function cleanupUnscopedAnnotations(root = document) {
   const annotatedElements = queryAllIncludingRootSafe(root, [
+    RANDOM_NICKNAME_SELECTOR,
     `[${CHAT_ROW_ATTR}="true"]`,
     `[${ROLE_ATTR}]`,
     `[${MESSAGE_PREFIX_ATTR}]`,

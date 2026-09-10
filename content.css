@@ -1,4 +1,10 @@
 /* Static content styles extracted from content.js for easier Chrome Web Store review. */
+html[data-chzzk-chat-ui-toggle-random-nicknames="on"]
+  [data-chzzk-chat-ui-toggle-random-name-pending],
+html[data-chzzk-chat-ui-toggle-random-nicknames="on"]
+  [data-chzzk-chat-ui-toggle-random-name-pending] * {
+  visibility: hidden !important;
+}
 /* Preserve native text nodes and events. Only the visual nickname is replaced. */
 html[data-chzzk-chat-ui-toggle-random-nicknames="on"][data-chzzk-chat-ui-toggle-nicknames="on"]
   :is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i])[data-chzzk-chat-ui-toggle-chat-row="true"]:has(:is([class*="live_chatting_message_container" i], [class*="_chatting_message_" i])) [data-chzzk-chat-ui-toggle-role~="nickname"][data-chzzk-chat-ui-toggle-random-name]:not([hidden]) {

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "치지직 채팅 커스텀",
   "short_name": "채팅 커스텀",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "치지직 채팅창을 꾸미고, 실제 전송 없이 나만 보는 채팅과 미니 채팅창을 내 브라우저에서 사용합니다.",
   "icons": {
     "16": "icons/icon-16.png",
