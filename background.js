@@ -86,7 +86,12 @@ const RANDOM_NAMES_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_RANDOM_NAMES";
 const RANDOM_NAMES_PREFIX = "randomNames:";
 let randomNamesQueue = Promise.resolve();
 
-// Session storage survives MV3 worker suspension but is never written to disk.
+// Firefox's chrome namespace is callback-only; use browser for Promise APIs.
+function getPromiseExtensionApi() {
+  return typeof browser !== "undefined" ? browser : chrome;
+}
+
+// Session storage survives background suspension but is never written to disk.
 // All frames in a tab share the same channel-specific allocation sequence.
 function queueRandomNames(message, sender) {
   const task = randomNamesQueue.then(async () => {
@@ -104,7 +109,8 @@ function queueRandomNames(message, sender) {
     const prefix = `${RANDOM_NAMES_PREFIX}${tabId}:${channelId}:`;
     const counterKey = `${prefix}counter`;
     const nameKey = (name) => `${prefix}name:${name}`;
-    const stored = await chrome.storage.session.get([counterKey, ...message.names.map(nameKey)]);
+    const session = getPromiseExtensionApi().storage.session;
+    const stored = await session.get([counterKey, ...message.names.map(nameKey)]);
     const entries = new Map();
     const updates = {};
     let counter = stored[counterKey] || 0;
@@ -122,7 +128,7 @@ function queueRandomNames(message, sender) {
     }
     if (Object.keys(updates).length) {
       updates[counterKey] = counter;
-      await chrome.storage.session.set(updates);
+      await session.set(updates);
     }
     return { ok: true, entries: message.names.map((name) => [name, entries.get(name)]) };
   });
@@ -448,13 +454,14 @@ function queueStoredOptionsUpdate(message) {
 }
 
 function openExtensionPopup(sendResponse) {
-  if (!chrome.action?.openPopup) {
+  const api = getPromiseExtensionApi();
+  if (!api.action?.openPopup) {
     sendResponse({ ok: false, error: "open-popup-unavailable" });
     return false;
   }
 
   try {
-    const result = chrome.action.openPopup();
+    const result = api.action.openPopup();
 
     if (result && typeof result.then === "function") {
       result
@@ -480,9 +487,10 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.tabs.onRemoved.addListener((tabId) => {
   guestChatThemesByTab.delete(tabId);
   randomNamesQueue = randomNamesQueue.then(async () => {
-    const stored = await chrome.storage.session.get(null);
+    const session = getPromiseExtensionApi().storage.session;
+    const stored = await session.get(null);
     const keys = Object.keys(stored).filter((key) => key.startsWith(`${RANDOM_NAMES_PREFIX}${tabId}:`));
-    if (keys.length) await chrome.storage.session.remove(keys);
+    if (keys.length) await session.remove(keys);
   }).catch(() => {});
 });
 

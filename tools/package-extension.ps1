@@ -1,8 +1,14 @@
+param(
+  [ValidateSet("chromium", "firefox")]
+  [string]$Browser = "chromium"
+)
+
 $ErrorActionPreference = "Stop"
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Resolve-Path (Join-Path $scriptRoot "..")
-$manifestPath = Join-Path $repoRoot "manifest.json"
+$manifestFile = if ($Browser -eq "firefox") { "manifest.firefox.json" } else { "manifest.json" }
+$manifestPath = Join-Path $repoRoot $manifestFile
 $manifest = Get-Content -Raw -Encoding UTF8 -Path $manifestPath | ConvertFrom-Json
 
 function Assert-ChromeManifestVersion {
@@ -45,9 +51,19 @@ function Assert-ChromeManifestVersion {
 
 $manifestVersion = Assert-ChromeManifestVersion -Version $manifest.version
 $packageName = "chzzk-chat-ui-settings-$manifestVersion"
+if ($Browser -eq "firefox") {
+  $packageName += "-firefox"
+}
 $distRoot = Join-Path $repoRoot "dist"
 $stageRoot = Join-Path $distRoot $packageName
 $zipPath = Join-Path $distRoot "$packageName.zip"
+
+# Keep earlier packages intact when rebuilding the same version.
+if ((Test-Path -LiteralPath $stageRoot) -or (Test-Path -LiteralPath $zipPath)) {
+  $packageName += "-$(Get-Date -Format 'yyyyMMdd-HHmmss-fff')"
+  $stageRoot = Join-Path $distRoot $packageName
+  $zipPath = Join-Path $distRoot "$packageName.zip"
+}
 
 function Get-ResolvedFullPath {
   param([string]$Path)
@@ -86,18 +102,11 @@ if (-not (Test-Path -LiteralPath $icon128)) {
   & (Join-Path $scriptRoot "generate-icons.ps1")
 }
 
-if (Test-Path -LiteralPath $resolvedStageRoot) {
-  Remove-Item -LiteralPath $resolvedStageRoot -Recurse -Force
-}
+New-Item -ItemType Directory -Path $resolvedStageRoot | Out-Null
 
-if (Test-Path -LiteralPath $resolvedZipPath) {
-  Remove-Item -LiteralPath $resolvedZipPath -Force
-}
-
-New-Item -ItemType Directory -Force -Path $resolvedStageRoot | Out-Null
+Copy-Item -LiteralPath $manifestPath -Destination (Join-Path $resolvedStageRoot "manifest.json")
 
 $filesToCopy = @(
-  "manifest.json",
   "background.js",
   "content-bootstrap.js",
   "content-options.js",
@@ -157,4 +166,10 @@ try {
 }
 
 Write-Host "Created package: $resolvedZipPath"
-Write-Host "Upload this zip in the Chrome Web Store or Microsoft Edge Add-ons dashboard."
+Write-Host "Unpacked extension: $resolvedStageRoot"
+if ($Browser -eq "firefox") {
+  Write-Host "Firefox: load the packaged manifest.json from about:debugging for temporary use."
+  Write-Host "Permanent installation requires Mozilla signing; this zip is unsigned."
+} else {
+  Write-Host "Upload this zip in the Chrome Web Store or Microsoft Edge Add-ons dashboard."
+}

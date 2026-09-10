@@ -199,7 +199,7 @@ function normalizeOptions(options) {
     showTimestamps: options?.showTimestamps !== false,
     showNonChatPanels,
     showChatBoxes: options?.showChatBoxes !== false,
-    useGuestChatFrame: options?.useGuestChatFrame === true,
+    useGuestChatFrame: options?.useGuestChatFrame === true && supportsCredentiallessIframe(),
     useMiniFloatingChat: options?.useMiniFloatingChat === true,
     miniFloatingChatFullscreenOnly: options?.miniFloatingChatFullscreenOnly === true,
     showGuestChatToggleButton: options?.showGuestChatToggleButton !== false,

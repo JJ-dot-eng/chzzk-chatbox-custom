@@ -1862,7 +1862,7 @@ function setHeaderSettingsButtonState(button, state = "idle") {
   const labels = {
     idle: "채팅 설정 열기",
     loading: "채팅 설정 여는 중",
-    error: "채팅 설정 열기 실패"
+    error: "브라우저 도구 모음의 확장 아이콘에서 설정을 열어 주세요"
   };
   const label = labels[state] || labels.idle;
 
@@ -1918,6 +1918,10 @@ async function openExtensionPopupFromHeader(button) {
 }
 
 async function toggleGuestChatFrame(button) {
+  if (!supportsCredentiallessIframe()) {
+    return;
+  }
+
   const previousOptions = currentOptions;
   const stateRevisionAtStart = optionsStateRevision;
   const patch = {
@@ -2057,7 +2061,8 @@ function ensureGuestChatToggleButton() {
   const existingSettingsButton = document.getElementById(HEADER_SETTINGS_BUTTON_ID);
   const existingMiniChatButton = document.getElementById(MINI_CHAT_BUTTON_ID);
   const canRenderHeaderButtons = isGuestChatFrameEligibleContext();
-  const canRenderGuestChatToggle = canRenderHeaderButtons || isLocalOnlyChatContext();
+  const canRenderGuestChatToggle = supportsCredentiallessIframe() &&
+    (canRenderHeaderButtons || isLocalOnlyChatContext());
 
   if (!canRenderHeaderButtons) {
     existingSettingsButton?.remove();

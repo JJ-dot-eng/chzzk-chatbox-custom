@@ -481,6 +481,7 @@ label {
   line-height: 1.35;
 }
 
+.mode-card.is-disabled,
 .setting-row.is-disabled {
   opacity: 0.48;
   cursor: default;

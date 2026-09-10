@@ -2,6 +2,41 @@
 
 치지직 채팅창을 꾸미고 주 영상의 소리를 개선하는 확장 프로그램입니다. 모든 변경은 내 브라우저에만 적용됩니다.
 
+## 파이어폭스 버전
+
+Firefox 데스크톱 140 이상을 지원합니다. 닉네임·랜덤 별명·배지·타임스탬프 표시, 채팅 스타일, 미니 플로팅 채팅창과 오디오 개선을 사용할 수 있습니다.
+
+- **나만 보는 채팅은 Firefox에서 지원하지 않습니다.** 이 기능에 필요한 `credentialless` iframe을 지원하지 않아 모드 선택을 비활성화하고 전환 버튼을 숨깁니다. 이전 설정에 이 모드가 켜져 있어도 기본/미니 채팅을 막지 않습니다.
+- Firefox 140~148에서는 채팅 헤더의 설정 버튼으로 팝업을 열지 못할 수 있습니다. 이때 브라우저 도구 모음의 확장 아이콘에서 설정을 여세요.
+- Chrome/Edge는 기존 루트 `manifest.json`을 사용하고, Firefox 패키지는 `manifest.firefox.json`을 `manifest.json`으로 넣어 생성합니다.
+
+### 설치
+
+1. Firefox용 ZIP을 풀고 Firefox 주소창에서 `about:debugging#/runtime/this-firefox`를 엽니다.
+2. **임시 부가 기능 로드**를 눌러 압축을 푼 폴더의 `manifest.json`을 선택합니다.
+3. 치지직 접근 권한이 허용되어 있는지 확인하고, 열려 있던 치지직 페이지를 새로고침합니다.
+
+임시 설치는 Firefox를 종료하면 해제됩니다. 일반 Firefox에서 계속 설치해 두려면 [Mozilla 서명](https://extensionworkshop.com/documentation/publish/signing-and-distribution-overview/)을 받은 XPI가 필요합니다. 생성된 ZIP은 서명 전 개발/심사용 패키지입니다.
+
+### 빌드와 검증
+
+```powershell
+npm ci
+npm run package:firefox
+```
+
+`dist/chzzk-chat-ui-settings-<버전>-firefox/`와 같은 이름의 ZIP을 생성합니다. 같은 버전의 결과물이 있으면 파일명에 시간을 붙여 보존합니다. Chrome/Edge 패키지는 `npm run package`로 생성합니다.
+
+`npm run check`는 구조·문법 및 기존 Chromium 회귀 테스트를 실행합니다(설치된 Edge 또는 `EDGE_PATH` 지정 필요). Firefox 검증은 저장소 안에 테스트용 브라우저를 준비한 뒤 실행합니다. 개인 브라우저 프로필 대신 별도 임시 프로필과 대표 채팅 DOM을 사용합니다.
+
+```powershell
+$env:PLAYWRIGHT_BROWSERS_PATH = "$PWD/.tmp/firefox-port/browsers"
+node node_modules/playwright-core/cli.js install firefox
+npm run test:firefox
+```
+
+호환성 근거: [Firefox background](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/background), [credentialless 지원 범위](https://developer.mozilla.org/en-US/docs/Web/API/HTMLIFrameElement/credentialless), [action.openPopup 지원 범위](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/action/openPopup).
+
 ## 설정창
 
 스타일 프리셋으로 외형을 간편하게 바꾸거나, 각 설정 카드에서 필요한 기능을 조절할 수 있습니다. 빠른 설정은 세부 설정 카드로 통합했습니다.

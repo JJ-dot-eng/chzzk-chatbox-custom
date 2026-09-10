@@ -357,7 +357,8 @@ function applyMiniChatOptionsState(options, source) {
 
   const panel = document.getElementById(MINI_CHAT_PANEL_ID);
 
-  if (panel instanceof HTMLElement) {
+  // A late save response must not replace bounds while the pointer is moving.
+  if (panel instanceof HTMLElement && !miniChatDragState && !miniChatResizeState) {
     applyMiniChatPanelBounds(panel, normalizedOptions.miniFloatingChatBounds, {
       scale: normalizedOptions.miniFloatingChatScale,
       inputOnly: normalizedOptions.miniFloatingChatInputOnly

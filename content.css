@@ -735,6 +735,7 @@ html[data-chzzk-chat-ui-toggle-guest-chat-frame="on"]
 }
 
 #chzzk-chat-ui-toggle-mini-chat-panel {
+  box-sizing: border-box !important;
   position: fixed !important;
   display: flex !important;
   flex-direction: column !important;

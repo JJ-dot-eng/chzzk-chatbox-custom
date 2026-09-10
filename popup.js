@@ -356,7 +356,7 @@ function normalizeOptions(options) {
     showTimestamps: options?.showTimestamps !== false,
     showNonChatPanels,
     showChatBoxes: options?.showChatBoxes !== false,
-    useGuestChatFrame: options?.useGuestChatFrame === true,
+    useGuestChatFrame: options?.useGuestChatFrame === true && supportsGuestChatFrame(),
     useMiniFloatingChat: options?.useMiniFloatingChat === true,
     miniFloatingChatFullscreenOnly: options?.miniFloatingChatFullscreenOnly === true,
     showGuestChatToggleButton: options?.showGuestChatToggleButton !== false,
@@ -472,6 +472,10 @@ function hueToHex(hue) {
   return rgbToHex(hsvToRgb({ hue, saturation: 1, value: 1 }));
 }
 
+function supportsGuestChatFrame() {
+  return typeof HTMLIFrameElement !== "undefined" && "credentialless" in HTMLIFrameElement.prototype;
+}
+
 function getChatMode(options = currentOptions) {
   if (options.useMiniFloatingChat) {
     return "mini";
@@ -511,6 +515,7 @@ function applyPresetSnapshot(snapshot, optionsToPreserve = currentOptions) {
 }
 
 function setChatMode(mode) {
+  if (mode === "guest" && !supportsGuestChatFrame()) return;
   currentOptions.useGuestChatFrame = mode === "guest";
   currentOptions.useMiniFloatingChat = mode === "mini";
 }
@@ -702,6 +707,17 @@ function syncControlsFromOptions() {
   }
 
   chatFontSizeValue.textContent = `${currentOptions.chatFontSizePt}pt`;
+  const guestSupported = supportsGuestChatFrame();
+  const guestMode = document.getElementById("useGuestChatFrame");
+  guestMode.disabled = !guestSupported;
+  guestMode.closest(".mode-card").classList.toggle("is-disabled", !guestSupported);
+  document.getElementById("guestChatModeHint").textContent = guestSupported
+    ? "원래 입력창 그대로 · 실제 전송되지 않음"
+    : "이 브라우저에서는 지원되지 않습니다";
+  const guestButtonOption = document.querySelector('[data-option="showGuestChatToggleButton"]');
+  guestButtonOption.disabled = !guestSupported;
+  guestButtonOption.closest(".setting-row").hidden = !guestSupported;
+
   nicknameFontSizeValue.textContent = `${currentOptions.nicknameFontSizePt}pt`;
   chatBoxOpacityValue.textContent = `${currentOptions.chatBoxOpacity}%`;
   audioCompressorGainValue.textContent = `${Math.round(currentOptions.audioCompressorGain * 100)}%`;
