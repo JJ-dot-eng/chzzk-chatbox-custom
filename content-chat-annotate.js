@@ -1507,8 +1507,8 @@ function getMessageBaseTextColor(row) {
   return getElementTextColor(getMessageTextElement(row));
 }
 
-function syncNicknameColorMessage(row) {
-  clearNicknameColorMessage(row);
+function syncNicknameColorMessage(row, measuredColor) {
+  if (measuredColor === undefined) clearNicknameColorMessage(row);
 
   if (
     currentOptions.useChatTextColor !== true ||
@@ -1521,7 +1521,7 @@ function syncNicknameColorMessage(row) {
     return;
   }
 
-  const color = getNicknameTextColor(row);
+  const color = measuredColor === undefined ? getNicknameTextColor(row) : measuredColor;
 
   if (!color) {
     return;
@@ -1531,8 +1531,8 @@ function syncNicknameColorMessage(row) {
   row.style.setProperty("--chzzk-chat-ui-toggle-nickname-color", color);
 }
 
-function syncAutoContrast(row) {
-  clearAutoContrast(row);
+function syncAutoContrast(row, measured = null) {
+  if (!measured) clearAutoContrast(row);
 
   const shouldAutoContrast = currentOptions.useAutoTextContrast === true;
 
@@ -1543,11 +1543,13 @@ function syncAutoContrast(row) {
   const shouldPreferAccentForNicknameColorMessage =
     currentOptions.useChatTextColor === true &&
     currentOptions.useNicknameColorForMessage === true;
-  const backgroundRgb = getContrastBackgroundRgb(row);
+  const backgroundRgb = measured ? measured.background : getContrastBackgroundRgb(row);
+  // Read both source colors before applying either correction.
+  const nicknameColor = measured ? measured.nickname : getNicknameTextColor(row);
+  const messageColor = measured ? measured.message : getMessageBaseTextColor(row);
   const contrastRoles = [];
 
   if (shouldAutoContrast) {
-    const nicknameColor = getNicknameTextColor(row);
     const autoNicknameColor = getAutoContrastColor(nicknameColor, backgroundRgb);
 
     if (autoNicknameColor) {
@@ -1556,8 +1558,6 @@ function syncAutoContrast(row) {
     }
   }
 
-  const messageText = getMessageTextElement(row);
-  const messageColor = messageText instanceof HTMLElement ? getMessageBaseTextColor(row) : null;
   const autoMessageColor = getAutoContrastColor(messageColor, backgroundRgb, {
     preferAccent: shouldPreferAccentForNicknameColorMessage
   });
@@ -1569,6 +1569,32 @@ function syncAutoContrast(row) {
 
   if (contrastRoles.length > 0) {
     row.setAttribute(AUTO_CONTRAST_ATTR, contrastRoles.join(" "));
+  }
+}
+
+function syncChatRowColors(rows) {
+  // Reset all rows before any computed-style read, then apply all results together.
+  // Keep this synchronous so new rows are corrected before the browser paints.
+  for (const row of rows) {
+    clearAutoContrast(row);
+    clearNicknameColorMessage(row);
+  }
+  const useNickname = currentOptions.useChatTextColor && currentOptions.useNicknameColorForMessage;
+  if (!currentOptions.useAutoTextContrast && !useNickname) return;
+  const measurements = rows.map((row) => {
+    const nickname = getNicknameTextColor(row);
+    return {
+      row,
+      nickname,
+      message: currentOptions.useAutoTextContrast
+        ? (useNickname ? nickname : getMessageBaseTextColor(row))
+        : null,
+      background: currentOptions.useAutoTextContrast ? getContrastBackgroundRgb(row) : null
+    };
+  });
+  for (const measured of measurements) {
+    syncNicknameColorMessage(measured.row, measured.nickname);
+    syncAutoContrast(measured.row, measured);
   }
 }
 
@@ -1725,7 +1751,7 @@ function removeGeneratedTimestampWhenNativeExists(row) {
   }
 }
 
-function annotateChatRow(row, { contentMutated = false } = {}) {
+function annotateChatRow(row, { contentMutated = false, deferColors = false } = {}) {
   if (!isChatMessageRow(row)) {
     return;
   }
@@ -1746,8 +1772,7 @@ function annotateChatRow(row, { contentMutated = false } = {}) {
   annotateLeadingBadges(row);
   annotateSelectorTargets(row, "nickname");
   annotateMessageText(row);
-  syncNicknameColorMessage(row);
-  syncAutoContrast(row);
+  if (!deferColors) syncChatRowColors([row]);
   syncRandomNickname(row);
   chatRowAnnotationSnapshots.set(row, snapshot);
 }
@@ -1784,6 +1809,7 @@ function syncLargeTextRowLayout() {
 
   largeTextLayoutRows.clear();
   largeTextLayoutSyncAll = false;
+  const updates = [];
 
   for (const row of rows) {
     if (!(row instanceof HTMLElement) || !row.isConnected) {
@@ -1819,7 +1845,12 @@ function syncLargeTextRowLayout() {
 
     const measuredHeight = Math.ceil(contentBottom - rowRect.top + 8);
     const dynamicHeight = Math.max(minimumHeight, measuredHeight);
-    row.style.setProperty("--chzzk-chat-ui-toggle-row-dynamic-height", `${dynamicHeight.toFixed(2)}px`);
+    updates.push([row, `${dynamicHeight.toFixed(2)}px`]);
+  }
+  for (const [row, height] of updates) {
+    if (row.style.getPropertyValue("--chzzk-chat-ui-toggle-row-dynamic-height") !== height) {
+      row.style.setProperty("--chzzk-chat-ui-toggle-row-dynamic-height", height);
+    }
   }
 }
 
@@ -1926,11 +1957,14 @@ function scanRows(rows, { contentMutated = false, contentMutatedRows = null } = 
 
   cleanupRows(uniqueRows);
 
-  for (const row of uniqueRows.filter(hasChatLikeText)) {
+  const chatRows = uniqueRows.filter(hasChatLikeText).filter(isChatMessageRow);
+  for (const row of chatRows) {
     annotateChatRow(row, {
-      contentMutated: contentMutated || Boolean(contentMutatedRows?.has(row))
+      contentMutated: contentMutated || Boolean(contentMutatedRows?.has(row)),
+      deferColors: true
     });
   }
+  syncChatRowColors(chatRows);
 
   scheduleLargeTextLayoutSync(uniqueRows);
 }

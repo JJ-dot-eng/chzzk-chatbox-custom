@@ -596,7 +596,7 @@ for (const token of [
   "const useChatTextColor = options?.useChatTextColor === true;",
   "useNicknameColorForMessage: useChatTextColor && options?.useNicknameColorForMessage === true",
   'useAutoTextContrast: options?.useAutoTextContrast !== false',
-  "function syncAutoContrast(row)",
+  "function syncAutoContrast(row, measured = null)",
   "var autoContrastCache = new Map();",
   "AUTO_CONTRAST_CACHE_LIMIT",
   "AUTO_CONTRAST_ACCENT_COLORS",

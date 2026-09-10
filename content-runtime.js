@@ -246,6 +246,17 @@ function start() {
 
   connectObserver();
   window.addEventListener("resize", scheduleGuestChatUiSync);
+  window.addEventListener("resize", () => {
+    if (currentOptions.showLargeText) scheduleLargeTextLayoutSync();
+  });
+  document.addEventListener("load", (event) => {
+    if (!currentOptions.showLargeText || !(event.target instanceof HTMLImageElement)) return;
+    const row = event.target.closest(`[${CHAT_ROW_ATTR}="true"]`);
+    if (row) scheduleLargeTextLayoutSync([row]);
+  }, true);
+  document.fonts?.addEventListener("loadingdone", () => {
+    if (currentOptions.showLargeText) scheduleLargeTextLayoutSync();
+  });
   document.addEventListener("fullscreenchange", handleMiniChatFullscreenChange);
   syncGuestChatTheme();
   scheduleScan();

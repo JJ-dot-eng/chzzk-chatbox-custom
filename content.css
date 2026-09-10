@@ -1053,6 +1053,7 @@ html[data-chzzk-chat-ui-toggle-large-text="on"]
   ) !important;
   align-items: flex-start !important;
   flex-wrap: wrap !important;
+  align-content: flex-start !important;
   gap: 0 4px !important;
   contain: none !important;
   overflow: visible !important;

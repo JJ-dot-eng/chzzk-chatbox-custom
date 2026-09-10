@@ -1023,6 +1023,88 @@ after(async () => {
   await browser?.close();
 });
 
+test("batched colors refresh original colors and settings without retaining old corrections", async () => {
+  const harness = await createHarness();
+  try {
+    const result = await harness.page.evaluate(() => {
+      const row = document.getElementById("chat-row");
+      const nickname = document.getElementById("nickname");
+      const message = document.getElementById("message");
+      nickname.style.color = "rgb(32, 40, 48)";
+      message.style.color = "rgb(48, 40, 32)";
+      const read = () => [getComputedStyle(nickname).color, getComputedStyle(message).color];
+      applyOptions({ ...currentOptions, useAutoTextContrast: true, showChatBoxes: true, chatBoxColor: "#000000" });
+      scanRows([row]);
+      const dark = read();
+      scanRows([row]);
+      const repeated = read();
+      nickname.style.color = "rgb(240, 220, 200)";
+      applyOptions({ ...currentOptions, chatBoxColor: "#ffffff" });
+      scanRows([row]);
+      const light = read();
+      applyOptions({ ...currentOptions, useAutoTextContrast: false });
+      scanRows([row]);
+      const disabled = read();
+      applyOptions({ ...currentOptions, useChatTextColor: true, useNicknameColorForMessage: true });
+      scanRows([row]);
+      const linked = read();
+      const second = row.cloneNode(true);
+      second.id = "second-color-row";
+      second.querySelector("#nickname").style.color = "rgb(180, 80, 20)";
+      row.after(second);
+      nickname.style.color = "rgb(20, 160, 80)";
+      scanRows([row, second]);
+      const refreshed = read();
+      const secondColor = getComputedStyle(second.querySelector("#message")).color;
+      return { dark, repeated, light, disabled, linked, refreshed, secondColor };
+    });
+    assert.deepEqual(result.dark, result.repeated);
+    assert.notEqual(result.dark[0], "rgb(32, 40, 48)");
+    assert.notEqual(result.light[0], "rgb(240, 220, 200)");
+    assert.deepEqual(result.disabled, ["rgb(240, 220, 200)", "rgb(48, 40, 32)"]);
+    assert.equal(result.linked[0], result.linked[1]);
+    assert.deepEqual(result.refreshed, ["rgb(20, 160, 80)", "rgb(20, 160, 80)"]);
+    assert.equal(result.secondColor, "rgb(180, 80, 20)");
+    assertNoPageErrors(harness.pageErrors);
+  } finally { await harness.close(); }
+});
+
+test("large text remeasures wrapping after resize and skips unchanged height writes", async () => {
+  const harness = await createHarness({ html: createChatDocument("긴 채팅 내용입니다. ".repeat(30)), initialOptions: { showLargeText: true } });
+  try {
+    const before = await harness.page.evaluate(() => {
+      const row = document.getElementById("chat-row");
+      document.getElementById("aside-chatting").style.width = "600px";
+      scheduleLargeTextLayoutSync([row]);
+      syncLargeTextRowLayout();
+      return row.style.getPropertyValue("--chzzk-chat-ui-toggle-row-dynamic-height");
+    });
+    await harness.page.evaluate(() => {
+      document.getElementById("aside-chatting").style.width = "160px";
+      window.dispatchEvent(new Event("resize"));
+    });
+    await harness.page.waitForFunction((before) => parseFloat(document.getElementById("chat-row").style.getPropertyValue("--chzzk-chat-ui-toggle-row-dynamic-height")) > parseFloat(before), before);
+    const writes = await harness.page.evaluate(() => {
+      const row = document.getElementById("chat-row");
+      const observer = new MutationObserver(() => {});
+      observer.observe(row, { attributes: true, attributeFilter: ["style"] });
+      const before = row.style.cssText;
+      scheduleLargeTextLayoutSync([row]);
+      syncLargeTextRowLayout();
+      const count = observer.takeRecords().length;
+      observer.disconnect();
+      return { count, before, after: row.style.cssText };
+    });
+    assert.equal(writes.count, 0, JSON.stringify(writes));
+    await harness.page.evaluate(() => {
+      document.getElementById("aside-chatting").style.width = "600px";
+      window.dispatchEvent(new Event("resize"));
+    });
+    await harness.page.waitForFunction((before) => document.getElementById("chat-row").style.getPropertyValue("--chzzk-chat-ui-toggle-row-dynamic-height") === before, before);
+    assertNoPageErrors(harness.pageErrors);
+  } finally { await harness.close(); }
+});
+
 test("automatic text contrast defaults to on and preserves an explicit off setting", { timeout: 30_000 }, async () => {
   const popupDefault = await createPopupHarness();
   const popupDisabled = await createPopupHarness({
