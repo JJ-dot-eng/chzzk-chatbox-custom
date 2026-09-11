@@ -51,21 +51,6 @@ function getDefaultOptionContract(source, declaration, label, globals = {}) {
 }
 
 const manifest = await readJson("manifest.json");
-const firefoxManifest = await readJson("manifest.firefox.json");
-const { background: firefoxBackground, browser_specific_settings: firefoxSettings,
-  description: firefoxDescription, ...firefoxCommon } = firefoxManifest;
-const { background: chromeBackground, description: chromeDescription, ...chromeCommon } = manifest;
-assert(JSON.stringify(firefoxCommon) === JSON.stringify(chromeCommon),
-  "Firefox and Chromium manifests must share versions, assets, permissions and content scripts.");
-assert(JSON.stringify(firefoxBackground) === JSON.stringify({ scripts: ["background.js"] }),
-  "Firefox must use a background event page without a service worker.");
-assert(firefoxSettings?.gecko?.id === "chzzk-chat-ui-toggle@jj-dot-eng" &&
-  firefoxSettings.gecko.strict_min_version === "140.0",
-  "Firefox must declare a stable add-on ID and minimum supported version.");
-assert(JSON.stringify(firefoxSettings.gecko.data_collection_permissions) ===
-  JSON.stringify({ required: ["none"] }), "Firefox must declare that it collects no data.");
-assert(typeof firefoxDescription === "string" && firefoxDescription.length > 0,
-  "Firefox must describe its supported features.");
 const packageJson = await readJson("package.json");
 const packageLock = await readJson("package-lock.json");
 const contentScriptFiles = [
@@ -309,7 +294,7 @@ for (const token of [
   'const SET_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_SET_GUEST_CHAT_THEME";',
   'const APPLY_GUEST_CHAT_THEME_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_APPLY_GUEST_CHAT_THEME";',
   "chrome.runtime.onMessage.addListener",
-  "api.action.openPopup()",
+  "chrome.action.openPopup()",
   "chrome.storage.local.get(STORAGE_KEY",
   "function queueStoredOptionsUpdate(message)",
   "optionsUpdateQueue.then(() => getStoredOptions(sendResponse));",

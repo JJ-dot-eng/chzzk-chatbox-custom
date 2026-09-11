@@ -1,14 +1,11 @@
-param(
-  [ValidateSet("chromium", "firefox")]
-  [string]$Browser = "chromium"
-)
+[CmdletBinding()]
+param()
 
 $ErrorActionPreference = "Stop"
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Resolve-Path (Join-Path $scriptRoot "..")
-$manifestFile = if ($Browser -eq "firefox") { "manifest.firefox.json" } else { "manifest.json" }
-$manifestPath = Join-Path $repoRoot $manifestFile
+$manifestPath = Join-Path $repoRoot "manifest.json"
 $manifest = Get-Content -Raw -Encoding UTF8 -Path $manifestPath | ConvertFrom-Json
 
 function Assert-ChromeManifestVersion {
@@ -51,9 +48,6 @@ function Assert-ChromeManifestVersion {
 
 $manifestVersion = Assert-ChromeManifestVersion -Version $manifest.version
 $packageName = "chzzk-chat-ui-settings-$manifestVersion"
-if ($Browser -eq "firefox") {
-  $packageName += "-firefox"
-}
 $distRoot = Join-Path $repoRoot "dist"
 $stageRoot = Join-Path $distRoot $packageName
 $zipPath = Join-Path $distRoot "$packageName.zip"
@@ -167,9 +161,4 @@ try {
 
 Write-Host "Created package: $resolvedZipPath"
 Write-Host "Unpacked extension: $resolvedStageRoot"
-if ($Browser -eq "firefox") {
-  Write-Host "Firefox: load the packaged manifest.json from about:debugging for temporary use."
-  Write-Host "Permanent installation requires Mozilla signing; this zip is unsigned."
-} else {
-  Write-Host "Upload this zip in the Chrome Web Store or Microsoft Edge Add-ons dashboard."
-}
+Write-Host "Upload this zip in the Chrome Web Store or Microsoft Edge Add-ons dashboard."

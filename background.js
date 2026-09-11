@@ -86,12 +86,7 @@ const RANDOM_NAMES_MESSAGE = "CHZZK_CHAT_UI_TOGGLE_RANDOM_NAMES";
 const RANDOM_NAMES_PREFIX = "randomNames:";
 let randomNamesQueue = Promise.resolve();
 
-// Firefox's chrome namespace is callback-only; use browser for Promise APIs.
-function getPromiseExtensionApi() {
-  return typeof browser !== "undefined" ? browser : chrome;
-}
-
-// Session storage survives background suspension but is never written to disk.
+// Session storage survives MV3 worker suspension but is never written to disk.
 // All frames in a tab share the same channel-specific allocation sequence.
 function queueRandomNames(message, sender) {
   const task = randomNamesQueue.then(async () => {
@@ -109,7 +104,7 @@ function queueRandomNames(message, sender) {
     const prefix = `${RANDOM_NAMES_PREFIX}${tabId}:${channelId}:`;
     const counterKey = `${prefix}counter`;
     const nameKey = (name) => `${prefix}name:${name}`;
-    const session = getPromiseExtensionApi().storage.session;
+    const session = chrome.storage.session;
     const stored = await session.get([counterKey, ...message.names.map(nameKey)]);
     const entries = new Map();
     const updates = {};
@@ -454,14 +449,13 @@ function queueStoredOptionsUpdate(message) {
 }
 
 function openExtensionPopup(sendResponse) {
-  const api = getPromiseExtensionApi();
-  if (!api.action?.openPopup) {
+  if (!chrome.action?.openPopup) {
     sendResponse({ ok: false, error: "open-popup-unavailable" });
     return false;
   }
 
   try {
-    const result = api.action.openPopup();
+    const result = chrome.action.openPopup();
 
     if (result && typeof result.then === "function") {
       result
@@ -487,7 +481,7 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.tabs.onRemoved.addListener((tabId) => {
   guestChatThemesByTab.delete(tabId);
   randomNamesQueue = randomNamesQueue.then(async () => {
-    const session = getPromiseExtensionApi().storage.session;
+    const session = chrome.storage.session;
     const stored = await session.get(null);
     const keys = Object.keys(stored).filter((key) => key.startsWith(`${RANDOM_NAMES_PREFIX}${tabId}:`));
     if (keys.length) await session.remove(keys);
