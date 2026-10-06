@@ -91,12 +91,20 @@ let randomNamesQueue = Promise.resolve();
 function queueRandomNames(message, sender) {
   const task = randomNamesQueue.then(async () => {
     const tabId = sender.tab?.id;
-    const url = new URL(sender.url);
     const channelId = normalizeChannelId(message.channelId);
-    const parts = url.pathname.split("/").filter(Boolean);
-    const senderChannel = parts[0] === "live" ? parts[1] : parts[0];
-    if (!Number.isInteger(tabId) || url.origin !== "https://chzzk.naver.com" ||
-        !channelId || normalizeChannelId(senderChannel) !== channelId ||
+    // sender.url keeps the document's first URL after in-page navigation
+    // (e.g. /lives -> /live/<id>), so the tab's current URL is also accepted.
+    const senderChannels = [sender.url, sender.tab?.url].map((value) => {
+      try {
+        const url = new URL(value);
+        if (url.origin !== "https://chzzk.naver.com") return null;
+        const parts = url.pathname.split("/").filter(Boolean);
+        return normalizeChannelId(parts[0] === "live" ? parts[1] : parts[0]);
+      } catch (_error) {
+        return null;
+      }
+    });
+    if (!Number.isInteger(tabId) || !channelId || !senderChannels.includes(channelId) ||
         !Array.isArray(message.names) || message.names.length > 250 ||
         message.names.some((name) => typeof name !== "string" || !name.trim() || name.length > 128)) {
       return { ok: false, error: "invalid-random-names-request" };

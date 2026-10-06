@@ -4798,6 +4798,13 @@ test("랜덤 닉네임은 프레임·worker 재시작에도 번호를 유지하�
   assert.deepEqual(again.entries[0], entries[0]);
   const badSender = await background.send(request(["무효"]), { ...sender, url: "https://example.com/" });
   assert.equal(badSender.ok, false);
+  // 치지직 안에서 /lives 등을 거쳐 방송으로 이동하면 sender.url은 처음 문서 주소로 남는다.
+  const spaSender = await background.send(request(["이동"]),
+    { tab: { id: 77, url: LIVE_URL }, url: "https://chzzk.naver.com/lives" });
+  assert.equal(spaSender.ok, true);
+  const otherChannel = await background.send(request(["무효"]),
+    { tab: { id: 77, url: "https://chzzk.naver.com/live/" + "b".repeat(32) }, url: "https://chzzk.naver.com/lives" });
+  assert.equal(otherChannel.ok, false);
   const otherTab = await background.send(request(["별도"]), { ...sender, tab: { id: 78 } });
   assert.equal(otherTab.entries[0][1].number, 1);
   await background.removeTab(77);
