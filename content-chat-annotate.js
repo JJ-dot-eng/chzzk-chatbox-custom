@@ -48,7 +48,7 @@ function flushRandomNicknames() {
   const complete = (response) => {
     randomNicknameInFlight = false;
     if (channelId !== getCurrentChannelId()) {
-      if (randomNicknamePending.size) randomNicknameTimer = window.setTimeout(flushRandomNicknames, 50);
+      if (randomNicknamePending.size) randomNicknameTimer = window.setTimeout(flushRandomNicknames, 0);
       return;
     }
     if (!response?.ok) {
@@ -72,7 +72,7 @@ function flushRandomNicknames() {
     }
     // Only visible/recent names need a frame-local cache; the shared session owns identity.
     while (randomNicknameCache.size > 2000) randomNicknameCache.delete(randomNicknameCache.keys().next().value);
-    if (randomNicknamePending.size) randomNicknameTimer = window.setTimeout(flushRandomNicknames, 50);
+    if (randomNicknamePending.size) randomNicknameTimer = window.setTimeout(flushRandomNicknames, 0);
   };
   try {
     getRuntime().runtime.sendMessage({ type: "CHZZK_CHAT_UI_TOGGLE_RANDOM_NAMES", channelId, names: batch.map(([name]) => name) }, (response) => {
@@ -114,7 +114,7 @@ function syncRandomNickname(row) {
     if (!element.isConnected) randomNicknamePending.get(name).delete(element);
   }
   randomNicknamePending.get(name).add(nickname);
-  if (!randomNicknameTimer && !randomNicknameInFlight) randomNicknameTimer = window.setTimeout(flushRandomNicknames, 50);
+  if (!randomNicknameTimer && !randomNicknameInFlight) randomNicknameTimer = window.setTimeout(flushRandomNicknames, 0);
 }
 var miniChatAnnotationPass = null;
 var MINI_CHAT_ANNOTATION_ATTRIBUTES = [
