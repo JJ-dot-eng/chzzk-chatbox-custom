@@ -24,7 +24,7 @@
 - [낮음] 색상 선택기에서 회색(채도 0) 상태로 색조 슬라이더를 움직이면 선택한 색조가 0(빨강)으로 초기화됨. `popup.js:1267`, `popup.js:1305`.
 - [낮음] `tools/validate-extension.mjs:248`은 `content_scripts`의 첫 항목만 검사하고 추가 항목은 확인하지 않음.
 - [낮음] `package.json:7,9`의 `check`/`package` 스크립트가 `npm.cmd`를 사용해 Windows 외 환경에서는 `npm run check`가 실패함(테스트는 직접 실행하면 동작).
-- 버전 번호(`0.8.3`)와 `docs/project/project-after-direction.md` 패치 기록은 이번에 바꾸지 않음. 릴리즈 시 갱신 필요.
+- 위 수정은 `0.8.4`로 릴리즈됨(버전 표기와 패치 기록 갱신 완료).
 
 ## 사용자 결정 사항
 
