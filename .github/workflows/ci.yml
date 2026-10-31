@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check-and-package:
+    name: 검증·테스트·패키징 (Windows + Edge)
+    # windows-latest 러너에는 Microsoft Edge가 설치되어 있어 회귀 테스트가 그대로 동작한다.
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: 코드 가져오기
+        uses: actions/checkout@v5
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v5
+        with:
+          # package.json에 engines/.nvmrc가 없어 현재 Active LTS인 24를 사용한다(playwright-core는 Node 20 이상 필요).
+          node-version: 24
+          cache: npm
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: Edge 경로 확인
+        shell: pwsh
+        run: |
+          $edge = Join-Path ${env:ProgramFiles(x86)} "Microsoft\Edge\Application\msedge.exe"
+          if (-not (Test-Path $edge)) { $edge = Join-Path $env:ProgramFiles "Microsoft\Edge\Application\msedge.exe" }
+          if (-not (Test-Path $edge)) { throw "Microsoft Edge를 찾지 못했습니다." }
+          (Get-Item $edge).VersionInfo.ProductVersion
+          "EDGE_PATH=$edge" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      # npm run package = npm run check(매니페스트 검증 + 모든 JS 문법 검사 + Edge 회귀 테스트) 후 배포용 ZIP 생성
+      - name: 검증·테스트·패키징
+        run: npm run package
+
+      - name: 패키지 업로드
+        uses: actions/upload-artifact@v4
+        with:
+          name: chzzk-chat-extension-package
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 14
