@@ -483,12 +483,12 @@ function supportsGuestChatFrame() {
 }
 
 function getChatMode(options = currentOptions) {
-  if (options.useMiniFloatingChat) {
-    return "mini";
-  }
-
   if (options.useGuestChatFrame) {
     return "guest";
+  }
+
+  if (options.useMiniFloatingChat) {
+    return "mini";
   }
 
   return "default";

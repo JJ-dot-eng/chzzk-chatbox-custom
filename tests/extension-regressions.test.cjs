@@ -3885,6 +3885,168 @@ test("채팅 행과 함께 추가된 비채팅 패널은 같은 mutation batch�
   }
 });
 
+test("헤더 미니 버튼은 게스트 모드에서 미니 모드로 전환하고 팝업도 실제 모드를 표시한다", { timeout: 30_000 }, async () => {
+  for (const useMiniFloatingChat of [false, true]) {
+    const harness = await createHarness({
+      html: createLocalOnlyChatDocument(),
+      initialOptions: {
+        useGuestChatFrame: true,
+        useMiniFloatingChat,
+        showMiniFloatingChatButton: true,
+        showGuestChatToggleButton: true
+      }
+    });
+
+    try {
+      const button = harness.page.locator("#chzzk-chat-ui-toggle-mini-chat-button");
+      const panel = harness.page.locator("#chzzk-chat-ui-toggle-mini-chat-panel");
+      const guestFrame = harness.page.locator("#chzzk-chat-ui-toggle-guest-chat-frame-container");
+      await guestFrame.waitFor({ state: "visible" });
+      await button.waitFor({ state: "visible" });
+      assert.equal(await panel.count(), 0);
+      assert.equal(await button.getAttribute("aria-pressed"), "false");
+      assert.equal(await button.getAttribute("title"), "미니 채팅창 열기");
+      await button.click();
+      await harness.page.waitForFunction(() => !miniChatOptionsWriteInFlight);
+      const options = await harness.page.evaluate((storageKey) =>
+        window.__storageHarness.store[storageKey], STORAGE_KEY);
+      assert.equal(options.useGuestChatFrame, false);
+      assert.equal(options.useMiniFloatingChat, true);
+      await panel.waitFor({ state: "visible" });
+      await guestFrame.waitFor({ state: "detached" });
+
+      const popup = await createPopupHarness({ initialOptions: options });
+      try {
+        await popup.page.locator('[data-goto="chat-mode"]').click();
+        assert.equal(await popup.page.locator('input[name="chatMode"][value="mini"]').isChecked(), true);
+        assertNoPageErrors(popup.pageErrors);
+      } finally {
+        await popup.close();
+      }
+
+      await button.click();
+      await harness.page.waitForFunction(() => !miniChatOptionsWriteInFlight);
+      await panel.waitFor({ state: "detached" });
+      assert.equal(await harness.page.evaluate((storageKey) =>
+        window.__storageHarness.store[storageKey].useMiniFloatingChat, STORAGE_KEY), false);
+      assertNoPageErrors(harness.pageErrors);
+    } finally {
+      await harness.close();
+    }
+  }
+
+  const popup = await createPopupHarness({
+    initialOptions: { useGuestChatFrame: true, useMiniFloatingChat: true }
+  });
+  try {
+    await popup.page.locator('[data-goto="chat-mode"]').click();
+    assert.equal(await popup.page.locator('input[name="chatMode"][value="guest"]').isChecked(), true);
+    assertNoPageErrors(popup.pageErrors);
+  } finally {
+    await popup.close();
+  }
+});
+
+test("열린 미니 창은 외부 위치·크기를 반영하되 포인터 조작과 늦은 저장 응답을 보존한다", { timeout: 15_000 }, async () => {
+  const harness = await createHarness({
+    initialOptions: {
+      useMiniFloatingChat: true,
+      miniFloatingChatBounds: { left: 100, top: 100, width: 360, height: 400 }
+    }
+  });
+
+  try {
+    const panel = harness.page.locator("#chzzk-chat-ui-toggle-mini-chat-panel");
+    await panel.waitFor({ state: "visible" });
+    const readBounds = () => panel.evaluate((element) => Object.fromEntries(
+      ["left", "top", "width", "height"].map((key) => [key, parseFloat(element.style[key])])
+    ));
+    const emitBounds = (bounds) => harness.page.evaluate(({ storageKey, bounds }) => {
+      window.__storageHarness.emitOptionsChange({
+        ...window.__storageHarness.store[storageKey], miniFloatingChatBounds: bounds
+      });
+    }, { storageKey: STORAGE_KEY, bounds });
+
+    const presetBounds = { left: 500, top: 80, width: 600, height: 500 };
+    await emitBounds(presetBounds);
+    assert.deepEqual(await readBounds(), presetBounds);
+
+    await emitBounds({ left: 5000, top: 5000, width: 600, height: 500 });
+    assert.deepEqual(await readBounds(), { left: 672, top: 292, width: 600, height: 500 });
+    await emitBounds(presetBounds);
+
+    // 응답 완료를 직접 제어해 다음 포인터 조작이 고정 지연 안에 시작될 필요가 없게 한다.
+    await harness.page.evaluate(() => {
+      const writeOptions = writeOptionsPatchToStorageLocal;
+      writeOptionsPatchToStorageLocal = async (...args) => {
+        const holdResponse = window.__holdMiniBoundsResponse === true;
+        window.__holdMiniBoundsResponse = false;
+        const result = await writeOptions(...args);
+        if (!holdResponse) return result;
+        return new Promise((resolve) => {
+          window.__releaseMiniBoundsResponse = () => {
+            window.__releaseMiniBoundsResponse = null;
+            resolve(result);
+          };
+        });
+      };
+    });
+
+    for (const handleClass of ["drag-handle", "resize"]) {
+      const handle = panel.locator(`.chzzk-chat-ui-toggle-mini-chat__${handleClass}`);
+      const box = await handle.boundingBox();
+      assert.ok(box);
+      const x = box.x + box.width / 2;
+      const y = box.y + box.height / 2;
+      await harness.page.mouse.move(x, y);
+      await harness.page.mouse.down();
+      await harness.page.mouse.move(x + 20, y + 10);
+      const movingBounds = await readBounds();
+      await emitBounds({ left: 40, top: 40, width: 320, height: 360 });
+      assert.deepEqual(await readBounds(), movingBounds);
+      await harness.page.evaluate(() => { window.__holdMiniBoundsResponse = true; });
+      await harness.page.mouse.up();
+      await harness.page.waitForFunction(() =>
+        window.__storageHarness.committed.length === 1 && miniChatOptionsWriteInFlight &&
+        typeof window.__releaseMiniBoundsResponse === "function"
+      );
+
+      // 저장 응답을 기다리는 동안 다음 포인터 조작을 시작한다.
+      const nextBox = await handle.boundingBox();
+      const nextX = nextBox.x + nextBox.width / 2;
+      const nextY = nextBox.y + nextBox.height / 2;
+      await harness.page.mouse.move(nextX, nextY);
+      await harness.page.mouse.down();
+      await harness.page.mouse.move(nextX + 20, nextY + 10);
+      const nextMovingBounds = await readBounds();
+      assert.notDeepEqual(nextMovingBounds, movingBounds);
+      await harness.page.evaluate(() => window.__releaseMiniBoundsResponse());
+      await harness.page.waitForFunction(() => !miniChatOptionsWriteInFlight);
+      assert.deepEqual(await readBounds(), nextMovingBounds);
+      await harness.page.evaluate((storageKey) => {
+        window.__storageHarness.emitOptionsChange({
+          ...window.__storageHarness.store[storageKey], showBadges: false
+        });
+        syncMiniFloatingChatPanel();
+      }, STORAGE_KEY);
+      assert.deepEqual(await readBounds(), nextMovingBounds);
+      await harness.page.mouse.up();
+      await harness.page.waitForFunction(() =>
+        window.__storageHarness.committed.length === 2 && !miniChatOptionsWriteInFlight
+      );
+      assert.deepEqual(await readBounds(), nextMovingBounds);
+      const stored = await harness.page.evaluate((storageKey) =>
+        window.__storageHarness.store[storageKey].miniFloatingChatBounds, STORAGE_KEY);
+      assert.deepEqual(stored, nextMovingBounds);
+      await emitBounds(presetBounds);
+      await harness.page.evaluate(() => window.__storageHarness.resetLogs());
+    }
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
 test("미니 채팅 배율 + 연속 입력은 두 단계 증가하고 저장 순서가 역전되지 않는다", { timeout: 15_000 }, async () => {
   const harness = await createHarness({
     initialOptions: {

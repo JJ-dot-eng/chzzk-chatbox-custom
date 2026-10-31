@@ -3,6 +3,7 @@ var miniChatOptionsWriteInFlight = false;
 var miniChatOptionsOptimisticState = null;
 var miniChatOptionsCommittedState = null;
 var miniChatOptionsOptimisticPatch = null;
+var miniChatPanelOptionsBounds = new WeakMap();
 
 function getViewportBounds() {
   return {
@@ -1050,9 +1051,13 @@ function syncMiniFloatingChatPanel() {
   const isExistingPanel = existingPanel instanceof HTMLElement;
   const panel = isExistingPanel ? existingPanel : createMiniFloatingChatPanel();
   const iframe = panel.querySelector(`#${MINI_CHAT_FRAME_ID}`);
-  const nextBounds = isExistingPanel
-    ? readMiniChatPanelStyleBounds(panel)
-    : currentOptions.miniFloatingChatBounds;
+  // Ignore echoed older bounds while a newer local save is pending.
+  const optionsBounds = (miniChatOptionsOptimisticState || currentOptions).miniFloatingChatBounds;
+  const previousBounds = miniChatPanelOptionsBounds.get(panel);
+  const boundsChanged = !previousBounds || ["left", "top", "width", "height"].some(
+    (key) => previousBounds[key] !== optionsBounds[key]
+  );
+  const nextBounds = boundsChanged ? optionsBounds : readMiniChatPanelStyleBounds(panel);
 
   if (iframe instanceof HTMLIFrameElement && iframe.src !== frameUrl) {
     iframe.src = frameUrl;
@@ -1060,5 +1065,8 @@ function syncMiniFloatingChatPanel() {
 
   setMiniFloatingChatPanelState(panel);
   moveMiniChatPanelToHost(panel, panelHost);
-  applyMiniChatPanelBounds(panel, nextBounds);
+  if (!miniChatDragState && !miniChatResizeState) {
+    applyMiniChatPanelBounds(panel, nextBounds);
+    miniChatPanelOptionsBounds.set(panel, { ...optionsBounds });
+  }
 }

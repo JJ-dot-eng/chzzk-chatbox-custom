@@ -1873,8 +1873,9 @@ function setHeaderSettingsButtonState(button, state = "idle") {
 }
 
 function setMiniChatToggleButtonState(button, state = "idle") {
+  const isActive = currentOptions.useMiniFloatingChat && !currentOptions.useGuestChatFrame;
   const labels = {
-    idle: currentOptions.useMiniFloatingChat ? "미니 채팅창 닫기" : "미니 채팅창 열기",
+    idle: isActive ? "미니 채팅창 닫기" : "미니 채팅창 열기",
     loading: "미니 채팅창 변경 중",
     error: "미니 채팅창 변경 실패"
   };
@@ -1884,7 +1885,7 @@ function setMiniChatToggleButtonState(button, state = "idle") {
   button.disabled = state === "loading";
   button.title = label;
   button.setAttribute("aria-label", label);
-  button.setAttribute("aria-pressed", String(currentOptions.useMiniFloatingChat === true));
+  button.setAttribute("aria-pressed", String(isActive));
 }
 
 function resetHeaderSettingsButtonStateLater(button) {
@@ -1958,7 +1959,8 @@ async function toggleMiniFloatingChat(button) {
 
   const result = await updateMiniChatOptions(
     {
-      useMiniFloatingChat: !currentOptions.useMiniFloatingChat,
+      useGuestChatFrame: false,
+      useMiniFloatingChat: currentOptions.useGuestChatFrame || !currentOptions.useMiniFloatingChat,
       miniFloatingChatCollapsed: false
     },
     "mini-chat-header-toggle"
