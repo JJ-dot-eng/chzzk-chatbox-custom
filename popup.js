@@ -249,7 +249,13 @@ function normalizeHexColor(value, fallback = DEFAULT_CHAT_BOX_COLOR) {
     return fallback;
   }
 
-  const mappedValue = NAMED_CHAT_BOX_COLORS[value] || value;
+  const mappedValue = Object.prototype.hasOwnProperty.call(NAMED_CHAT_BOX_COLORS, value)
+    ? NAMED_CHAT_BOX_COLORS[value]
+    : value;
+  if (typeof mappedValue !== "string") {
+    return fallback;
+  }
+
   const trimmed = mappedValue.trim();
   const hex = trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
 

@@ -1019,13 +1019,13 @@ html[data-chzzk-chat-ui-toggle-chat-boxes="on"]
 }
 
 html[data-chzzk-chat-ui-toggle-chat-text-color="on"]:not([data-chzzk-chat-ui-toggle-nickname-color-message="on"])
-  :is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i])[data-chzzk-chat-ui-toggle-chat-row="true"]
+  :is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i])[data-chzzk-chat-ui-toggle-chat-row="true"]:not([data-chzzk-chat-ui-toggle-auto-contrast~="message"])
   [data-chzzk-chat-ui-toggle-message-text="true"] {
   color: var(--chzzk-chat-ui-toggle-chat-text-color) !important;
 }
 
 html[data-chzzk-chat-ui-toggle-nickname-color-message="on"]
-  :is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i])[data-chzzk-chat-ui-toggle-chat-row="true"][data-chzzk-chat-ui-toggle-nickname-color-message="true"]
+  :is([class*="live_chatting_list_item" i], [role="log"] [class*="_item_" i])[data-chzzk-chat-ui-toggle-chat-row="true"][data-chzzk-chat-ui-toggle-nickname-color-message="true"]:not([data-chzzk-chat-ui-toggle-auto-contrast~="message"])
   [data-chzzk-chat-ui-toggle-message-text="true"] {
   color: var(--chzzk-chat-ui-toggle-nickname-color) !important;
 }

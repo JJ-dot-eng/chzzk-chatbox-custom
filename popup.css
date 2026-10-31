@@ -839,7 +839,6 @@ input:disabled {
   outline-offset: 2px;
 }
 .alias-settings {
-  display: grid;
   gap: 8px;
   padding: 12px 16px;
   border: 1px solid var(--line);
