@@ -1023,6 +1023,89 @@ after(async () => {
   await browser?.close();
 });
 
+test("세 색상 정규화 함수는 상속 속성과 문자열이 아닌 매핑을 거부한다", () => {
+  for (const file of ["background.js", "content-options.js", "popup.js"]) {
+    const source = fs.readFileSync(path.join(REPO_ROOT, file), "utf8");
+    const colorSource = file === "content-options.js"
+      ? fs.readFileSync(path.join(REPO_ROOT, "content-bootstrap.js"), "utf8")
+      : source;
+    const colors = colorSource.match(/(?:const|var) NAMED_CHAT_BOX_COLORS = \{[\s\S]*?\n\};/)[0];
+    const normalizer = source.match(/function normalizeHexColor\([\s\S]*?\n\}/)[0];
+    const context = vm.createContext({});
+    vm.runInContext(`${colors}\n${normalizer}`, context, { filename: file });
+    const normalize = vm.runInContext("(value) => normalizeHexColor(value, '#abcdef')", context);
+
+    for (const value of ["constructor", "toString", "__proto__", "invalid", null, 123, {}]) {
+      assert.equal(normalize(value), "#abcdef", `${file}: ${String(value)}`);
+    }
+    assert.equal(normalize("green"), "#00c471", file);
+    assert.equal(normalize(" #AbC "), "#aabbcc", file);
+    assert.equal(normalize("123ABC"), "#123abc", file);
+
+    vm.runInContext(`
+      Object.setPrototypeOf(NAMED_CHAT_BOX_COLORS, { inheritedColor: '#123456' });
+      Object.assign(NAMED_CHAT_BOX_COLORS, {
+        nullColor: null, numberColor: 123, objectColor: {}, falseColor: false,
+        undefinedColor: undefined, '#abc': null
+      });
+    `, context);
+    for (const value of ["inheritedColor", "nullColor", "numberColor", "objectColor", "falseColor", "undefinedColor", "#abc"]) {
+      assert.equal(normalize(value), "#abcdef", `${file}: ${value}`);
+    }
+  }
+});
+
+test("자동 대비 보정은 지정 글자색·닉네임색보다 우선하고 불필요하거나 꺼지면 원래 색을 유지한다", async () => {
+  const harness = await createHarness();
+  try {
+    for (const rowClass of ["live_chatting_list_item", "_item_fixture_7"]) {
+      for (const linked of [false, true]) {
+        const result = await harness.page.evaluate(({ rowClass, linked }) => {
+          const row = document.getElementById("chat-row");
+          const nickname = document.getElementById("nickname");
+          const message = document.getElementById("message");
+          row.className = rowClass;
+          nickname.style.color = "rgb(32, 40, 48)";
+          const read = () => ({
+            roles: row.getAttribute(AUTO_CONTRAST_ATTR),
+            nickname: getComputedStyle(nickname).color,
+            message: getComputedStyle(message).color
+          });
+          applyOptions({ ...currentOptions, useAutoTextContrast: true, showChatBoxes: true,
+            chatBoxColor: "#000000", chatBoxOpacity: 100, useChatTextColor: true,
+            chatTextColor: "#202830", useNicknameColorForMessage: linked });
+          scanRows([row]);
+          const corrected = read();
+          const probe = document.createElement("span");
+          row.append(probe);
+          const expected = ["nickname", "message"].map((role) => {
+            probe.style.color = row.style.getPropertyValue(`--chzzk-chat-ui-toggle-auto-${role}-color`);
+            return getComputedStyle(probe).color;
+          });
+          probe.remove();
+          applyOptions({ ...currentOptions, useAutoTextContrast: false });
+          scanRows([row]);
+          const disabled = read();
+          if (linked) nickname.style.color = "rgb(255, 255, 255)";
+          applyOptions({ ...currentOptions, useAutoTextContrast: true, chatTextColor: "#ffffff" });
+          scanRows([row]);
+          return { corrected, expected, disabled, readable: read() };
+        }, { rowClass, linked });
+
+        assert.equal(result.corrected.roles, "nickname message");
+        assert.deepEqual([result.corrected.nickname, result.corrected.message], result.expected);
+        assert.notEqual(result.corrected.message, "rgb(32, 40, 48)");
+        assert.deepEqual(result.disabled, {
+          roles: null, nickname: "rgb(32, 40, 48)", message: "rgb(32, 40, 48)"
+        });
+        assert.equal(result.readable.roles, linked ? null : "nickname");
+        assert.equal(result.readable.message, "rgb(255, 255, 255)");
+      }
+    }
+    assertNoPageErrors(harness.pageErrors);
+  } finally { await harness.close(); }
+});
+
 test("batched colors refresh original colors and settings without retaining old corrections", async () => {
   const harness = await createHarness();
   try {
@@ -4894,7 +4977,12 @@ test("팝업의 랜덤·직접 지정 닉네임 설정은 저장과 미리보기
   const harness = await createPopupHarness();
   try {
     await harness.page.evaluate(() => navigate("visibility"));
+    const aliasSettings = harness.page.locator('.alias-settings[data-when="useRandomNicknames"]');
+    assert.equal(await aliasSettings.evaluate((element) => getComputedStyle(element).display), "none");
+    assert.equal(await aliasSettings.isVisible(), false);
     await harness.page.locator('[data-option="useRandomNicknames"]').check();
+    assert.equal(await aliasSettings.evaluate((element) => getComputedStyle(element).display), "grid");
+    assert.equal(await aliasSettings.isVisible(), true);
     await harness.page.locator("#randomNicknameMode").selectOption("custom");
     await harness.page.locator("#randomNicknamePrefix").fill("치수");
     await harness.page.locator("#randomNicknamePrefix").press("Tab");
@@ -4904,6 +4992,9 @@ test("팝업의 랜덤·직접 지정 닉네임 설정은 저장과 미리보기
     assert.equal(await harness.page.evaluate(() => currentOptions.useRandomNicknames && currentOptions.randomNicknamePrefix === "치수"), true);
     await harness.page.evaluate(() => { currentOptions = normalizeOptions({ ...currentOptions, randomNicknamePrefix: "  " }); syncControlsFromOptions(); });
     assert.equal(await harness.page.locator("#randomNicknamePrefix").inputValue(), "시청자");
+    await harness.page.locator('[data-option="useRandomNicknames"]').uncheck();
+    assert.equal(await aliasSettings.evaluate((element) => getComputedStyle(element).display), "none");
+    assert.equal(await aliasSettings.isVisible(), false);
     assertNoPageErrors(harness.pageErrors);
   } finally { await harness.close(); }
 });
