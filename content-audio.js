@@ -98,14 +98,33 @@ function bypassAudioCompressor() {
   setAudioCompressorState("off");
 }
 
+function canStartAudioContext(userGestureActive) {
+  const userActivation = navigator.userActivation;
+
+  // Chrome/Edge allow an AudioContext to start once the page has sticky user
+  // activation, even outside the input event (popup toggle, SPA navigation).
+  // A touch pointerdown is not an activation, so a fresh gesture flag alone
+  // would create a context that stays suspended.
+  if (userActivation && typeof userActivation.hasBeenActive === "boolean") {
+    return userActivation.hasBeenActive;
+  }
+
+  return userGestureActive;
+}
+
 function connectAudioCompressorResumeListener() {
   if (audioCompressorState.resumeListenerConnected) {
     return;
   }
 
   audioCompressorState.resumeListenerConnected = true;
-  const resume = () => {
+  const resume = (event) => {
     const context = audioCompressorState.context;
+
+    if (event?.type === "pointerup" && event.pointerType === "mouse") {
+      // Mouse input already activated the page on pointerdown.
+      return;
+    }
 
     if (!currentOptions.useAudioCompressor) {
       return;
@@ -127,6 +146,8 @@ function connectAudioCompressorResumeListener() {
   };
 
   document.addEventListener("pointerdown", resume, { capture: true, passive: true });
+  // Touch and pen input activate the page on pointerup, not pointerdown.
+  document.addEventListener("pointerup", resume, { capture: true, passive: true });
   document.addEventListener("keydown", resume, { capture: true });
 }
 
@@ -141,7 +162,7 @@ function ensureAudioCompressorNodes(video, userGestureActive = false) {
   connectAudioCompressorResumeListener();
 
   if (!audioCompressorState.context) {
-    if (!userGestureActive) {
+    if (!canStartAudioContext(userGestureActive)) {
       setAudioCompressorState("waiting");
       return false;
     }

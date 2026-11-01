@@ -296,10 +296,16 @@ async function createHarness({
   initialStorageChange = null,
   storageSetDelays = [],
   optionsUpdateResponseDelays = [],
-  storageEventsAfterCallbacks = false
+  storageEventsAfterCallbacks = false,
+  contextOptions = {},
+  initScripts = []
 } = {}) {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, ...contextOptions });
   const page = await context.newPage();
+
+  for (const initScript of initScripts) {
+    await page.addInitScript(initScript);
+  }
   const pageErrors = [];
   const requests = [];
 
@@ -5031,6 +5037,70 @@ test("오디오 설정은 쉬운 강도 프리셋을 우선하고 전문 파라�
   }
 });
 
+// Playwright의 evaluate·addScriptTag는 페이지에 사용자 활성화를 부여하므로, 오디오 테스트에서는
+// 실제 입력만 활성화로 인정하는 Chrome 자동 재생 정책을 흉내 낸다. 활성화 전에 만든
+// AudioContext는 suspended로 남고, 활성화 전 resume()은 Chrome처럼 끝나지 않는다.
+function emulateChromeAutoplayPolicy() {
+  const activation = { sticky: false, lastAt: -Infinity };
+  const policy = { contexts: [] };
+  const fakeUserActivation = {
+    get hasBeenActive() {
+      return activation.sticky;
+    },
+    get isActive() {
+      return performance.now() - activation.lastAt < 5000;
+    }
+  };
+  const activate = (event) => {
+    if (!event.isTrusted) return;
+    if (event.type === "keydown" && event.key === "Escape") return;
+    if (event.type === "pointerdown" && event.pointerType !== "mouse") return;
+    if (event.type === "pointerup" && event.pointerType === "mouse") return;
+    activation.sticky = true;
+    activation.lastAt = performance.now();
+  };
+
+  for (const type of ["keydown", "mousedown", "pointerdown", "pointerup", "touchend"]) {
+    window.addEventListener(type, activate, true);
+  }
+
+  Object.defineProperty(Navigator.prototype, "userActivation", {
+    configurable: true,
+    get() {
+      return fakeUserActivation;
+    }
+  });
+
+  const NativeAudioContext = window.AudioContext;
+
+  class PolicyAudioContext extends NativeAudioContext {
+    constructor(...args) {
+      super(...args);
+      this.__policyBlocked = !activation.sticky;
+      policy.contexts.push({ createdWithoutActivation: this.__policyBlocked });
+    }
+
+    get state() {
+      return this.__policyBlocked ? "suspended" : super.state;
+    }
+
+    resume() {
+      if (this.__policyBlocked) {
+        if (!activation.sticky) {
+          return new Promise(() => {});
+        }
+
+        this.__policyBlocked = false;
+      }
+
+      return super.resume();
+    }
+  }
+
+  window.AudioContext = PolicyAudioContext;
+  window.__audioPolicy = policy;
+}
+
 test("오디오 개선은 주 영상에 설정값을 적용하고 끄면 원음 경로로 우회한다", { timeout: 15_000 }, async () => {
   const harness = await createHarness({
     html: `<!doctype html>
@@ -5042,6 +5112,7 @@ test("오디오 개선은 주 영상에 설정값을 적용하고 끄면 원음 
           </div>
         </body>
       </html>`,
+    initScripts: [emulateChromeAutoplayPolicy],
     initialOptions: {
       useAudioCompressor: true,
       audioCompressorThreshold: -42,
@@ -5195,6 +5266,124 @@ test("오디오 개선은 주 영상에 설정값을 적용하고 끄면 원음 
     assert.match(failedReconnect.error, /forced-compressor-connect-failure/);
     assert.equal(failedReconnect.graphMode, "bypass");
     assert.equal(failedReconnect.graphCalls.bypassConnect, 2);
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
+function createAudioFixtureDocument(videoMarkup = "") {
+  return `<!doctype html>
+    <html lang="ko">
+      <head><meta charset="utf-8"><title>Audio compressor fixture</title></head>
+      <body>${videoMarkup}</body>
+    </html>`;
+}
+
+const AUDIO_FIXTURE_VIDEO_MARKUP = `
+  <div id="live_player_layout">
+    <div class="pzp-pc"><video id="primary-video"></video></div>
+  </div>`;
+
+function readAudioCompressorState(page) {
+  return page.evaluate(() => ({
+    state: document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState,
+    videoId: audioCompressorState.video?.id || null,
+    contexts: window.__audioPolicy.contexts.slice()
+  }));
+}
+
+test("오디오 개선은 이미 입력이 있었던 페이지에서 영상이 늦게 생기거나 설정을 켜도 다시 클릭을 기다리지 않는다", { timeout: 20_000 }, async () => {
+  // 치지직 SPA 이동: 영상이 없는 목록 페이지에서 방송을 눌러 들어가면 클릭 시점에는 영상이 없다.
+  const spaHarness = await createHarness({
+    html: createAudioFixtureDocument(),
+    initScripts: [emulateChromeAutoplayPolicy],
+    initialOptions: { useAudioCompressor: true }
+  });
+
+  try {
+    await spaHarness.page.waitForFunction(() =>
+      document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState === "waiting"
+    );
+    await spaHarness.page.mouse.click(10, 10);
+    await spaHarness.page.waitForTimeout(100);
+
+    const beforeVideo = await readAudioCompressorState(spaHarness.page);
+    assert.equal(beforeVideo.state, "waiting");
+    assert.equal(beforeVideo.contexts.length, 0);
+
+    await spaHarness.page.evaluate((markup) => {
+      document.body.insertAdjacentHTML("beforeend", markup);
+    }, AUDIO_FIXTURE_VIDEO_MARKUP);
+    await spaHarness.page.waitForFunction(() =>
+      document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState === "on",
+    null, { timeout: 2_000 }).catch(() => {});
+
+    const afterVideo = await readAudioCompressorState(spaHarness.page);
+    assert.equal(afterVideo.state, "on", "클릭 뒤 SPA로 생긴 영상에는 추가 입력 없이 바로 적용돼야 합니다");
+    assert.equal(afterVideo.videoId, "primary-video");
+    assert.deepEqual(afterVideo.contexts, [{ createdWithoutActivation: false }]);
+    assertNoPageErrors(spaHarness.pageErrors);
+  } finally {
+    await spaHarness.close();
+  }
+
+  // 시청 중 팝업에서 오디오 개선을 켜는 경우: 페이지에는 이미 입력이 있었지만 새 입력은 없다.
+  const popupHarness = await createHarness({
+    html: createAudioFixtureDocument(AUDIO_FIXTURE_VIDEO_MARKUP),
+    initScripts: [emulateChromeAutoplayPolicy],
+    initialOptions: { useAudioCompressor: false }
+  });
+
+  try {
+    await popupHarness.page.mouse.click(10, 10);
+    await popupHarness.page.evaluate(() => {
+      window.__storageHarness.emitOptionsChange({
+        ...window.__storageHarness.store[STORAGE_KEY],
+        useAudioCompressor: true
+      });
+    });
+    await popupHarness.page.waitForFunction(() =>
+      document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState === "on",
+    null, { timeout: 2_000 }).catch(() => {});
+
+    const enabled = await readAudioCompressorState(popupHarness.page);
+    assert.equal(enabled.state, "on", "팝업에서 켜면 페이지를 다시 클릭하지 않아도 적용돼야 합니다");
+    assert.equal(enabled.videoId, "primary-video");
+    assert.deepEqual(enabled.contexts, [{ createdWithoutActivation: false }]);
+    assertNoPageErrors(popupHarness.pageErrors);
+  } finally {
+    await popupHarness.close();
+  }
+});
+
+test("오디오 개선은 터치 첫 탭에 멈춘 AudioContext를 만들지 않고 그 탭으로 바로 시작한다", { timeout: 20_000 }, async () => {
+  const harness = await createHarness({
+    html: createAudioFixtureDocument(AUDIO_FIXTURE_VIDEO_MARKUP),
+    contextOptions: { hasTouch: true },
+    initScripts: [emulateChromeAutoplayPolicy],
+    initialOptions: { useAudioCompressor: true }
+  });
+
+  try {
+    await harness.page.waitForFunction(() =>
+      document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState === "waiting"
+    );
+    assert.equal((await readAudioCompressorState(harness.page)).contexts.length, 0);
+
+    await harness.page.touchscreen.tap(10, 10);
+    await harness.page.waitForFunction(() =>
+      document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState === "on",
+    null, { timeout: 2_000 }).catch(() => {});
+
+    const afterTap = await readAudioCompressorState(harness.page);
+    assert.deepEqual(
+      afterTap.contexts,
+      [{ createdWithoutActivation: false }],
+      "터치 pointerdown은 사용자 활성화가 아니므로 그 시점에 AudioContext를 만들면 안 됩니다"
+    );
+    assert.equal(afterTap.state, "on", "터치 한 번으로 오디오 개선이 시작돼야 합니다");
+    assert.equal(afterTap.videoId, "primary-video");
     assertNoPageErrors(harness.pageErrors);
   } finally {
     await harness.close();
