@@ -1,6 +1,7 @@
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import vm from "node:vm";
+import { contentScriptFiles, validateContentScripts } from "./lib/manifest-content-scripts.mjs";
 
 const root = process.cwd();
 
@@ -53,17 +54,6 @@ function getDefaultOptionContract(source, declaration, label, globals = {}) {
 const manifest = await readJson("manifest.json");
 const packageJson = await readJson("package.json");
 const packageLock = await readJson("package-lock.json");
-const contentScriptFiles = [
-  "content-bootstrap.js",
-  "content-options.js",
-  "content-theme.js",
-  "content-core.js",
-  "content-audio.js",
-  "content-mini-chat.js",
-  "content-guest-chat.js",
-  "content-chat-annotate.js",
-  "content-runtime.js"
-];
 const backgroundSource = await readText("background.js");
 const contentSources = await Promise.all(contentScriptFiles.map((file) => readText(file)));
 const contentSource = contentSources.join("\n");
@@ -183,13 +173,17 @@ for (const [source, label] of [
 }
 
 assert(
-  packageJson.scripts?.package?.startsWith("npm.cmd run check && "),
+  packageJson.scripts?.package === "npm run check && node tools/run-powershell.mjs tools/package-extension.ps1",
   "package script must run the complete check before creating release artifacts."
 );
 assert(
-  packageJson.scripts?.test === "node --test tests/extension-regressions.test.cjs" &&
-    packageJson.scripts?.check?.endsWith("&& npm.cmd test"),
-  "check must run the Edge-backed regression test suite."
+  packageJson.scripts?.test === "node --test tests/extension-regressions.test.cjs tests/tooling.test.mjs" &&
+    packageJson.scripts?.check?.endsWith("&& npm test"),
+  "check must run the Edge-backed regression and tooling test suites."
+);
+assert(
+  Object.values(packageJson.scripts).every((script) => !script.includes("npm.cmd")),
+  "package.json scripts must use npm instead of npm.cmd for cross-OS support."
 );
 for (const token of [
   'createChatDocument("12:34")',
@@ -245,31 +239,10 @@ assert(
   "host permissions must be limited to https://chzzk.naver.com/*."
 );
 
-const contentScript = manifest.content_scripts?.[0];
-assert(contentScript, "manifest must declare one content script entry.");
-assert(
-  Array.isArray(contentScript.matches) &&
-    contentScript.matches.length === 1 &&
-    contentScript.matches[0] === "https://chzzk.naver.com/*",
-  "content script matches must be limited to https://chzzk.naver.com/*."
-);
-assert(contentScript.run_at === "document_start", "content script must run at document_start to avoid raw chat flashes.");
-assert(contentScript.all_frames === true, "content script should run in all CHZZK frames.");
-assert(
-  Array.isArray(contentScript.css) &&
-    contentScript.css.length === 1 &&
-    contentScript.css[0] === "content.css",
-  "content script CSS must load content.css."
-);
+await validateContentScripts(manifest, { root });
 assert(
   !manifest.web_accessible_resources,
   "local-only chat must not expose a separate extension page or nested composer."
-);
-assert(
-  Array.isArray(contentScript.js) &&
-    contentScript.js.length === contentScriptFiles.length &&
-    contentScript.js.every((file, index) => file === contentScriptFiles[index]),
-  "content script JS files must load in the expected module order."
 );
 
 for (const token of [
