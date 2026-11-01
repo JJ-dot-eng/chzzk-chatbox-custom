@@ -1262,9 +1262,17 @@ function openColorPicker(target) {
   navigate("color-picker", { rememberColorReturn: true });
 }
 
-function updateColorPickerUi(hexColor) {
+function updateColorPickerUi(hexColor, { preserveHsv = false } = {}) {
   const normalized = normalizeHexColor(hexColor, colorPickerTarget === "box" ? DEFAULT_CHAT_BOX_COLOR : DEFAULT_CHAT_TEXT_COLOR);
-  colorPickerHsv = rgbToHsv(hexToRgb(normalized));
+
+  if (!preserveHsv) {
+    const nextHsv = rgbToHsv(hexToRgb(normalized));
+    // 무채색에는 색조가 없고 검정에는 채도도 없으므로 이전 선택을 유지한다.
+    if (nextHsv.saturation === 0) nextHsv.hue = colorPickerHsv.hue;
+    if (nextHsv.value === 0) nextHsv.saturation = colorPickerHsv.saturation;
+    colorPickerHsv = nextHsv;
+  }
+
   colorPickerSwatch.style.backgroundColor = normalized;
   colorPickerHex.value = normalized;
   colorPickerHex.classList.remove("is-invalid");
@@ -1274,7 +1282,7 @@ function updateColorPickerUi(hexColor) {
   colorPickerField.style.setProperty("--field-y", String(1 - colorPickerHsv.value));
 }
 
-function applyColorPickerValue(hexColor, { commit = true, immediate = false } = {}) {
+function applyColorPickerValue(hexColor, { commit = true, immediate = false, preserveHsv = false } = {}) {
   const normalized = normalizeHexColor(
     hexColor,
     colorPickerTarget === "box" ? DEFAULT_CHAT_BOX_COLOR : DEFAULT_CHAT_TEXT_COLOR
@@ -1286,7 +1294,7 @@ function applyColorPickerValue(hexColor, { commit = true, immediate = false } = 
     currentOptions.chatTextColor = normalized;
   }
 
-  updateColorPickerUi(normalized);
+  updateColorPickerUi(normalized, { preserveHsv });
   renderColorChips();
   syncPreview();
 
@@ -1302,7 +1310,8 @@ function setColorPickerFromHsv(nextHsv, { commit = true } = {}) {
     value: clampNumber(nextHsv.value, 0, 1, colorPickerHsv.value)
   };
 
-  applyColorPickerValue(rgbToHex(hsvToRgb(colorPickerHsv)), { commit });
+  // HSV 조작은 8비트 RGB 왕복으로 좌표·색조 정밀도를 잃지 않도록 한다.
+  applyColorPickerValue(rgbToHex(hsvToRgb(colorPickerHsv)), { commit, preserveHsv: true });
 }
 
 function updateColorPickerFromField(event) {
@@ -1531,6 +1540,13 @@ function bindEvents() {
 
     if (!/^#?[0-9a-f]{3}$/i.test(value) && !/^#?[0-9a-f]{6}$/i.test(value)) {
       colorPickerHex.classList.add("is-invalid");
+      return;
+    }
+
+    const currentColor = colorPickerTarget === "box" ? currentOptions.chatBoxColor : currentOptions.chatTextColor;
+    if (normalizeHexColor(value) === currentColor) {
+      // 필드 조작 직후 blur로 발생한 change가 HSV를 RGB에서 다시 계산하지 않게 한다.
+      colorPickerHex.classList.remove("is-invalid");
       return;
     }
 
