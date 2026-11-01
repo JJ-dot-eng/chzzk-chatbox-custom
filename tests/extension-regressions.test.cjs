@@ -1233,6 +1233,338 @@ test("automatic text contrast defaults to on and preserves an explicit off setti
   }
 });
 
+async function openPopupColorPicker(page, target) {
+  await page.locator('[data-goto="style"]').click();
+  if (target === "text") {
+    await page.locator('[data-option="useChatTextColor"]').check();
+  }
+  await page.locator(`[data-open-color="${target}"]`).click();
+  await page.locator('[data-view="color-picker"]').evaluate(async (view) => {
+    // 진입 애니메이션이 필드를 움직이는 동안에는 드래그 좌표를 잡지 않는다.
+    await Promise.all(view.getAnimations({ subtree: true }).map((animation) => animation.finished));
+  });
+  await page.locator("#colorPickerField").evaluate((field) => {
+    const recordPointer = (event) => {
+      if (event.type !== "pointerdown" && !field.hasPointerCapture(event.pointerId)) return;
+      const rect = field.getBoundingClientRect();
+      // Playwright에 요청한 좌표 대신 Chromium이 실제 전달한 좌표와 당시 영역을 사용한다.
+      window.__popupHarness.pickerPointer = {
+        clientX: event.clientX,
+        clientY: event.clientY,
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+        x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
+        y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height))
+      };
+    };
+    field.addEventListener("pointerdown", recordPointer, true);
+    field.addEventListener("pointermove", recordPointer, true);
+  });
+}
+
+async function setPopupPickerHex(page, hex) {
+  await page.locator("#chatTextColorHex").fill(hex);
+  await page.locator("#chatTextColorHex").press("Enter");
+}
+
+async function setPopupPickerHue(page, hue) {
+  const slider = page.locator("#colorPickerHue");
+  await slider.press(hue > 180 ? "End" : "Home");
+  const steps = hue > 180 ? 360 - hue : hue;
+  for (let step = 0; step < steps; step += 1) {
+    await slider.press(hue > 180 ? "ArrowLeft" : "ArrowRight");
+  }
+}
+
+async function readPopupPicker(page) {
+  return page.evaluate(() => {
+    const field = document.getElementById("colorPickerField");
+    return {
+      hue: Number(document.getElementById("colorPickerHue").value),
+      fieldHue: field.style.getPropertyValue("--field-hue"),
+      x: Number(field.style.getPropertyValue("--field-x")),
+      y: Number(field.style.getPropertyValue("--field-y"))
+    };
+  });
+}
+
+async function assertPopupPickerAtPointer(page, message = "필드 포인터") {
+  const pointer = await page.evaluate(() => window.__popupHarness.pickerPointer);
+  assert.ok(pointer, `${message}: 실제 포인터 이벤트가 있어야 한다`);
+  const picker = await readPopupPicker(page);
+  // 같은 이벤트의 실제 좌표와 비교하므로 1px 허용으로 RGB 양자화 오차를 숨기지 않는다.
+  const detail = `${message}: ${JSON.stringify(pointer)}`;
+  assert.ok(Math.abs(picker.x - pointer.x) < 1e-10, `${detail}: x`);
+  assert.ok(Math.abs(picker.y - pointer.y) < 1e-10, `${detail}: y`);
+  return picker;
+}
+
+function popupPickerHex({ hue, x: saturation, y }) {
+  const value = 1 - y;
+  const channel = (offset) => {
+    const sector = (offset + hue / 60) % 6;
+    return Math.round(255 * value * (1 - saturation * Math.max(0, Math.min(sector, 4 - sector, 1))))
+      .toString(16).padStart(2, "0");
+  };
+  return `#${[5, 3, 1].map(channel).join("")}`;
+}
+
+async function assertPopupPickerColor(page, target, expected) {
+  await page.waitForFunction(() => !optionsDirty);
+  const result = await page.evaluate(({ storageKey, target }) => ({
+    stored: window.__popupHarness.store[storageKey][target === "box" ? "chatBoxColor" : "chatTextColor"],
+    hex: document.getElementById("chatTextColorHex").value,
+    swatch: document.getElementById("colorPickerSwatch").style.backgroundColor
+  }), { storageKey: STORAGE_KEY, target });
+  assert.equal(result.stored, expected);
+  assert.equal(result.hex, expected);
+  const channels = expected.slice(1).match(/../g).map((channel) => Number.parseInt(channel, 16));
+  assert.equal(result.swatch, `rgb(${channels.join(", ")})`);
+}
+
+test("색상 선택기는 hex 편집 후 필드를 누를 때 실제 blur change로 HSV를 덮어쓰지 않는다", { timeout: 20_000 }, async () => {
+  for (const target of ["box", "text"]) {
+    const harness = await createPopupHarness();
+    const { page } = harness;
+    try {
+      await openPopupColorPicker(page, target);
+      await setPopupPickerHex(page, "#808080");
+      await setPopupPickerHue(page, 210);
+      await assertPopupPickerColor(page, target, "#808080");
+      await page.evaluate(() => {
+        const hex = document.getElementById("chatTextColorHex");
+        const changes = window.__popupHarness.hexChanges = [];
+        const recordChange = (phase) => (event) => {
+          if (event.target !== hex) return;
+          changes.push({
+            phase,
+            trusted: event.isTrusted,
+            snapshot: {
+              hsv: { ...colorPickerHsv },
+              hex: hex.value,
+              color: colorPickerTarget === "box" ? currentOptions.chatBoxColor : currentOptions.chatTextColor,
+              commitTimer,
+              writes: window.__popupHarness.writes.length
+            }
+          });
+        };
+        document.addEventListener("change", recordChange("before"), true);
+        document.addEventListener("change", recordChange("after"));
+      });
+
+      // Enter로 확정하지 않는다. pointerdown이 갱신한 hex로 브라우저의 blur change가 발생한다.
+      await page.locator("#chatTextColorHex").fill("#00ff00");
+      const rect = await page.locator("#colorPickerField").boundingBox();
+      const x = Math.ceil(rect.x + 2);
+      const y = Math.floor(rect.y + rect.height / 2);
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+      const changes = await page.evaluate(() => window.__popupHarness.hexChanges);
+      assert.equal(changes.length, 2, "실제 change가 한 번 발생하고 전후 상태를 기록한다");
+      assert.deepEqual(changes.map(({ phase, trusted }) => ({ phase, trusted })), [
+        { phase: "before", trusted: true }, { phase: "after", trusted: true }
+      ]);
+      assert.equal(changes[0].snapshot.hsv.hue, 210);
+      assert.equal(changes[0].snapshot.hex, changes[0].snapshot.color);
+      assert.deepEqual(changes[1].snapshot, changes[0].snapshot, "동일 색상의 change는 HSV와 저장 예약을 유지한다");
+      let picker = await assertPopupPickerAtPointer(page, "blur 직후");
+      assert.equal(picker.hue, 210);
+      for (let step = 1; step <= 3; step += 1) {
+        await page.mouse.move(x + step, y + step);
+        picker = await assertPopupPickerAtPointer(page, `blur 이후 드래그 ${step}`);
+        assert.equal(picker.hue, 210);
+        assert.equal(picker.fieldHue, "#0080ff");
+      }
+      await page.mouse.up();
+      await assertPopupPickerColor(page, target, popupPickerHex(picker));
+      assertNoPageErrors(harness.pageErrors);
+    } finally { await harness.close(); }
+  }
+});
+
+test("색상 선택기는 현재 색상과 같은 hex 입력의 오류 표시만 지우고 다시 저장하지 않는다", { timeout: 20_000 }, async () => {
+  for (const target of ["box", "text"]) {
+    const harness = await createPopupHarness();
+    const { page } = harness;
+    try {
+      await openPopupColorPicker(page, target);
+      await setPopupPickerHex(page, "#ff00aa");
+      await assertPopupPickerColor(page, target, "#ff00aa");
+      const picker = await readPopupPicker(page);
+      const writes = await page.evaluate(() => window.__popupHarness.writes.length);
+      for (const hex of ["#FF00AA", "F0A", "ff00aa"]) {
+        await setPopupPickerHex(page, "invalid");
+        assert.equal(await page.locator("#chatTextColorHex").evaluate((input) => input.classList.contains("is-invalid")), true);
+        await setPopupPickerHex(page, hex);
+        assert.equal(await page.locator("#chatTextColorHex").evaluate((input) => input.classList.contains("is-invalid")), false);
+        assert.equal(await page.locator("#chatTextColorHex").inputValue(), hex);
+        assert.deepEqual(await readPopupPicker(page), picker);
+        assert.deepEqual(await page.evaluate(() => ({ writes: window.__popupHarness.writes.length, dirty: optionsDirty })), { writes, dirty: false });
+      }
+      assertNoPageErrors(harness.pageErrors);
+    } finally { await harness.close(); }
+  }
+});
+
+test("색상 선택기는 회색과 필드 왼쪽 끝에서도 선택한 색조를 유지한다", { timeout: 20_000 }, async () => {
+  for (const target of ["box", "text"]) {
+    const harness = await createPopupHarness();
+    const { page } = harness;
+    try {
+      await openPopupColorPicker(page, target);
+      await setPopupPickerHex(page, "#808080");
+      await setPopupPickerHue(page, 210);
+      let picker = await readPopupPicker(page);
+      assert.equal(picker.hue, 210);
+      assert.equal(picker.fieldHue, "#0080ff");
+      assert.equal(picker.x, 0);
+      await assertPopupPickerColor(page, target, "#808080");
+
+      const rect = await page.locator("#colorPickerField").boundingBox();
+      const y = Math.floor(rect.y + rect.height / 2);
+      await page.mouse.move(rect.x + 2, y);
+      await page.mouse.down();
+      // 포인터 캡처 중 바깥으로 이동해 소수점 경계와 무관하게 채도 0에 도달한다.
+      await page.mouse.move(rect.x - 2, y);
+      await page.mouse.up();
+      picker = await assertPopupPickerAtPointer(page);
+      assert.equal(picker.hue, 210);
+      assert.equal(picker.fieldHue, "#0080ff");
+      assert.equal(picker.x, 0);
+      await assertPopupPickerColor(page, target, popupPickerHex(picker));
+      assertNoPageErrors(harness.pageErrors);
+    } finally { await harness.close(); }
+  }
+});
+
+test("색상 선택기는 검정 하단을 거쳐 올라와도 채도와 색조를 유지한다", { timeout: 20_000 }, async () => {
+  for (const target of ["box", "text"]) {
+    const harness = await createPopupHarness();
+    const { page } = harness;
+    try {
+      await openPopupColorPicker(page, target);
+      await setPopupPickerHex(page, "#0000ff");
+      const rect = await page.locator("#colorPickerField").boundingBox();
+      const x = Math.floor(rect.x + rect.width * 0.65);
+      const y = Math.floor(rect.y + rect.height / 2);
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+      const beforeBlack = await assertPopupPickerAtPointer(page, "검정 진입 전");
+      await page.mouse.move(x, rect.y + rect.height + 2);
+      let picker = await assertPopupPickerAtPointer(page);
+      assert.equal(picker.hue, 240);
+      assert.equal(picker.fieldHue, "#0000ff");
+      assert.ok(Math.abs(picker.x - beforeBlack.x) < 1e-10);
+      assert.equal(picker.y, 1);
+      await assertPopupPickerColor(page, target, "#000000");
+
+      await page.mouse.move(x, y);
+      await page.mouse.up();
+      picker = await assertPopupPickerAtPointer(page);
+      assert.equal(picker.hue, 240);
+      assert.ok(Math.abs(picker.x - beforeBlack.x) < 1e-10);
+      assert.ok(Math.abs(picker.y - beforeBlack.y) < 1e-10);
+      await assertPopupPickerColor(page, target, popupPickerHex(picker));
+      assertNoPageErrors(harness.pageErrors);
+    } finally { await harness.close(); }
+  }
+});
+
+test("색상 선택기는 어둡고 채도가 낮은 필드의 작은 이동을 반올림 없이 유지한다", { timeout: 20_000 }, async () => {
+  for (const target of ["box", "text"]) {
+    const harness = await createPopupHarness();
+    const { page } = harness;
+    try {
+      await openPopupColorPicker(page, target);
+      await setPopupPickerHex(page, "#0080ff");
+      await setPopupPickerHue(page, 210);
+      const rect = await page.locator("#colorPickerField").boundingBox();
+      const startX = Math.ceil(rect.x + 3);
+      const startY = Math.floor(rect.y + rect.height - 12);
+      await page.mouse.move(startX, startY);
+      await page.mouse.down();
+      let picker;
+      for (let step = 0; step < 6; step += 1) {
+        const x = startX + step;
+        const y = startY + step;
+        await page.mouse.move(x, y);
+        const previous = picker;
+        picker = await assertPopupPickerAtPointer(page, `step ${step}`);
+        if (previous) {
+          assert.ok(picker.x > previous.x, `step ${step}: 채도가 포인터를 따라 증가한다`);
+          assert.ok(picker.y > previous.y, `step ${step}: 마커가 포인터를 따라 내려간다`);
+        }
+        assert.equal(picker.hue, 210);
+        assert.equal(picker.fieldHue, "#0080ff");
+      }
+      await page.mouse.up();
+      await assertPopupPickerColor(page, target, popupPickerHex(picker));
+      assertNoPageErrors(harness.pageErrors);
+    } finally { await harness.close(); }
+  }
+});
+
+test("색상 선택기의 외부 hex·재열기·초기화는 HSV를 갱신하고 무채색의 이전 색조를 보존한다", { timeout: 20_000 }, async () => {
+  for (const target of ["box", "text"]) {
+    const harness = await createPopupHarness();
+    const { page } = harness;
+    try {
+      await openPopupColorPicker(page, target);
+      await setPopupPickerHex(page, "#336699");
+      for (const hex of ["#808080", "#FFFFFF"]) {
+        await setPopupPickerHex(page, hex);
+        const picker = await readPopupPicker(page);
+        assert.equal(picker.hue, 210);
+        assert.equal(picker.fieldHue, "#0080ff");
+        assert.equal(picker.x, 0);
+        assert.ok(Math.abs(picker.y - (hex === "#FFFFFF" ? 0 : 127 / 255)) < 1e-10);
+        await assertPopupPickerColor(page, target, hex.toLowerCase());
+      }
+      await setPopupPickerHex(page, "#336699");
+      await setPopupPickerHex(page, "#000");
+      let picker = await readPopupPicker(page);
+      assert.equal(picker.hue, 210);
+      assert.ok(Math.abs(picker.x - 2 / 3) < 1e-10);
+      assert.equal(picker.y, 1);
+      await assertPopupPickerColor(page, target, "#000000");
+
+      await page.locator('[data-view="color-picker"] [data-color-back]').click();
+      assert.equal(await page.locator('[data-view="style"]').isVisible(), true);
+      await page.locator(`[data-open-color="${target}"]`).click();
+      assert.deepEqual(await readPopupPicker(page), picker);
+      await setPopupPickerHex(page, "#00FF00");
+      assert.deepEqual(await readPopupPicker(page), { hue: 120, fieldHue: "#00ff00", x: 1, y: 0 });
+      await assertPopupPickerColor(page, target, "#00ff00");
+
+      await page.locator("#colorPickerReset").click();
+      picker = await readPopupPicker(page);
+      assert.equal(picker.hue, target === "box" ? 120 : 210);
+      assert.ok(Math.abs(picker.x - (target === "box" ? 0 : 1 / 3)) < 1e-10);
+      assert.ok(Math.abs(picker.y - (1 - (target === "box" ? 223 : 24) / 255)) < 1e-10);
+      await assertPopupPickerColor(page, target, target === "box" ? "#dfdfdf" : "#101418");
+      assertNoPageErrors(harness.pageErrors);
+    } finally { await harness.close(); }
+  }
+});
+
+test("색상 선택기의 색조 360은 슬라이더 끝을 유지하며 빨강으로 저장된다", { timeout: 20_000 }, async () => {
+  const harness = await createPopupHarness();
+  const { page } = harness;
+  try {
+    await openPopupColorPicker(page, "text");
+    await setPopupPickerHex(page, "#0F0");
+    await setPopupPickerHue(page, 360);
+    assert.deepEqual(await readPopupPicker(page), { hue: 360, fieldHue: "#ff0000", x: 1, y: 0 });
+    await assertPopupPickerColor(page, "text", "#ff0000");
+    await setPopupPickerHue(page, 0);
+    assert.deepEqual(await readPopupPicker(page), { hue: 0, fieldHue: "#ff0000", x: 1, y: 0 });
+    await assertPopupPickerColor(page, "text", "#ff0000");
+    assertNoPageErrors(harness.pageErrors);
+  } finally { await harness.close(); }
+});
+
 test("style presets preserve every chat window selection", { timeout: 30_000 }, async () => {
   const harness = await createPopupHarness();
   const chatWindowScenarios = [
