@@ -13,9 +13,9 @@ npm ci
 npm run package
 ```
 
-`npm run package`는 검증 후 `dist/chzzk-chat-ui-settings-<버전>/`와 같은 이름의 ZIP을 생성합니다. 같은 버전의 결과물이 있으면 파일명에 시간을 붙여 보존합니다.
+`npm run package`는 PowerShell(Windows PowerShell 또는 PATH에 등록된 `pwsh`)이 필요하며, 검증 후 `dist/chzzk-chat-ui-settings-<버전>/`와 같은 이름의 ZIP을 생성합니다. 같은 버전의 결과물이 있으면 파일명에 시간을 붙여 보존합니다.
 
-`npm run check`는 구조·문법 및 Edge 기반 회귀 테스트를 실행합니다(설치된 Edge 또는 `EDGE_PATH` 지정 필요). 테스트는 개인 브라우저 프로필 대신 격리된 브라우저 컨텍스트와 대표 채팅 DOM을 사용합니다.
+`npm run check`는 모든 OS에서 구조·문법, 도구 테스트 및 Edge 기반 회귀 테스트를 실행합니다(설치된 Edge 또는 `EDGE_PATH` 지정 필요). 테스트는 개인 브라우저 프로필 대신 격리된 브라우저 컨텍스트와 대표 채팅 DOM을 사용합니다.
 
 ## 설정창
 
