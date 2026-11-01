@@ -27,7 +27,7 @@ for f in $(git ls-files '*.js' '*.cjs' '*.mjs'); do node --check "$f"; done
 EDGE_PATH=/usr/bin/google-chrome node --test tests/extension-regressions.test.cjs
 ```
 
-Windows에서는 `npm run check`(내부에서 `npm.cmd` 사용)로 같은 검증을 한 번에 실행할 수 있다.
+`npm run check`로 같은 검증을 한 번에 실행할 수 있다(Windows·macOS·Linux 모두 동작). 패키징(`npm run package`)은 PowerShell이 필요하다(Windows는 `powershell`, 다른 OS는 `pwsh`).
 모든 검증이 통과한 경우에만 커밋한다.
 
 ## 공통 규칙
