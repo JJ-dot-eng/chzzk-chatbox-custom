@@ -33,29 +33,25 @@ function connectAudioNode(source, destination) {
 }
 
 function findPrimaryVideoElement() {
-  const candidates = [
-    ...document.querySelectorAll(
-      "#live_player_layout video, #player_layout video, .pzp-pc video, video"
-    )
-  ];
-
-  if (candidates.length === 0) {
-    return null;
-  }
-
-  const visibleCandidates = candidates
+  const candidates = [...document.querySelectorAll("video")]
+    .filter((video) => !video.closest("[data-chzzk-chat-ui-toggle-generated]"))
     .map((video) => {
       const rect = video.getBoundingClientRect();
+      const visibility = window.getComputedStyle(video).visibility;
       return {
         video,
         area: Math.max(0, rect.width) * Math.max(0, rect.height),
-        visible: rect.width > 0 && rect.height > 0
+        visible: rect.width > 0 && rect.height > 0 &&
+          visibility !== "hidden" && visibility !== "collapse"
       };
-    })
-    .filter(({ video }) => !video.closest("[data-chzzk-chat-ui-toggle-generated]"));
-  const rankedCandidates = visibleCandidates.some(({ visible }) => visible)
-    ? visibleCandidates.filter(({ visible }) => visible)
-    : visibleCandidates;
+    });
+  const visibleCandidates = candidates.filter(({ visible }) => visible);
+  const playerCandidates = visibleCandidates.filter(({ video }) =>
+    video.closest("#live_player_layout, #player_layout, .pzp-pc")
+  );
+  const rankedCandidates = playerCandidates.length > 0
+    ? playerCandidates
+    : visibleCandidates.length > 0 ? visibleCandidates : candidates;
 
   rankedCandidates.sort((left, right) => right.area - left.area);
   return rankedCandidates[0]?.video || null;
@@ -151,6 +147,33 @@ function connectAudioCompressorResumeListener() {
   document.addEventListener("keydown", resume, { capture: true });
 }
 
+function connectAudioCompressorMediaListener() {
+  if (audioCompressorState.mediaListenerConnected) {
+    return;
+  }
+
+  audioCompressorState.mediaListenerConnected = true;
+  const syncOnPlayback = (event) => {
+    const video = event.target;
+
+    if (
+      !currentOptions.useAudioCompressor ||
+      !(video instanceof HTMLVideoElement) ||
+      video === audioCompressorState.video ||
+      video.closest("[data-chzzk-chat-ui-toggle-generated]")
+    ) {
+      return;
+    }
+
+    scheduleAudioCompressorSync();
+  };
+
+  // Media events do not bubble. Capture also catches a previously hidden video
+  // starting playback without any nodes being added to the document.
+  document.addEventListener("play", syncOnPlayback, { capture: true, passive: true });
+  document.addEventListener("playing", syncOnPlayback, { capture: true, passive: true });
+}
+
 function ensureAudioCompressorNodes(video, userGestureActive = false) {
   const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
 
@@ -222,9 +245,16 @@ function syncAudioCompressor(userGestureActive = false) {
     return;
   }
 
+  connectAudioCompressorMediaListener();
   const video = findPrimaryVideoElement();
 
   if (!video) {
+    // Keep the previous source audible if CHZZK reuses its element later, but
+    // stop treating the detached video and its bypass graph as the active one.
+    bypassAudioCompressor();
+    audioCompressorState.video = null;
+    audioCompressorState.source = null;
+    audioCompressorState.graphMode = "off";
     setAudioCompressorState("waiting");
     return;
   }
@@ -280,6 +310,12 @@ function audioCompressorMutationNeedsSync(mutations) {
 }
 
 function scheduleAudioCompressorSync(delay = 50) {
+  // Mutations and playback events must not postpone an already queued sync.
+  // Settings and input still replace the pending timer with an immediate sync.
+  if (delay > 0 && audioCompressorState.syncTimer) {
+    return;
+  }
+
   window.clearTimeout(audioCompressorState.syncTimer);
   audioCompressorState.syncTimer = 0;
 
