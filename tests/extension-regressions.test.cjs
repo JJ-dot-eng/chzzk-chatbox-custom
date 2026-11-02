@@ -5040,8 +5040,20 @@ test("오디오 설정은 쉬운 강도 프리셋을 우선하고 전문 파라�
 // Playwright의 evaluate·addScriptTag는 페이지에 사용자 활성화를 부여하므로, 오디오 테스트에서는
 // 실제 입력만 활성화로 인정하는 Chrome 자동 재생 정책을 흉내 낸다. 활성화 전에 만든
 // AudioContext는 suspended로 남고, 활성화 전 resume()은 Chrome처럼 끝나지 않는다.
+// Chrome처럼 하위 프레임 입력의 활성화는 상위 프레임에도 전달한다.
 function emulateChromeAutoplayPolicy() {
   const activation = { sticky: false, lastAt: -Infinity };
+  const markActive = () => {
+    activation.sticky = true;
+    activation.lastAt = performance.now();
+
+    try {
+      if (window.parent !== window) window.parent.__emulatedUserActivation?.();
+    } catch (_error) {
+      // 다른 출처 상위 프레임은 이 테스트에서 쓰지 않는다.
+    }
+  };
+  window.__emulatedUserActivation = markActive;
   const policy = { contexts: [] };
   const fakeUserActivation = {
     get hasBeenActive() {
@@ -5056,8 +5068,7 @@ function emulateChromeAutoplayPolicy() {
     if (event.type === "keydown" && event.key === "Escape") return;
     if (event.type === "pointerdown" && event.pointerType !== "mouse") return;
     if (event.type === "pointerup" && event.pointerType === "mouse") return;
-    activation.sticky = true;
-    activation.lastAt = performance.now();
+    markActive();
   };
 
   for (const type of ["keydown", "mousedown", "pointerdown", "pointerup", "touchend"]) {
@@ -5584,6 +5595,120 @@ test("오디오 개선은 터치 첫 탭에 멈춘 AudioContext를 만들지 않
     );
     assert.equal(afterTap.state, "on", "터치 한 번으로 오디오 개선이 시작돼야 합니다");
     assert.equal(afterTap.videoId, "primary-video");
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("오디오 개선은 보이는 영상이 없을 때도 큰 외부 영상보다 플레이어 영상을 먼저 고른다", { timeout: 20_000 }, async () => {
+  for (const containerAttribute of ['id="live_player_layout"', 'id="player_layout"', 'class="pzp-pc"']) {
+    const harness = await createHarness({
+      html: createAudioFixtureDocument(`
+        <video id="outside-video" style="width:900px;height:500px;visibility:hidden"></video>
+        <div ${containerAttribute}>
+          <video id="primary-video" style="width:320px;height:180px;visibility:hidden"></video>
+          <div data-chzzk-chat-ui-toggle-generated="true">
+            <video id="generated-video" style="width:1000px;height:700px;visibility:hidden"></video>
+          </div>
+        </div>`),
+      initScripts: [emulateChromeAutoplayPolicy],
+      initialOptions: { useAudioCompressor: true }
+    });
+
+    try {
+      await harness.page.mouse.click(10, 10);
+      await harness.page.waitForFunction(() => audioCompressorState.graphMode === "compressor");
+      assert.equal((await readAudioCompressorState(harness.page)).videoId, "primary-video",
+        `숨겨진 영상 중에서도 플레이어 영상을 먼저 골라야 합니다 (${containerAttribute})`);
+
+      await harness.page.evaluate(() => {
+        document.getElementById("primary-video").remove();
+        syncAudioCompressor();
+      });
+      assert.equal((await readAudioCompressorState(harness.page)).videoId, "outside-video",
+        "플레이어 영상이 없으면 확장 영상이 아닌 외부 영상으로 대체해야 합니다");
+      assertNoPageErrors(harness.pageErrors);
+    } finally {
+      await harness.close();
+    }
+  }
+});
+
+test("오디오 개선은 확장 iframe 안에서만 입력해도 최상위 문서에서 바로 시작한다", { timeout: 20_000 }, async () => {
+  const harness = await createHarness({
+    html: createLocalOnlyChatDocument().replace("<body>", `<body>${AUDIO_FIXTURE_VIDEO_MARKUP}`),
+    initScripts: [emulateChromeAutoplayPolicy, () => {
+      const originalAddEventListener = window.addEventListener;
+      window.__topPointerDownCount = 0;
+      window.__windowBlurListenerCount = 0;
+      window.addEventListener = function (type, listener, options) {
+        if (type === "blur") window.__windowBlurListenerCount += 1;
+        return originalAddEventListener.call(this, type, listener, options);
+      };
+      document.addEventListener("pointerdown", (event) => {
+        if (event.isTrusted) window.__topPointerDownCount += 1;
+      }, true);
+    }],
+    initialOptions: { useAudioCompressor: true, useGuestChatFrame: true }
+  });
+
+  try {
+    const frameLocator = harness.page.locator("#chzzk-chat-ui-toggle-guest-chat-frame");
+    await frameLocator.waitFor({ state: "visible" });
+    const deadline = Date.now() + 5_000;
+    let guestFrame = null;
+
+    while (Date.now() < deadline && !guestFrame) {
+      guestFrame = harness.page.frames().find((frame) => {
+        try {
+          return new URL(frame.url()).searchParams.get("chzzkChatUiToggleGuest") === "1";
+        } catch (_error) {
+          return false;
+        }
+      }) || null;
+      if (!guestFrame) await harness.page.waitForTimeout(25);
+    }
+
+    assert.ok(guestFrame, "나만 보는 채팅 iframe이 열려야 합니다");
+    await guestFrame.waitForLoadState("domcontentloaded");
+    await harness.page.waitForFunction(() =>
+      document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState === "waiting"
+    );
+    assert.equal((await readAudioCompressorState(harness.page)).contexts.length, 0);
+
+    const box = await frameLocator.boundingBox();
+    await harness.page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await harness.page.waitForFunction(() =>
+      document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState === "on",
+    null, { timeout: 2_000 }).catch(() => {});
+
+    const afterFrameInput = await readAudioCompressorState(harness.page);
+    assert.equal(await harness.page.evaluate(() => window.__topPointerDownCount), 0,
+      "입력은 iframe 안에서만 일어나야 합니다");
+    assert.equal(afterFrameInput.state, "on",
+      "확장 iframe 안 입력만으로도 최상위 문서의 오디오 개선이 시작돼야 합니다");
+    assert.equal(afterFrameInput.videoId, "primary-video");
+    assert.deepEqual(afterFrameInput.contexts, [{ createdWithoutActivation: false }]);
+
+    const blurListenerCount = await harness.page.evaluate(() => window.__windowBlurListenerCount);
+    await harness.page.evaluate(() => {
+      applyOptions({ ...currentOptions, useAudioCompressor: false });
+      applyOptions({ ...currentOptions, useAudioCompressor: true });
+      syncAudioCompressor();
+    });
+    await harness.page.waitForFunction(() =>
+      document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState === "on" &&
+      audioCompressorState.syncTimer === 0
+    );
+    assert.deepEqual(await harness.page.evaluate(() => {
+      window.dispatchEvent(new Event("blur"));
+      return {
+        listeners: window.__windowBlurListenerCount,
+        syncTimer: audioCompressorState.syncTimer
+      };
+    }), { listeners: blurListenerCount, syncTimer: 0 },
+    "다시 동기화해도 blur 리스너를 더 붙이지 않고, waiting이 아닐 때 blur는 동기화를 예약하지 않아야 합니다");
     assertNoPageErrors(harness.pageErrors);
   } finally {
     await harness.close();
