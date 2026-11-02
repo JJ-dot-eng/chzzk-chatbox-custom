@@ -5293,6 +5293,206 @@ function readAudioCompressorState(page) {
   }));
 }
 
+test("오디오 개선은 영상이 사라지면 참조를 놓고 원음 경로를 보존하며 관계없는 변이를 무시한다", { timeout: 15_000 }, async () => {
+  const harness = await createHarness({
+    html: createAudioFixtureDocument(AUDIO_FIXTURE_VIDEO_MARKUP),
+    initScripts: [emulateChromeAutoplayPolicy],
+    initialOptions: { useAudioCompressor: true }
+  });
+
+  try {
+    await harness.page.mouse.click(10, 10);
+    await harness.page.waitForFunction(() => audioCompressorState.graphMode === "compressor");
+    await harness.page.evaluate(() => {
+      window.__removedVideo = audioCompressorState.video;
+      window.__removedSource = audioCompressorState.source;
+      window.__removedSourceOutputs = [];
+      const originalConnect = AudioNode.prototype.connect;
+      const originalDisconnect = AudioNode.prototype.disconnect;
+      AudioNode.prototype.connect = function (...args) {
+        if (this === window.__removedSource) window.__removedSourceOutputs.push(args[0]);
+        return originalConnect.apply(this, args);
+      };
+      AudioNode.prototype.disconnect = function (...args) {
+        if (this === window.__removedSource) window.__removedSourceOutputs.length = 0;
+        return originalDisconnect.apply(this, args);
+      };
+      window.__removedVideo.remove();
+    });
+    await harness.page.waitForFunction(() =>
+      document.documentElement.dataset.chzzkChatUiToggleAudioCompressorState === "waiting" &&
+      audioCompressorState.syncTimer === 0
+    );
+
+    const removed = await harness.page.evaluate(() => ({
+      videoCleared: audioCompressorState.video === null,
+      sourceCleared: audioCompressorState.source === null,
+      graphMode: audioCompressorState.graphMode,
+      bypassConnected: window.__removedSourceOutputs.length === 1 &&
+        window.__removedSourceOutputs[0] === audioCompressorState.context.destination,
+      unrelatedNeedsSync: audioCompressorMutationNeedsSync([
+        { addedNodes: [document.createElement("div")] }
+      ])
+    }));
+    assert.deepEqual(removed, {
+      videoCleared: true, sourceCleared: true, graphMode: "off",
+      bypassConnected: true, unrelatedNeedsSync: false
+    });
+
+    // 같은 영상이 다시 붙어도 기존 source를 재사용해 무음 없이 개선 경로로 돌아와야 한다.
+    await harness.page.evaluate(() => document.getElementById("live_player_layout").append(window.__removedVideo));
+    await harness.page.waitForFunction(() => audioCompressorState.graphMode === "compressor");
+    assert.equal(await harness.page.evaluate(() =>
+      audioCompressorState.video === window.__removedVideo &&
+      audioCompressorState.source === window.__removedSource
+    ), true);
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("오디오 개선은 연속 DOM 변경에도 영상 전환 예약을 미루지 않고 즉시 설정을 적용한다", { timeout: 15_000 }, async () => {
+  const harness = await createHarness({
+    html: createAudioFixtureDocument(AUDIO_FIXTURE_VIDEO_MARKUP),
+    initScripts: [emulateChromeAutoplayPolicy],
+    initialOptions: { useAudioCompressor: true }
+  });
+
+  try {
+    await harness.page.mouse.click(10, 10);
+    await harness.page.waitForFunction(() => audioCompressorState.graphMode === "compressor");
+    await harness.page.evaluate(() => {
+      const oldVideo = document.getElementById("primary-video");
+      const nextVideo = document.createElement("video");
+      nextVideo.id = "next-video";
+      oldVideo.replaceWith(nextVideo);
+      window.__audioMutationCount = 0;
+      window.__audioMutationInterval = window.setInterval(() => {
+        const message = document.createElement("div");
+        message.textContent = `새 채팅 ${++window.__audioMutationCount}`;
+        document.body.append(message);
+      }, 10);
+    });
+    // 변이가 계속 오는 동안 전환돼야 한다. 기존 디바운스는 이 시간 동안 계속 밀린다.
+    await harness.page.waitForFunction(() => audioCompressorState.video?.id === "next-video",
+      null, { timeout: 1_000 });
+    await harness.page.evaluate(() => window.clearInterval(window.__audioMutationInterval));
+
+    await harness.page.evaluate(() => {
+      scheduleAudioCompressorSync(5_000);
+      applyOptions({ ...currentOptions, audioCompressorGain: 1.7 });
+    });
+    await harness.page.waitForFunction(() =>
+      Math.abs(audioCompressorState.gain.gain.value - 1.7) < 0.001,
+    null, { timeout: 1_000 });
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
+test("오디오 개선은 큰 외부 영상보다 보이는 플레이어 영상을 우선하고 없으면 외부 영상으로 대체한다", { timeout: 20_000 }, async () => {
+  for (const containerAttribute of ['id="live_player_layout"', 'id="player_layout"', 'class="pzp-pc"']) {
+    const harness = await createHarness({
+      html: createAudioFixtureDocument(`
+        <video id="outside-video" style="width:900px;height:500px"></video>
+        <div ${containerAttribute} data-player-fixture>
+          <video id="small-player-video" style="width:100px;height:80px"></video>
+          <video id="primary-video" style="width:320px;height:180px"></video>
+          <video id="hidden-player-video" style="width:800px;height:450px;visibility:hidden"></video>
+          <div data-chzzk-chat-ui-toggle-generated="true">
+            <video id="generated-video" style="width:1000px;height:700px"></video>
+          </div>
+        </div>`),
+      initScripts: [emulateChromeAutoplayPolicy],
+      initialOptions: { useAudioCompressor: true }
+    });
+
+    try {
+      await harness.page.mouse.click(10, 10);
+      await harness.page.waitForFunction(() => audioCompressorState.graphMode === "compressor");
+      assert.equal((await readAudioCompressorState(harness.page)).videoId, "primary-video", containerAttribute);
+
+      await harness.page.evaluate(() => {
+        document.querySelector("[data-player-fixture]").style.display = "none";
+        syncAudioCompressor();
+      });
+      assert.equal((await readAudioCompressorState(harness.page)).videoId, "outside-video",
+        "보이는 플레이어 영상이 없을 때는 외부 영상을 골라야 합니다");
+      assertNoPageErrors(harness.pageErrors);
+    } finally {
+      await harness.close();
+    }
+  }
+});
+
+test("오디오 개선은 DOM 추가 없이 클래스·style이 바뀐 영상의 play·playing 이벤트로 주 영상을 갱신한다", { timeout: 15_000 }, async () => {
+  const harness = await createHarness({
+    html: createAudioFixtureDocument(`
+      <style>.hidden-video { display:none }</style>
+      <div id="live_player_layout">
+        <video id="primary-video" style="width:320px;height:180px"></video>
+        <video id="next-video" class="hidden-video" style="width:320px;height:180px"></video>
+        <div data-chzzk-chat-ui-toggle-generated="true"><video id="generated-video"></video></div>
+      </div>`),
+    initScripts: [emulateChromeAutoplayPolicy, () => {
+      const originalAddEventListener = document.addEventListener;
+      window.__audioMediaListenerRegistrations = [];
+      document.addEventListener = function (type, listener, options) {
+        if (type === "play" || type === "playing") {
+          window.__audioMediaListenerRegistrations.push({ type, capture: options?.capture === true });
+        }
+        return originalAddEventListener.call(this, type, listener, options);
+      };
+    }],
+    initialOptions: { useAudioCompressor: true }
+  });
+
+  try {
+    await harness.page.mouse.click(10, 10);
+    await harness.page.waitForFunction(() => audioCompressorState.video?.id === "primary-video");
+
+    for (const [eventType, videoId, previousId] of [
+      ["play", "next-video", "primary-video"],
+      ["playing", "primary-video", "next-video"]
+    ]) {
+      await harness.page.evaluate(({ eventType, videoId, previousId }) => {
+        const nextVideo = document.getElementById(videoId);
+        document.getElementById(previousId).style.display = "none";
+        nextVideo.classList.remove("hidden-video");
+        nextVideo.style.display = "block";
+        // 실제 미디어 이벤트처럼 버블링하지 않는 이벤트를 쓴다.
+        nextVideo.dispatchEvent(new Event(eventType));
+      }, { eventType, videoId, previousId });
+      await harness.page.waitForFunction((id) => audioCompressorState.video?.id === id,
+        videoId, { timeout: 1_000 });
+    }
+
+    assert.deepEqual(await harness.page.evaluate(() => window.__audioMediaListenerRegistrations), [
+      { type: "play", capture: true }, { type: "playing", capture: true }
+    ], "재동기화해도 문서의 재생 리스너는 종류별로 한 번만 연결해야 합니다");
+
+    const ignoredTimer = await harness.page.evaluate(() => {
+      document.getElementById("primary-video").dispatchEvent(new Event("play"));
+      document.getElementById("generated-video").dispatchEvent(new Event("playing"));
+      document.body.dispatchEvent(new Event("play"));
+      return audioCompressorState.syncTimer;
+    });
+    assert.equal(ignoredTimer, 0, "현재 영상·확장 영상·영상 외 이벤트는 동기화를 예약하지 않아야 합니다");
+
+    await harness.page.evaluate(() => applyOptions({ ...currentOptions, useAudioCompressor: false }));
+    await harness.page.waitForFunction(() => audioCompressorState.syncTimer === 0);
+    assert.equal(await harness.page.evaluate(() => {
+      document.getElementById("next-video").dispatchEvent(new Event("play"));
+      return audioCompressorState.syncTimer;
+    }), 0, "오디오 개선이 꺼져 있으면 재생 이벤트를 무시해야 합니다");
+    assertNoPageErrors(harness.pageErrors);
+  } finally {
+    await harness.close();
+  }
+});
+
 test("오디오 개선은 이미 입력이 있었던 페이지에서 영상이 늦게 생기거나 설정을 켜도 다시 클릭을 기다리지 않는다", { timeout: 20_000 }, async () => {
   // 치지직 SPA 이동: 영상이 없는 목록 페이지에서 방송을 눌러 들어가면 클릭 시점에는 영상이 없다.
   const spaHarness = await createHarness({
