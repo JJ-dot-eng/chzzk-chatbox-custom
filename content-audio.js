@@ -46,12 +46,13 @@ function findPrimaryVideoElement() {
       };
     });
   const visibleCandidates = candidates.filter(({ visible }) => visible);
-  const playerCandidates = visibleCandidates.filter(({ video }) =>
+  // Prefer visible videos, then player videos within that pool, so the hidden
+  // fallback also keeps the player ahead of a larger video elsewhere.
+  const pool = visibleCandidates.length > 0 ? visibleCandidates : candidates;
+  const playerCandidates = pool.filter(({ video }) =>
     video.closest("#live_player_layout, #player_layout, .pzp-pc")
   );
-  const rankedCandidates = playerCandidates.length > 0
-    ? playerCandidates
-    : visibleCandidates.length > 0 ? visibleCandidates : candidates;
+  const rankedCandidates = playerCandidates.length > 0 ? playerCandidates : pool;
 
   rankedCandidates.sort((left, right) => right.area - left.area);
   return rankedCandidates[0]?.video || null;
@@ -145,6 +146,20 @@ function connectAudioCompressorResumeListener() {
   // Touch and pen input activate the page on pointerup, not pointerdown.
   document.addEventListener("pointerup", resume, { capture: true, passive: true });
   document.addEventListener("keydown", resume, { capture: true });
+  // Input inside an iframe (guest chat, mini chat) also activates this page,
+  // but its events stay in the frame. Moving focus into the frame blurs this
+  // window, so retry only while waiting and once the page has been activated.
+  window.addEventListener("blur", (event) => {
+    if (
+      event.target !== window ||
+      document.documentElement.dataset[AUDIO_COMPRESSOR_STATE_DATASET_KEY] !== "waiting" ||
+      navigator.userActivation?.hasBeenActive !== true
+    ) {
+      return;
+    }
+
+    resume(event);
+  });
 }
 
 function connectAudioCompressorMediaListener() {
