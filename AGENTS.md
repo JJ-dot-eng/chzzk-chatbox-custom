@@ -33,8 +33,7 @@ EDGE_PATH=/usr/bin/google-chrome node --test tests/extension-regressions.test.cj
 ## 공통 규칙
 
 - 사용자와의 소통, 커밋 메시지, PR 설명은 한국어로 작성한다.
-- 작업은 항상 새 브랜치에서 하고, 그 브랜치를 push한 뒤 `master`로 PR을 연다.
-- `master`에 직접 push, 병합(merge), 강제 push(force push)는 하지 않는다.
+- push는 사용자가 요청할 때만 한다. 강제 push(force push)는 하지 않는다.
 - 한 브랜치·worktree에는 한 AI만 작업한다. 서로 다른 worktree(각자 별도 브랜치)라면 여러 AI가 병렬로 작업해도 된다. 같은 파일을 동시에 고치지 않도록 작업을 맡기는 AI가 작업을 나눈다. 작업 전 열린 PR·최근 브랜치·`HANDOFF.md`를 확인해 같은 브랜치·worktree에서 다른 AI가 작업 중이면 멈춘다.
 - 병렬 하위 작업 중인 AI는 `HANDOFF.md`를 고치지 않고 결과(목표·바꾼 파일·상태·실패 원인·남은 일)를 맡긴 AI에게 보고하며, `HANDOFF.md`는 통합할 때 맡긴 AI가 한 번 갱신한다.
 - 비밀값·env·자격증명 파일은 열지 않는다.
